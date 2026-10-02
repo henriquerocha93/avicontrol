@@ -1,0 +1,916 @@
+import { 
+  Bird, Cage, Ring, BreedingPair, Clutch, Egg, DiseaseRecord, Medication, 
+  Treatment, SexingRecord, GenotypingRecord, BirdTimelineEvent, 
+  NotificationItem, Tenant, User, SupportTicket, BirdDocument, BirdPhoto,
+  CalendarEvent, NoteItem, UserReferralProgram
+} from '@/types';
+
+export const INITIAL_TENANT: Tenant = {
+  id: 'tenant-demo-01',
+  name: 'Luis Henrique Schreiber Júnior "Madruguinha"',
+  slug: 'madruguinha',
+  document: '022.034.960-61',
+  email: 'luis.henrique.schreiber@hotmail.com',
+  phone: '(55) 9134-3265',
+  cellphone: '(55) 9 9134-3265',
+  whatsapp: '5555991343265',
+  address: 'Rua das violetas',
+  addressNumber: '109',
+  neighborhood: 'universitario',
+  city: 'IJUI',
+  state: 'RS',
+  zipCode: '98700-000',
+  complement: '',
+  registryNumber: '4719754',
+  licenseDate: '2009-10-29',
+  category: 'Amador',
+  speciesType: 'Ambos',
+  website: 'madruguinha_999 ou face luis henrique Madruguinha',
+  facebook: 'LUIS HENRIQUE MADRUGUINHA',
+  twitter: '',
+  instagram: 'LUIS HENRIQUE MADRUGUINHA',
+  youtube: '',
+  description: 'Criatório de elite especializado na preservação, seleção genética e canto clássico.',
+  logoUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=300&auto=format&fit=crop&q=80',
+  coverUrl: 'https://images.unsplash.com/photo-1444464666168-49d633b86797?w=1200&auto=format&fit=crop&q=80',
+  isPublic: true,
+  plan: 'PREMIUM',
+  billingCycle: 'ANUAL' as const,
+  planStatus: 'ACTIVE',
+  maxBirds: 9999,
+  setupProgress: 100,
+  expiresAt: '2027-12-31T23:59:59Z',
+  createdAt: '2026-01-10T10:00:00Z',
+  owners: [
+    {
+      id: 'owner-01',
+      name: 'Luis Henrique Schreiber júnior "Madruguinha"',
+      nickname: 'Madruguinha',
+      cpf: '022.034.960-61',
+      city: 'IJUI',
+      state: 'RS',
+      phone: '(55) 9134-3265',
+      isMain: true
+    }
+  ],
+  visualConfig: {
+    textColorGenealogy: '#000000',
+    textColorLabelFront: '#000000',
+    textColorLabelBack: '#000000',
+    colorField: '#ffffff',
+    colorTextField: '#000000',
+    colorPaletteMale: '#cce5ff',
+    colorPaletteFemale: '#ffd1dc',
+    colorTextPaletteMale: '#000000',
+    colorTextPaletteFemale: '#000000',
+    levelDisplayPaletteGenealogy: 70,
+    levelDisplayPaletteLabel: 60,
+    printTitleCertificate: true,
+    printSixthGeneration: true,
+    treeLogoUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=300&auto=format&fit=crop&q=80',
+    treeBackgroundUrl: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1150&auto=format&fit=crop&q=80',
+    logoGenealogyUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=300&auto=format&fit=crop&q=80',
+    bgGenealogyUrl: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1200&auto=format&fit=crop&q=80',
+    labelLogoUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=300&auto=format&fit=crop&q=80',
+    bgLabelFrontUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=300&auto=format&fit=crop&q=80',
+    bgLabelBackUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=300&auto=format&fit=crop&q=80'
+  }
+};
+
+export const INITIAL_ALL_TENANTS: Tenant[] = [
+  INITIAL_TENANT,
+  {
+    id: 'tenant-demo-02',
+    name: 'Criatório Canto Real (Marcos Silva)',
+    slug: 'cantoreal',
+    document: '123.456.789-10',
+    email: 'marcos.cantoreal@gmail.com',
+    phone: '(11) 98888-2233',
+    plan: 'PRO',
+    billingCycle: 'MENSAL' as const,
+    planStatus: 'ACTIVE',
+    maxBirds: 200,
+    setupProgress: 90,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Vence em 7 dias
+    createdAt: '2026-02-01T10:00:00Z',
+    owners: [],
+    visualConfig: INITIAL_TENANT.visualConfig
+  },
+  {
+    id: 'tenant-demo-03',
+    name: 'Criatório Curió da Serra (Carlos Souza)',
+    slug: 'curiodaserra',
+    document: '987.654.321-00',
+    email: 'carlos.serra@hotmail.com',
+    phone: '(21) 97777-4455',
+    plan: 'PRO',
+    billingCycle: 'MENSAL' as const,
+    planStatus: 'PAST_DUE',
+    maxBirds: 100,
+    setupProgress: 80,
+    expiresAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(), // Vencido há 14 dias (Bloqueado)
+    createdAt: '2026-01-05T08:00:00Z',
+    owners: [],
+    visualConfig: INITIAL_TENANT.visualConfig
+  },
+  {
+    id: 'tenant-demo-04',
+    name: 'Federação e Juízes Parceiros FOB/SOCO',
+    slug: 'federacao-parceira',
+    document: '12.345.678/0001-90',
+    email: 'presidencia@federacaopassaros.org.br',
+    phone: '(11) 3333-1122',
+    plan: 'PREMIUM',
+    billingCycle: 'ISENTO' as const,
+    planStatus: 'ACTIVE',
+    maxBirds: 9999,
+    setupProgress: 100,
+    expiresAt: '2099-12-31T23:59:59Z', // Isento / Vitalício
+    createdAt: '2026-01-01T00:00:00Z',
+    owners: [],
+    visualConfig: INITIAL_TENANT.visualConfig
+  }
+];
+
+export const INITIAL_USER: User = {
+  id: 'user-demo-01',
+  name: 'Luis Henrique Schreiber Júnior',
+  email: 'luis.henrique.schreiber@hotmail.com',
+  role: 'OWNER',
+  tenantId: 'tenant-demo-01',
+  phone: '(55) 9 9134-3265',
+  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+  active: true,
+  createdAt: '2026-01-10T10:00:00Z',
+};
+
+export const INITIAL_USERS: User[] = [
+  INITIAL_USER,
+  {
+    id: 'user-master-admin',
+    name: 'Henrique Rocha (Super Admin Master)',
+    email: 'henrique_rocha@live.com',
+    role: 'SUPER_ADMIN',
+    tenantId: 'tenant-demo-01',
+    phone: '(55) 9 9134-3265',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    active: true,
+    createdAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'user-demo-02',
+    name: 'Dra. Juliana Mendes (Veterinária)',
+    email: 'juliana.vet@cantonobre.com.br',
+    role: 'ADMIN',
+    tenantId: 'tenant-demo-01',
+    phone: '(55) 97777-8888',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    active: true,
+    createdAt: '2026-01-15T10:00:00Z',
+  }
+];
+
+export const INITIAL_CAGES: Cage[] = [
+  {
+    id: 'cage-01',
+    tenantId: 'tenant-demo-01',
+    code: 'G-101',
+    name: 'Gaiola Reprodução Especial 01',
+    location: 'Setor A - Reprodução Nobre',
+    type: 'BREEDING',
+    size: '80x40x45 cm',
+    capacity: 2,
+    status: 'ACTIVE',
+    notes: 'Equipada com ninho tipo taça.',
+    createdAt: '2026-01-12T08:00:00Z'
+  },
+  {
+    id: 'cage-02',
+    tenantId: 'tenant-demo-01',
+    code: 'G-102',
+    name: 'Gaiola Reprodução Especial 02',
+    location: 'Setor A - Reprodução Nobre',
+    type: 'BREEDING',
+    size: '80x40x45 cm',
+    capacity: 2,
+    status: 'ACTIVE',
+    notes: 'Grade divisória removível.',
+    createdAt: '2026-01-12T08:00:00Z'
+  }
+];
+
+export const INITIAL_BIRDS: Bird[] = [
+  {
+    id: 'bird-01',
+    tenantId: 'tenant-demo-01',
+    name: 'Soberano Real',
+    nickname: 'O Campeão',
+    ringNumber: 'FOB-2024-BR-0891',
+    species: 'Canário da Terra (Sicalis flaveola)',
+    subspecies: 'Pelzelni',
+    sex: 'MALE',
+    birthDate: '2024-09-15',
+    breed: 'Linha de Canto Timbre Puro',
+    mutation: 'Amarelo Intenso',
+    color: 'Amarelo Ouro / Dourado',
+    features: 'Peito largo, porte altivo, canto melódico contínuo.',
+    origin: 'BRED_HERE',
+    fatherName: 'Trovão Negro',
+    fatherRing: 'FOB-2022-BR-0112',
+    motherName: 'Rainha do Ouro',
+    motherRing: 'FOB-2023-BR-0445',
+    cageId: 'cage-01',
+    location: 'Setor A - Reprodução Nobre (G-101)',
+    status: 'BREEDING',
+    notes: 'Matriz principal do plantel. Campeão de Canto 2025.',
+    entryDate: '2024-09-15',
+    isPublic: true,
+    photoUrl: '',
+    createdAt: '2024-09-15T09:00:00Z',
+    updatedAt: '2026-02-15T10:00:00Z'
+  },
+  {
+    id: 'bird-02',
+    tenantId: 'tenant-demo-01',
+    name: 'Princesa Dourada',
+    nickname: 'Dourada',
+    ringNumber: 'FOB-2024-BR-0892',
+    species: 'Canário da Terra (Sicalis flaveola)',
+    subspecies: 'Pelzelni',
+    sex: 'FEMALE',
+    birthDate: '2024-10-02',
+    breed: 'Linha Genética Matriarcal',
+    mutation: 'Amarelo Nevado',
+    color: 'Amarelo Claro',
+    features: 'Excelente instinto de choco.',
+    origin: 'BRED_HERE',
+    fatherName: 'Sol Radiante',
+    fatherRing: 'FOB-2021-BR-0932',
+    motherName: 'Estrela Guia',
+    motherRing: 'FOB-2022-BR-0881',
+    cageId: 'cage-01',
+    location: 'Setor A - Reprodução Nobre (G-101)',
+    status: 'BREEDING',
+    notes: 'Formando casal com Soberano Real.',
+    entryDate: '2024-10-02',
+    isPublic: true,
+    photoUrl: '',
+    createdAt: '2024-10-02T09:00:00Z',
+    updatedAt: '2026-02-15T10:00:00Z'
+  },
+  {
+    id: 'bird-03',
+    tenantId: 'tenant-demo-01',
+    name: 'Maestro Clássico',
+    nickname: 'Maestro',
+    ringNumber: 'SISPASS-2023-SP-5502',
+    species: 'Curió (Sporophila angolensis)',
+    subspecies: 'Angolensis',
+    sex: 'MALE',
+    birthDate: '2023-11-20',
+    breed: 'Canto Praia Grande Clássico',
+    mutation: 'Ancestral',
+    color: 'Preto e Castanho',
+    features: 'Timbre metálico cristalino, batida perfeita.',
+    origin: 'PURCHASED',
+    breederOrigin: 'Criadouro Vale do Curió',
+    fatherName: 'Voz de Cristal',
+    fatherRing: 'SISPASS-2020-MG-1022',
+    motherName: 'Doce Melodia',
+    motherRing: 'SISPASS-2021-MG-3301',
+    cageId: 'cage-02',
+    location: 'Setor A - Reprodução Nobre (G-102)',
+    status: 'BREEDING',
+    notes: 'Pureza de dialeto.',
+    entryDate: '2024-03-10',
+    isPublic: true,
+    photoUrl: '',
+    createdAt: '2024-03-10T09:00:00Z',
+    updatedAt: '2026-02-10T10:00:00Z'
+  }
+];
+
+export const INITIAL_RINGS: Ring[] = [
+  {
+    id: 'ring-01',
+    tenantId: 'tenant-demo-01',
+    number: 'FOB-2026-BR-0017',
+    year: 2026,
+    type: 'FOB Oficial 2.8mm',
+    origin: 'Federação Ornitológica do Brasil',
+    acquisitionDate: '2026-01-05',
+    status: 'IN_STOCK',
+    notes: 'Anilha ano 2026.',
+    createdAt: '2026-01-05T10:00:00Z'
+  },
+  {
+    id: 'ring-02',
+    tenantId: 'tenant-demo-01',
+    number: 'FOB-2026-BR-0018',
+    year: 2026,
+    type: 'FOB Oficial 2.8mm',
+    origin: 'Federação Ornitológica do Brasil',
+    acquisitionDate: '2026-01-05',
+    status: 'IN_STOCK',
+    notes: 'Disponível.',
+    createdAt: '2026-01-05T10:00:00Z'
+  }
+];
+
+export const INITIAL_PAIRS: BreedingPair[] = [
+  {
+    id: 'pair-01',
+    tenantId: 'tenant-demo-01',
+    name: 'Casal Real Canários 2026',
+    code: 'CP-01-CAN',
+    maleId: 'bird-01',
+    maleName: 'Soberano Real',
+    maleRing: 'FOB-2024-BR-0891',
+    maleSpecies: 'Canário da Terra',
+    femaleId: 'bird-02',
+    femaleName: 'Princesa Dourada',
+    femaleRing: 'FOB-2024-BR-0892',
+    femaleSpecies: 'Canário da Terra',
+    cageId: 'cage-01',
+    cageCode: 'G-101',
+    formedDate: '2025-10-01',
+    status: 'ACTIVE',
+    notes: 'Casal de alta fertilidade.',
+    clutchesCount: 2,
+    totalEggs: 7,
+    hatchedCount: 5,
+    createdAt: '2025-10-01T08:00:00Z'
+  }
+];
+
+export const INITIAL_CLUTCHES: Clutch[] = [];
+export const INITIAL_EGGS: Egg[] = [];
+export const INITIAL_MEDICATIONS: Medication[] = [];
+export const INITIAL_TREATMENTS: Treatment[] = [];
+export const INITIAL_DISEASES: DiseaseRecord[] = [];
+export const INITIAL_SEXINGS: SexingRecord[] = [];
+export const INITIAL_GENOTYPING: GenotypingRecord[] = [];
+export const INITIAL_NOTIFICATIONS: NotificationItem[] = [
+  {
+    id: 'notif-01',
+    tenantId: 'tenant-demo-01',
+    title: 'Nistatina Solução - Esmeralda Verde',
+    message: 'Dose: 2 gotas diretamente no bico (Gaiola UTI-01)',
+    type: 'WARNING',
+    category: 'MEDICATION',
+    priority: 'HIGH',
+    dueTime: '20:00',
+    birdName: 'Esmeralda Verde',
+    cageName: 'Gaiola UTI-01',
+    dosage: '2 gotas diretamente no bico',
+    status: 'PENDING',
+    pushEnabled: true,
+    actionText: 'Confirmar administração →',
+    link: '/dashboard/aves',
+    read: false,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'notif-02',
+    tenantId: 'tenant-demo-01',
+    title: 'Postura #1 Curió - Gaiola G-103',
+    message: '3 ovos férteis confirmados na ovoscopia',
+    type: 'ALERT',
+    category: 'EGG_HATCH',
+    priority: 'MEDIUM',
+    dueDate: 'Em 5 dias',
+    birdName: 'Casal Real',
+    cageName: 'Gaiola G-103',
+    status: 'PENDING',
+    pushEnabled: true,
+    actionText: 'Ver ninhada e ninhos →',
+    link: '/dashboard/aves',
+    read: false,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'notif-03',
+    tenantId: 'tenant-demo-01',
+    title: 'Junior 01 e Junior 02 (12 dias)',
+    message: 'Coleta de penas de bulbo recomendada',
+    type: 'INFO',
+    category: 'SEXING',
+    priority: 'LOW',
+    dueDate: 'Prontos',
+    birdName: 'Junior 01 & 02',
+    cageName: 'Gaiola G-101',
+    status: 'PENDING',
+    pushEnabled: true,
+    actionText: 'Registrar envio laboratório →',
+    link: '/dashboard/aves',
+    read: false,
+    createdAt: new Date().toISOString()
+  }
+];
+export const INITIAL_TIMELINE: BirdTimelineEvent[] = [];
+export const INITIAL_DOCUMENTS: BirdDocument[] = [];
+export const INITIAL_TICKETS: SupportTicket[] = [
+  {
+    id: 'tkt-01',
+    ticketCode: 'TKT-2026-0412',
+    tenantId: 'tenant-demo-01',
+    criatorioName: 'Criatório Canto Campeão',
+    userName: 'Dr. Roberto Silveira',
+    userEmail: 'roberto@cantocampeao.com.br',
+    userWhatsapp: '(31) 98877-6655',
+    subject: 'Dúvida sobre importação do relatório SISPASS com mais de 300 aves',
+    category: 'TECHNICAL',
+    priority: 'HIGH',
+    status: 'OPEN',
+    unreadByAdmin: true,
+    unreadByUser: false,
+    lastReplyBy: 'USER',
+    messages: [
+      {
+        id: 'msg-tkt-01-1',
+        sender: 'Dr. Roberto Silveira',
+        senderRole: 'USER',
+        isStaff: false,
+        content: 'Olá equipe BIRDPRO! Gostaria de saber se o importador automático do SISPASS suporta arquivos em PDF com múltiplas páginas e se ele já cadastra as espécies automaticamente.',
+        createdAt: '2026-10-02T13:40:00Z'
+      }
+    ],
+    createdAt: '2026-10-02T13:40:00Z',
+    updatedAt: '2026-10-02T13:40:00Z'
+  },
+  {
+    id: 'tkt-02',
+    ticketCode: 'TKT-2026-0398',
+    tenantId: 'tenant-demo-02',
+    criatorioName: 'Criadouro Vale das Aves',
+    userName: 'Marcos Vinícius de Andrade',
+    userEmail: 'marcos@valedasaves.com.br',
+    userWhatsapp: '(16) 99123-4567',
+    subject: 'Personalização do Pedigree A4 com brasão do criatório em alta resolução',
+    category: 'QUESTION',
+    priority: 'MEDIUM',
+    status: 'IN_PROGRESS',
+    unreadByAdmin: false,
+    unreadByUser: false,
+    lastReplyBy: 'ADMIN',
+    messages: [
+      {
+        id: 'msg-tkt-02-1',
+        sender: 'Marcos Vinícius de Andrade',
+        senderRole: 'USER',
+        isStaff: false,
+        content: 'Boa tarde! Como faço para adicionar nosso logotipo oficial em alta definição no cabeçalho dos pedigrees gerados para o nosso plantel de Trinca-Ferros?',
+        createdAt: '2026-10-02T10:15:00Z'
+      },
+      {
+        id: 'msg-tkt-02-2',
+        sender: 'Rodrigo Matos (Suporte BIRDPRO)',
+        senderRole: 'SUPPORT_AGENT',
+        isStaff: true,
+        content: 'Olá Marcos! Você pode acessar Configurações > Criatório e enviar o arquivo da sua logo nos formatos PNG ou JPG com fundo transparente. O sistema ajustará automaticamente a escala no PDF A4!',
+        createdAt: '2026-10-02T10:28:00Z'
+      }
+    ],
+    createdAt: '2026-10-02T10:15:00Z',
+    updatedAt: '2026-10-02T10:28:00Z'
+  },
+  {
+    id: 'tkt-03',
+    ticketCode: 'TKT-2026-0375',
+    tenantId: 'tenant-demo-03',
+    criatorioName: 'Criatório Pena Nobre',
+    userName: 'Carlos Eduardo Fontes',
+    userEmail: 'carlos@penanobre.com.br',
+    userWhatsapp: '(41) 98765-4321',
+    subject: 'Solicitação de nova espécie na tabela FOB (Canário Lipocromo Vermelho Mosaico)',
+    category: 'FEATURE_REQUEST',
+    priority: 'LOW',
+    status: 'RESOLVED',
+    unreadByAdmin: false,
+    unreadByUser: false,
+    lastReplyBy: 'ADMIN',
+    messages: [
+      {
+        id: 'msg-tkt-03-1',
+        sender: 'Carlos Eduardo Fontes',
+        senderRole: 'USER',
+        isStaff: false,
+        content: 'Gostaria de sugerir o cadastro padrão da mutação Canário Lipocromo Vermelho Mosaico nas opções rápidas de cor.',
+        createdAt: '2026-10-01T15:20:00Z'
+      },
+      {
+        id: 'msg-tkt-03-2',
+        sender: 'Suporte Técnico BIRDPRO',
+        senderRole: 'ADMIN',
+        isStaff: true,
+        content: 'Olá Carlos! Mutação cadastrada com sucesso no banco de dados global. Você já pode selecioná-la no cadastro de aves.',
+        createdAt: '2026-10-01T16:05:00Z'
+      }
+    ],
+    createdAt: '2026-10-01T15:20:00Z',
+    updatedAt: '2026-10-01T16:05:00Z'
+  }
+];
+
+export const INITIAL_SELLERS = [
+  {
+    id: 'seller-01',
+    name: 'Carlos Oliveira (Parceiro Sul)',
+    email: 'carlos.vendas@birdpro.com.br',
+    phone: '(51) 99888-1122',
+    pixKey: 'carlos.vendas@birdpro.com.br',
+    pixKeyType: 'EMAIL' as const,
+    type: 'VENDEDOR' as const,
+    commissionPercent: 20,
+    monthlySalesGoal: 5000.00,
+    monthlySignupsGoal: 25,
+    goalBonusPercent: 5,
+    goalBonusFixed: 250.00,
+    couponCode: 'CARLOS20',
+    affiliateCode: 'carlos-sul',
+    affiliateUrl: 'https://www.birdpro.com.br/?ref=carlos-sul',
+    totalClicks: 342,
+    totalSignups: 18,
+    totalSalesValue: 3580.00,
+    totalCommissionsEarned: 716.00,
+    totalCommissionsPaid: 400.00,
+    balanceAvailable: 316.00,
+    status: 'ACTIVE' as const,
+    createdAt: '2026-01-15T10:00:00Z',
+    notes: 'Vendedor comercial focado em criatórios de grande porte (RS/SC).'
+  },
+  {
+    id: 'seller-02',
+    name: 'Mariana Duarte (Influencer Ornitologia)',
+    email: 'mariana.aves@gmail.com',
+    phone: '(19) 98765-3344',
+    pixKey: '123.456.789-00',
+    pixKeyType: 'CPF' as const,
+    type: 'EMBAIXADOR' as const,
+    commissionPercent: 25,
+    monthlySalesGoal: 10000.00,
+    monthlySignupsGoal: 50,
+    goalBonusPercent: 5,
+    goalBonusFixed: 500.00,
+    instagram: '@mariana.aves',
+    youtube: 'Criando com Amor & Técnica',
+    couponCode: 'MARI25',
+    affiliateCode: 'mari-aves',
+    affiliateUrl: 'https://www.birdpro.com.br/?ref=mari-aves',
+    totalClicks: 890,
+    totalSignups: 45,
+    totalSalesValue: 8990.00,
+    totalCommissionsEarned: 2247.50,
+    totalCommissionsPaid: 1500.00,
+    balanceAvailable: 747.50,
+    status: 'ACTIVE' as const,
+    createdAt: '2026-01-20T14:30:00Z',
+    notes: 'Embaixadora oficial. Canal no YouTube e Instagram com 45k criadores de aves.'
+  },
+  {
+    id: 'seller-03',
+    name: 'Federação e Clubes Parceiros',
+    email: 'parcerias@clubespassaros.com.br',
+    phone: '(11) 3222-9988',
+    pixKey: '12.345.678/0001-90',
+    pixKeyType: 'CNPJ' as const,
+    type: 'EMBAIXADOR' as const,
+    commissionPercent: 15,
+    monthlySalesGoal: 6000.00,
+    monthlySignupsGoal: 30,
+    goalBonusPercent: 3,
+    goalBonusFixed: 300.00,
+    couponCode: 'CLUBE15',
+    affiliateCode: 'clubes-brasil',
+    affiliateUrl: 'https://www.birdpro.com.br/?ref=clubes-brasil',
+    totalClicks: 520,
+    totalSignups: 28,
+    totalSalesValue: 5600.00,
+    totalCommissionsEarned: 840.00,
+    totalCommissionsPaid: 840.00,
+    balanceAvailable: 0.00,
+    status: 'ACTIVE' as const,
+    createdAt: '2026-02-01T09:00:00Z',
+    notes: 'Parceria institucional com federações e clubes ornitológicos regionais.'
+  }
+];
+
+export const INITIAL_GLOBAL_CONFIG = {
+  systemName: 'BIRDPRO',
+  systemTagline: 'Gestão Inteligente de Criatórios e Genealogia Aviária',
+  systemDomain: 'www.birdpro.com.br',
+  systemSiteUrl: 'https://www.birdpro.com.br',
+  systemLogoUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=300&auto=format&fit=crop&q=80',
+  supportEmail: 'suporte@birdpro.com.br',
+  supportPhone: '(55) 9134-3265',
+  supportWhatsApp: '5555991343265',
+  defaultTrialDays: 30,
+  defaultCommissionPercent: 20,
+  cookieDurationDays: 60,
+  allowSelfRegistration: true,
+  maintenanceMode: false,
+  gatewayProvider: 'MERCADOPAGO' as const,
+  gatewayApiKey: 'MP-ACCESS-TOKEN-DEMO-2026',
+  gatewayWebhookSecret: 'whsec_demo_key_birdpro',
+  gatewayLiveMode: true,
+  smtpHost: 'smtp.birdpro.com.br',
+  smtpPort: 587,
+  smtpUser: 'nao-responda@birdpro.com.br',
+  smtpPass: '••••••••••••',
+  smtpFromEmail: 'nao-responda@birdpro.com.br'
+};
+
+export const INITIAL_CALENDAR_EVENTS: CalendarEvent[] = [
+  {
+    id: 'evt-01',
+    tenantId: 'tenant-demo-01',
+    title: 'Nossa Senhora Aparecida (Feriado)',
+    category: 'HOLIDAY',
+    startDate: '2026-10-12',
+    allDay: true,
+    enablePushAlert: false,
+    reminderMinutesBefore: 1440,
+    status: 'SCHEDULED',
+    color: '#00c853',
+    description: 'Feriado Nacional - Dia de Nossa Senhora Aparecida e Dia das Crianças',
+    createdAt: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'evt-02',
+    tenantId: 'tenant-demo-01',
+    title: 'Vacinação Newcastle & Complexo B - Matrizes Setor A',
+    category: 'VACCINE',
+    startDate: '2026-10-02',
+    startTime: '09:00',
+    endTime: '11:00',
+    allDay: false,
+    cageId: 'G-101',
+    birdId: 'bird-01',
+    birdName: 'Soberano Real',
+    enablePushAlert: true,
+    reminderMinutesBefore: 30,
+    status: 'SCHEDULED',
+    color: '#0284c7',
+    description: 'Aplicação da dose de reforço semestral nas matrizes reprodutoras.',
+    createdAt: '2026-09-25T10:00:00Z'
+  },
+  {
+    id: 'evt-03',
+    tenantId: 'tenant-demo-01',
+    title: 'Anilhamento Oficial Ninhada G-101 (FOB 2.8mm)',
+    category: 'RINGING',
+    startDate: '2026-10-05',
+    startTime: '08:30',
+    endTime: '09:30',
+    allDay: false,
+    cageId: 'G-101',
+    enablePushAlert: true,
+    reminderMinutesBefore: 60,
+    status: 'SCHEDULED',
+    color: '#ef4444',
+    description: 'Anilhar filhotes no 6º dia de vida com anilhas FOB 2026.',
+    createdAt: '2026-09-28T14:00:00Z'
+  },
+  {
+    id: 'evt-04',
+    tenantId: 'tenant-demo-01',
+    title: 'Visita Técnica Veterinária (Dra. Juliana Mendes)',
+    category: 'VET',
+    startDate: '2026-10-15',
+    startTime: '14:00',
+    endTime: '16:00',
+    allDay: false,
+    enablePushAlert: true,
+    reminderMinutesBefore: 1440,
+    status: 'SCHEDULED',
+    color: '#8b5cf6',
+    description: 'Revisão periódica sanitária do criatório e emissão de laudos.',
+    createdAt: '2026-09-20T08:00:00Z'
+  },
+  {
+    id: 'evt-05',
+    tenantId: 'tenant-demo-01',
+    title: 'Grande Torneio Regional de Canto FIBAP',
+    category: 'TOURNAMENT',
+    startDate: '2026-10-18',
+    startTime: '07:00',
+    endTime: '13:00',
+    allDay: false,
+    birdId: 'bird-01',
+    birdName: 'Soberano Real',
+    enablePushAlert: true,
+    reminderMinutesBefore: 2880,
+    status: 'SCHEDULED',
+    color: '#f59e0b',
+    description: 'Etapa do Campeonato Regional de Canto Clássico e Fibra.',
+    createdAt: '2026-09-10T09:00:00Z'
+  },
+  {
+    id: 'evt-06',
+    tenantId: 'tenant-demo-01',
+    title: 'Limpeza, Desinfecção e Troca de Ninhos',
+    category: 'CLEANING',
+    startDate: '2026-10-24',
+    startTime: '08:00',
+    endTime: '12:00',
+    allDay: false,
+    enablePushAlert: true,
+    reminderMinutesBefore: 60,
+    status: 'SCHEDULED',
+    color: '#0d9488',
+    description: 'Higienização profunda com Amônia Quaternária de todas as gaiolas.',
+    createdAt: '2026-09-25T11:00:00Z'
+  },
+  {
+    id: 'evt-07',
+    tenantId: 'tenant-demo-01',
+    title: 'Previsão de Eclosão Ninhada Princesa Dourada (13º Dia)',
+    category: 'BREEDING',
+    startDate: '2026-10-28',
+    allDay: true,
+    birdId: 'bird-02',
+    birdName: 'Princesa Dourada',
+    enablePushAlert: true,
+    reminderMinutesBefore: 1440,
+    status: 'SCHEDULED',
+    color: '#d97706',
+    description: 'Verificar eclosão dos ovos férteis no ninho taça.',
+    createdAt: '2026-09-29T10:00:00Z'
+  }
+];
+
+export const INITIAL_NOTES: NoteItem[] = [
+  {
+    id: 'note-01',
+    tenantId: 'tenant-demo-01',
+    title: 'Receita da Farinhada Especial para Época de Muda',
+    content: 'Mistura base: 500g de farinhada seca com ovo, 5g de Aminomix aves por kg, 1 colher de sobremesa de óleo de coco extra virgem, sementes de chia e perila germinadas. Fornecer 3x por semana.',
+    type: 'NOTE_ONLY',
+    priority: 'MEDIUM',
+    pinned: true,
+    finalized: false,
+    color: '#fef08a',
+    createdAt: '2026-09-18T10:00:00Z',
+    updatedAt: '2026-09-18T10:00:00Z'
+  },
+  {
+    id: 'note-02',
+    tenantId: 'tenant-demo-01',
+    title: 'Comprar Clorexidina 2% e Desinfetante Agropecuária',
+    content: 'Comprar 2 frascos de clorexidina degermante 2%, pó hemostático e 5 bebedouros tipo malha fina novos para a gaiola G-102.',
+    type: 'CALENDAR_REMINDER',
+    agendaDate: '2026-10-06',
+    agendaTime: '14:30',
+    priority: 'HIGH',
+    pinned: true,
+    finalized: false,
+    color: '#fecaca',
+    createdAt: '2026-09-28T16:00:00Z',
+    updatedAt: '2026-09-28T16:00:00Z'
+  },
+  {
+    id: 'note-03',
+    tenantId: 'tenant-demo-01',
+    title: 'Critérios de Acasalamento: Linhagem Canário Soberano Real',
+    content: 'Observação genética: Priorizar cruzamento com fêmeas de linha nevada média para evitar plumagem frouxa ou cistos. Fêmea Princesa Dourada (G-101) apresentou excelente compatibilidade de canto e porte.',
+    type: 'NOTE_ONLY',
+    priority: 'LOW',
+    pinned: false,
+    finalized: false,
+    birdId: 'bird-01',
+    birdName: 'Soberano Real (FOB-2024-BR-0891)',
+    color: '#bbf7d0',
+    createdAt: '2026-09-20T11:00:00Z',
+    updatedAt: '2026-09-20T11:00:00Z'
+  },
+  {
+    id: 'note-04',
+    tenantId: 'tenant-demo-01',
+    title: 'Substituição do Elemento Filtrante de Água do Criatório',
+    content: 'Troca periódica do filtro de carvão ativado e purificador de água das matrizes.',
+    type: 'CALENDAR_REMINDER',
+    agendaDate: '2026-10-20',
+    agendaTime: '08:00',
+    priority: 'INFO',
+    pinned: false,
+    finalized: true,
+    color: '#bae6fd',
+    createdAt: '2026-09-15T09:00:00Z',
+    updatedAt: '2026-10-01T14:00:00Z'
+  }
+];
+
+export const INITIAL_USER_REFERRALS: Record<string, UserReferralProgram> = {
+  'tenant-demo-01': {
+    tenantId: 'tenant-demo-01',
+    referralCode: 'madruguinha10',
+    referralUrl: 'https://www.birdpro.com.br/cadastro?ref=madruguinha10',
+    couponCode: 'MADRUGUINHA10',
+    friendDiscountPercent: 10,
+    userCommissionPercent: 20,
+    pixKey: 'luis.henrique.schreiber@hotmail.com',
+    pixKeyType: 'EMAIL',
+    totalClicks: 142,
+    totalInvited: 7,
+    totalPaid: 4,
+    totalEarnings: 319.20,
+    balanceAvailable: 159.60,
+    totalWithdrawn: 159.60,
+    referrals: [
+      {
+        id: 'ref-01',
+        friendName: 'Marcos Vinícius de Paula',
+        criatorioName: 'Criatório Canto Nobre',
+        email: 'marcos.canto@gmail.com',
+        phone: '(11) 98765-4321',
+        signupDate: '2026-09-10T14:30:00Z',
+        planName: 'Plano Anual PRO (R$ 169,99)',
+        status: 'ACTIVE_PAID',
+        saleAmount: 169.99,
+        rewardAmount: 34.00,
+        rewardStatus: 'AVAILABLE'
+      },
+      {
+        id: 'ref-02',
+        friendName: 'Luciano Andrade Santos',
+        criatorioName: 'Canaril Estrela do Norte',
+        email: 'luciano.canaril@hotmail.com',
+        phone: '(21) 99876-1234',
+        signupDate: '2026-09-18T10:15:00Z',
+        planName: 'Plano Anual PRO (R$ 169,99)',
+        status: 'ACTIVE_PAID',
+        saleAmount: 169.99,
+        rewardAmount: 34.00,
+        rewardStatus: 'AVAILABLE'
+      },
+      {
+        id: 'ref-03',
+        friendName: 'Dr. Fernando Vasconcelos',
+        criatorioName: 'Criadouro Vale Encantado',
+        email: 'dr.fernando.aves@gmail.com',
+        phone: '(31) 97654-8899',
+        signupDate: '2026-08-22T16:45:00Z',
+        planName: 'Plano Anual PRO (R$ 169,99)',
+        status: 'ACTIVE_PAID',
+        saleAmount: 169.99,
+        rewardAmount: 34.00,
+        rewardStatus: 'PAID'
+      },
+      {
+        id: 'ref-04',
+        friendName: 'Eduardo Mello',
+        criatorioName: 'Criatório Curió Imperial',
+        email: 'eduardo.curio@gmail.com',
+        phone: '(41) 99123-5566',
+        signupDate: '2026-08-15T11:20:00Z',
+        planName: 'Plano Mensal PRO (R$ 14,99)',
+        status: 'ACTIVE_PAID',
+        saleAmount: 14.99,
+        rewardAmount: 3.00,
+        rewardStatus: 'PAID'
+      },
+      {
+        id: 'ref-05',
+        friendName: 'Rodrigo Bicalho',
+        criatorioName: 'Canários do Vale',
+        email: 'rodrigo.bicalho@uol.com.br',
+        phone: '(19) 98822-3344',
+        signupDate: '2026-09-29T09:00:00Z',
+        planName: 'Período de Teste Grátis (30 Dias)',
+        status: 'TRIAL',
+        saleAmount: 0,
+        rewardAmount: 79.80,
+        rewardStatus: 'PENDING'
+      },
+      {
+        id: 'ref-06',
+        friendName: 'Gustavo Henrique Pires',
+        criatorioName: 'Criatório Asa Branca',
+        email: 'gustavo.asabranca@gmail.com',
+        phone: '(51) 99432-1188',
+        signupDate: '2026-10-01T15:20:00Z',
+        planName: 'Período de Teste Grátis (30 Dias)',
+        status: 'TRIAL',
+        saleAmount: 0,
+        rewardAmount: 79.80,
+        rewardStatus: 'PENDING'
+      }
+    ],
+    payouts: [
+      {
+        id: 'pay-ref-01',
+        affiliateId: 'tenant-demo-01',
+        affiliateName: 'Luis Henrique Schreiber Júnior (Madruguinha)',
+        amount: 159.60,
+        pixKey: 'luis.henrique.schreiber@hotmail.com',
+        receiptUrl: 'https://comprovante.pix.birdpro.com.br/tx-ref-019238',
+        status: 'COMPLETED',
+        createdAt: '2026-09-01T14:20:00Z',
+        completedAt: '2026-09-01T14:22:00Z'
+      }
+    ]
+  }
+};
+
+
+

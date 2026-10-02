@@ -1,0 +1,532 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  STAFF
+  VIEWER
+}
+
+enum BirdSex {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+enum BirdStatus {
+  ACTIVE
+  BREEDING
+  FOR_SALE
+  TRANSFERRED
+  DECEASED
+  LOST
+  IN_TREATMENT
+  QUARANTINE
+}
+
+enum RingStatus {
+  IN_STOCK
+  USED
+  RESERVED
+  TRANSFERRED
+  LOST
+  CANCELLED
+}
+
+enum EggStatus {
+  INCUBATING
+  FERTILE
+  INFERTILE
+  HATCHED
+  BROKEN
+  LOST
+}
+
+enum PlanType {
+  FREE
+  PRO
+  PREMIUM
+}
+
+model Tenant {
+  id            String         @id @default(uuid())
+  name          String
+  slug          String         @unique
+  document      String
+  email         String
+  phone         String
+  whatsapp      String?
+  address       String?
+  city          String?
+  state         String?
+  zipCode       String?
+  description   String?
+  logoUrl       String?
+  coverUrl      String?
+  isPublic      Boolean        @default(true)
+  plan          PlanType       @default(FREE)
+  planStatus    String         @default("ACTIVE")
+  maxBirds      Int            @default(20)
+  setupProgress Int            @default(20)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  users         User[]
+  birds         Bird[]
+  rings         Ring[]
+  cages         Cage[]
+  pairs         BreedingPair[]
+  clutches      Clutch[]
+  eggs          Egg[]
+  diseases      Disease[]
+  medications   Medication[]
+  treatments    Treatment[]
+  behaviors     BehaviorRecord[]
+  documents     BirdDocument[]
+  photos        BirdPhoto[]
+  sexings       SexingRecord[]
+  genotyping    GenotypingRecord[]
+  notifications Notification[]
+  tickets       SupportTicket[]
+  auditLogs     AuditLog[]
+  subscriptions Subscription[]
+
+  @@index([slug])
+  @@index([document])
+}
+
+model User {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  email     String   @unique
+  password  String?
+  role      UserRole @default(STAFF)
+  phone     String?
+  avatar    String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditLogs AuditLog[]
+
+  @@index([tenantId])
+  @@index([email])
+}
+
+model Bird {
+  id                    String     @id @default(uuid())
+  tenantId              String
+  tenant                Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name                  String
+  nickname              String?
+  ringNumber            String
+  species               String
+  subspecies            String?
+  sex                   BirdSex    @default(UNKNOWN)
+  birthDate             DateTime?
+  breed                 String?
+  mutation              String?
+  color                 String?
+  features              String?
+  origin                String     @default("BRED_HERE")
+  breederOrigin         String?
+  fatherName            String?
+  fatherRing            String?
+  motherName            String?
+  motherRing            String?
+  paternalGrandfatherId String?
+  paternalGrandmotherId String?
+  maternalGrandfatherId String?
+  maternalGrandmotherId String?
+  cageId                String?
+  status                BirdStatus @default(ACTIVE)
+  notes                 String?
+  entryDate             DateTime   @default(now())
+  exitDate              DateTime?
+  exitReason            String?
+  isPublic              Boolean    @default(true)
+  photoUrl              String?
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  documents             BirdDocument[]
+  photos                BirdPhoto[]
+  sexingRecords         SexingRecord[]
+  genotypingRecords     GenotypingRecord[]
+  treatments            Treatment[]
+  diseases              Disease[]
+  behaviors             BehaviorRecord[]
+  timelineEvents        TimelineEvent[]
+
+  @@unique([tenantId, ringNumber])
+  @@index([tenantId])
+  @@index([ringNumber])
+  @@index([species])
+  @@index([status])
+}
+
+model Ring {
+  id              String     @id @default(uuid())
+  tenantId        String
+  tenant          Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  number          String
+  year            Int
+  type            String
+  origin          String?
+  acquisitionDate DateTime   @default(now())
+  birdId          String?
+  birdName        String?
+  status          RingStatus @default(IN_STOCK)
+  notes           String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+  @@index([number])
+  @@index([status])
+}
+
+model Cage {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code      String
+  name      String
+  location  String
+  type      String   @default("BREEDING")
+  size      String?
+  capacity  Int      @default(2)
+  status    String   @default("ACTIVE")
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([code])
+}
+
+model BreedingPair {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  code          String
+  maleId        String
+  maleName      String
+  maleRing      String
+  maleSpecies   String
+  femaleId      String
+  femaleName    String
+  femaleRing    String
+  femaleSpecies String
+  cageCode      String?
+  formedDate    DateTime @default(now())
+  endDate       DateTime?
+  status        String   @default("ACTIVE")
+  notes         String?
+  clutchesCount Int      @default(0)
+  totalEggs     Int      @default(0)
+  hatchedCount  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  clutches      Clutch[]
+  eggs          Egg[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+model Clutch {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pairId        String
+  pair          BreedingPair @relation(fields: [pairId], references: [id], onDelete: Cascade)
+  clutchNumber  Int
+  startDate     DateTime @default(now())
+  totalEggs     Int      @default(0)
+  fertileEggs   Int      @default(0)
+  infertileEggs Int      @default(0)
+  hatchedEggs   Int      @default(0)
+  lostEggs      Int      @default(0)
+  status        String   @default("INCUBATING")
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  eggs          Egg[]
+
+  @@index([tenantId])
+  @@index([pairId])
+}
+
+model Egg {
+  id                String       @id @default(uuid())
+  tenantId          String
+  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clutchId          String
+  clutch            Clutch       @relation(fields: [clutchId], references: [id], onDelete: Cascade)
+  pairId            String
+  pair              BreedingPair @relation(fields: [pairId], references: [id], onDelete: Cascade)
+  eggNumber         Int
+  layDate           DateTime     @default(now())
+  expectedHatchDate DateTime
+  actualHatchDate   DateTime?
+  status            EggStatus    @default(INCUBATING)
+  offspringBirdId   String?
+  notes             String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([tenantId])
+  @@index([clutchId])
+}
+
+model Disease {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  birdId         String
+  bird           Bird     @relation(fields: [birdId], references: [id], onDelete: Cascade)
+  diseaseName    String
+  symptoms       String
+  diagnosis      String
+  diagnosedDate  DateTime @default(now())
+  veterinarian   String?
+  treatmentNotes String?
+  result         String   @default("IN_TREATMENT")
+  cureDate       DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([birdId])
+}
+
+model Medication {
+  id                String   @id @default(uuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name              String
+  activeIngredient  String
+  manufacturer      String?
+  standardDosage    String?
+  applicationMethod String   @default("WATER")
+  stockQuantity     String?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  treatments        Treatment[]
+
+  @@index([tenantId])
+}
+
+model Treatment {
+  id                String     @id @default(uuid())
+  tenantId          String
+  tenant            Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  birdId            String
+  bird              Bird       @relation(fields: [birdId], references: [id], onDelete: Cascade)
+  medicationId      String
+  medication        Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+  dosage            String
+  frequency         String
+  startDate         DateTime   @default(now())
+  endDate           DateTime
+  responsiblePerson String
+  status            String     @default("ACTIVE")
+  notes             String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@index([tenantId])
+  @@index([birdId])
+}
+
+model BehaviorRecord {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  birdId                String
+  bird                  Bird     @relation(fields: [birdId], references: [id], onDelete: Cascade)
+  date                  DateTime @default(now())
+  tamenessScore         Int      @default(5)
+  singingScore          Int      @default(5)
+  maternalInstinctScore Int      @default(5)
+  stressScore           Int      @default(1)
+  notes                 String?
+  createdAt             DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([birdId])
+}
+
+model SexingRecord {
+  id                String   @id @default(uuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  birdId            String
+  bird              Bird     @relation(fields: [birdId], references: [id], onDelete: Cascade)
+  result            BirdSex
+  method            String   @default("DNA_FEATHER")
+  laboratory        String
+  sampleDate        DateTime @default(now())
+  resultDate        DateTime @default(now())
+  certificateNumber String?
+  documentUrl       String?
+  notes             String?
+  createdAt         DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([birdId])
+}
+
+model GenotypingRecord {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  birdId              String
+  bird                Bird     @relation(fields: [birdId], references: [id], onDelete: Cascade)
+  laboratory          String
+  sampleDate          DateTime @default(now())
+  resultDate          DateTime @default(now())
+  geneticCode         String?
+  mutationsIdentified String[]
+  carrierGenes        String[]
+  documentUrl         String?
+  notes               String?
+  createdAt           DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([birdId])
+}
+
+model BirdDocument {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  birdId    String?
+  bird      Bird?    @relation(fields: [birdId], references: [id], onDelete: Cascade)
+  title     String
+  category  String
+  fileUrl   String
+  fileName  String
+  fileType  String
+  fileSize  String?
+  issueDate DateTime @default(now())
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([birdId])
+}
+
+model BirdPhoto {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  birdId    String
+  bird      Bird     @relation(fields: [birdId], references: [id], onDelete: Cascade)
+  url       String
+  caption   String?
+  isMain    Boolean  @default(false)
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([birdId])
+}
+
+model TimelineEvent {
+  id          String   @id @default(uuid())
+  birdId      String
+  bird        Bird     @relation(fields: [birdId], references: [id], onDelete: Cascade)
+  date        DateTime @default(now())
+  title       String
+  description String
+  eventType   String
+  userName    String
+  createdAt   DateTime @default(now())
+
+  @@index([birdId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("INFO")
+  category  String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SupportTicket {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userName  String
+  userEmail String
+  subject   String
+  category  String
+  priority  String   @default("MEDIUM")
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userName  String
+  action    String
+  module    String
+  details   String
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model Subscription {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan           PlanType
+  status         String   @default("ACTIVE")
+  billingCycle   String   @default("ANNUAL")
+  amount         Float
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId])
+}

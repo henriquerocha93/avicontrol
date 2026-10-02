@@ -1,0 +1,1677 @@
+'use client'
+
+import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { 
+  Building2, 
+  Search, 
+  Plus, 
+  Trash2, 
+  Edit3, 
+  Check, 
+  X, 
+  RotateCcw,
+  ChevronLeft,
+  User as UserIcon,
+  Sliders,
+  UploadCloud,
+  Image as ImageIcon,
+  Sparkles,
+  Layers,
+  SlidersHorizontal,
+  Link2,
+  FolderUp,
+  Camera
+} from 'lucide-react'
+import { db } from '@/lib/db'
+import { Tenant, BreederOwner, TenantVisualConfig } from '@/types'
+
+export default function CriatorioConfigPage() {
+  const [tenant, setTenant] = useState<Tenant | null>(null)
+  const [savedSuccess, setSavedSuccess] = useState(false)
+  const [isLoadingCep, setIsLoadingCep] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  // Image Selector Modal State
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false)
+  const [activeImageField, setActiveImageField] = useState<keyof TenantVisualConfig | null>(null)
+  const [activeImageTitle, setActiveImageTitle] = useState('')
+  const [imageModalTab, setImageModalTab] = useState<'upload' | 'presets' | 'url'>('upload')
+  const [customImageUrl, setCustomImageUrl] = useState('')
+  const [isProcessingImage, setIsProcessingImage] = useState(false)
+  const [dragOverField, setDragOverField] = useState<string | null>(null)
+
+  // Owner Modal State
+  const [isOwnerModalOpen, setIsOwnerModalOpen] = useState(false)
+  const [editingOwnerIndex, setEditingOwnerIndex] = useState<number | null>(null)
+  const [ownerForm, setOwnerForm] = useState<BreederOwner>({
+    id: '',
+    name: '',
+    cpf: '',
+    city: '',
+    state: 'RS',
+    avatarUrl: ''
+  })
+
+  useEffect(() => {
+    const t = db.getTenant()
+    setTenant(t)
+  }, [])
+
+  if (!tenant) {
+    return (
+      <div className="p-12 flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#00c853]"></div>
+      </div>
+    )
+  }
+
+  const handleInputChange = (field: keyof Tenant, value: any) => {
+    setTenant(prev => prev ? { ...prev, [field]: value } : null)
+  }
+
+  const handleVisualConfigChange = (field: keyof TenantVisualConfig, value: any) => {
+    setTenant(prev => {
+      if (!prev) return null
+      return {
+        ...prev,
+        visualConfig: {
+          ...prev.visualConfig,
+          [field]: value
+        }
+      }
+    })
+  }
+
+  const handleCepSearch = async () => {
+    if (!tenant.zipCode && !tenant.cep) return
+    const cleanCep = (tenant.zipCode || tenant.cep || '').replace(/\D/g, '')
+    if (cleanCep.length !== 8) {
+      alert('Por favor, informe um CEP válido com 8 dígitos.')
+      return
+    }
+
+    setIsLoadingCep(true)
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`)
+      const data = await res.json()
+      if (!data.erro) {
+        setTenant(prev => {
+          if (!prev) return null
+          return {
+            ...prev,
+            address: data.logradouro || prev.address,
+            neighborhood: data.bairro || prev.neighborhood,
+            city: data.localidade || prev.city,
+            state: data.uf || prev.state
+          }
+        })
+      } else {
+        alert('CEP não encontrado.')
+      }
+    } catch (e) {
+      console.error(e)
+      alert('Erro ao buscar o CEP.')
+    } finally {
+      setIsLoadingCep(false)
+    }
+  }
+
+  const handleOpenOwnerModal = (owner?: BreederOwner, index?: number) => {
+    if (owner && typeof index === 'number') {
+      setOwnerForm({ ...owner })
+      setEditingOwnerIndex(index)
+    } else {
+      setOwnerForm({
+        id: `own_${Date.now()}`,
+        name: '',
+        cpf: '',
+        city: tenant.city || 'IJUI',
+        state: tenant.state || 'RS',
+        avatarUrl: ''
+      })
+      setEditingOwnerIndex(null)
+    }
+    setIsOwnerModalOpen(true)
+  }
+
+  const handleSaveOwner = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!ownerForm.name || !ownerForm.cpf) {
+      alert('Nome e CPF são obrigatórios.')
+      return
+    }
+
+    setTenant(prev => {
+      if (!prev) return null
+      const updatedOwners = [...(prev.owners || [])]
+      if (editingOwnerIndex !== null) {
+        updatedOwners[editingOwnerIndex] = ownerForm
+      } else {
+        updatedOwners.push(ownerForm)
+      }
+      return { ...prev, owners: updatedOwners }
+    })
+
+    setIsOwnerModalOpen(false)
+  }
+
+  const handleDeleteOwner = (index: number) => {
+    if (confirm('Deseja realmente remover este proprietário?')) {
+      setTenant(prev => {
+        if (!prev) return null
+        const updated = [...(prev.owners || [])]
+        updated.splice(index, 1)
+        return { ...prev, owners: updated }
+      })
+    }
+  }
+
+  const handleClearOwners = () => {
+    if (confirm('Deseja limpar todos os proprietários?')) {
+      setTenant(prev => prev ? { ...prev, owners: [] } : null)
+    }
+  }
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg)
+    setTimeout(() => setToastMessage(null), 3500)
+  }
+
+  const processImageFile = (file: File, field: keyof TenantVisualConfig) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione um arquivo de imagem válido (PNG, JPG, WEBP, etc.).')
+      return
+    }
+    setIsProcessingImage(true)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string
+      if (dataUrl) {
+        const img = new Image()
+        img.onload = () => {
+          const maxWidth = 1200
+          const maxHeight = 1200
+          let width = img.width
+          let height = img.height
+
+          if (width > maxWidth || height > maxHeight) {
+            if (width > height) {
+              height = Math.round((height * maxWidth) / width)
+              width = maxWidth
+            } else {
+              width = Math.round((width * maxHeight) / height)
+              height = maxHeight
+            }
+          }
+
+          const canvas = document.createElement('canvas')
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height)
+            const compressed = canvas.toDataURL('image/jpeg', 0.88)
+            handleVisualConfigChange(field, compressed)
+          } else {
+            handleVisualConfigChange(field, dataUrl)
+          }
+          setIsProcessingImage(false)
+          setIsImageModalOpen(false)
+          showToast('Imagem importada com sucesso!')
+        }
+        img.onerror = () => {
+          handleVisualConfigChange(field, dataUrl)
+          setIsProcessingImage(false)
+          setIsImageModalOpen(false)
+          showToast('Imagem importada com sucesso!')
+        }
+        img.src = dataUrl
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleOpenImageSelector = (field: keyof TenantVisualConfig, title: string) => {
+    setActiveImageField(field)
+    setActiveImageTitle(title)
+    setCustomImageUrl((vc[field] as string) || '')
+    setImageModalTab('upload')
+    setIsImageModalOpen(true)
+  }
+
+  const handleApplyPresetOrUrl = (url: string) => {
+    if (!activeImageField) return
+    handleVisualConfigChange(activeImageField, url)
+    setIsImageModalOpen(false)
+    showToast('Imagem aplicada com sucesso!')
+  }
+
+  const handleClearImage = (field: keyof TenantVisualConfig) => {
+    handleVisualConfigChange(field, '')
+    if (field === 'treeLogoUrl') handleVisualConfigChange('treeLogoScale', 1)
+    if (field === 'treeBackgroundUrl') handleVisualConfigChange('treeBackgroundScale', 1)
+    if (field === 'labelLogoUrl') handleVisualConfigChange('labelLogoScale', 1)
+    if (field === 'labelFrontBackgroundUrl') handleVisualConfigChange('labelFrontScale', 1)
+    if (field === 'labelBackBackgroundUrl') handleVisualConfigChange('labelBackScale', 1)
+    showToast('Imagem removida.')
+  }
+
+  const handleResetColor = (field: keyof TenantVisualConfig, defaultColor: string) => {
+    handleVisualConfigChange(field, defaultColor)
+  }
+
+  const handleSave = () => {
+    if (!tenant) return
+    db.saveTenant(tenant)
+    setSavedSuccess(true)
+    setTimeout(() => setSavedSuccess(false), 3500)
+  }
+
+  const vc = tenant.visualConfig || {}
+
+  return (
+    <div className="space-y-4 pb-20 w-full font-sans">
+      {/* Breadcrumb estilo MyBirds */}
+      <div className="flex items-center space-x-1.5 text-xs text-slate-500 mb-2">
+        <Link href="/dashboard" className="text-[#00c853] hover:underline font-medium">Home</Link>
+        <span>/</span>
+        <span className="text-slate-400">Criador</span>
+      </div>
+
+      {/* Toast & Success Alerts */}
+      {toastMessage && (
+        <div className="p-3 bg-emerald-600 text-white text-xs font-bold rounded shadow-md flex items-center justify-between animate-fadeIn">
+          <div className="flex items-center space-x-2">
+            <Check className="w-4 h-4 text-white shrink-0" />
+            <span>{toastMessage}</span>
+          </div>
+          <button onClick={() => setToastMessage(null)} className="text-white/80 hover:text-white">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {savedSuccess && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded flex items-center space-x-2">
+          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>Configurações do criatório salvas com sucesso!</span>
+        </div>
+      )}
+
+      {/* Main White Card Form Container */}
+      <div className="bg-white rounded-md border border-slate-200 shadow-xs p-6 space-y-8">
+        
+        {/* 1. SEÇÃO CRIADOR */}
+        <div>
+          <div className="flex items-center space-x-2 pb-3 mb-4 text-slate-700 font-medium text-sm border-b border-slate-100">
+            <span className="text-base">📝</span>
+            <span>Criador</span>
+          </div>
+
+          <div className="space-y-4">
+            {/* Linha 1 */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+              <div className="md:col-span-3">
+                <label className="block text-xs text-slate-600 mb-1">
+                  CNPJ/CPF<span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={tenant.document || tenant.cpfCnpj || ''}
+                  onChange={(e) => {
+                    handleInputChange('document', e.target.value)
+                    handleInputChange('cpfCnpj', e.target.value)
+                  }}
+                  placeholder="000.000.000-00"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+                />
+              </div>
+
+              <div className="md:col-span-5">
+                <label className="block text-xs text-slate-600 mb-1">
+                  Nome do Criatório<span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={tenant.name || ''}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  placeholder="Luis Henrique Schreiber Júnior 'Madruguinha'"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs text-slate-600 mb-1">Registro</label>
+                <input
+                  type="text"
+                  value={tenant.registryNumber || tenant.registrationNumber || ''}
+                  onChange={(e) => {
+                    handleInputChange('registryNumber', e.target.value)
+                    handleInputChange('registrationNumber', e.target.value)
+                  }}
+                  placeholder="4719754"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs text-slate-600 mb-1">Data Licença</label>
+                <input
+                  type="date"
+                  value={tenant.licenseDate || ''}
+                  onChange={(e) => handleInputChange('licenseDate', e.target.value)}
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+                />
+              </div>
+            </div>
+
+            {/* Linha 2 */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+              <div className="md:col-span-3">
+                <label className="block text-xs text-slate-600 mb-1">
+                  Categoria<span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={tenant.category || 'Amador'}
+                  onChange={(e) => handleInputChange('category', e.target.value)}
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+                >
+                  <option value="Amador">Amador</option>
+                  <option value="Comercial">Comercial</option>
+                  <option value="Científico">Científico</option>
+                  <option value="Conservacionista">Conservacionista</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-4">
+                <label className="block text-xs text-slate-600 mb-1">
+                  Tipo Espécie<span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center space-x-4 pt-1.5 text-xs text-slate-700">
+                  <label className="flex items-center space-x-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="speciesType"
+                      value="Ambos"
+                      checked={(tenant.speciesType || 'Ambos') === 'Ambos'}
+                      onChange={() => handleInputChange('speciesType', 'Ambos')}
+                      className="text-[#00c853] focus:ring-[#00c853]"
+                    />
+                    <span>Ambos</span>
+                  </label>
+                  <label className="flex items-center space-x-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="speciesType"
+                      value="SISPASS"
+                      checked={tenant.speciesType === 'SISPASS'}
+                      onChange={() => handleInputChange('speciesType', 'SISPASS')}
+                      className="text-[#00c853] focus:ring-[#00c853]"
+                    />
+                    <span>SISPASS</span>
+                  </label>
+                  <label className="flex items-center space-x-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="speciesType"
+                      value="FOB"
+                      checked={tenant.speciesType === 'FOB'}
+                      onChange={() => handleInputChange('speciesType', 'FOB')}
+                      className="text-[#00c853] focus:ring-[#00c853]"
+                    />
+                    <span>FOB</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="md:col-span-5">
+                <label className="block text-xs text-slate-600 mb-1">Site</label>
+                <input
+                  type="text"
+                  value={tenant.website || ''}
+                  onChange={(e) => handleInputChange('website', e.target.value)}
+                  placeholder="madruguinha_999 ou face luis henrique Madruguinha"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. SEÇÃO REDE SOCIAL */}
+        <div>
+          <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-3">Rede Social</h3>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">WhatsApp</label>
+              <input
+                type="text"
+                value={tenant.whatsapp || tenant.socialMedia?.whatsapp || ''}
+                onChange={(e) => {
+                  handleInputChange('whatsapp', e.target.value)
+                  setTenant(prev => prev ? { ...prev, socialMedia: { ...prev.socialMedia, whatsapp: e.target.value } } : null)
+                }}
+                placeholder="(55) 9 9134-3265"
+                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">FaceBook</label>
+              <input
+                type="text"
+                value={tenant.facebook || tenant.socialMedia?.facebook || ''}
+                onChange={(e) => {
+                  handleInputChange('facebook', e.target.value)
+                  setTenant(prev => prev ? { ...prev, socialMedia: { ...prev.socialMedia, facebook: e.target.value } } : null)
+                }}
+                placeholder="LUIS HENRIQUE MADRUGUINHA"
+                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">Twitter</label>
+              <input
+                type="text"
+                value={tenant.twitter || tenant.socialMedia?.twitter || ''}
+                onChange={(e) => {
+                  handleInputChange('twitter', e.target.value)
+                  setTenant(prev => prev ? { ...prev, socialMedia: { ...prev.socialMedia, twitter: e.target.value } } : null)
+                }}
+                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">Instagram</label>
+              <input
+                type="text"
+                value={tenant.instagram || tenant.socialMedia?.instagram || ''}
+                onChange={(e) => {
+                  handleInputChange('instagram', e.target.value)
+                  setTenant(prev => prev ? { ...prev, socialMedia: { ...prev.socialMedia, instagram: e.target.value } } : null)
+                }}
+                placeholder="LUIS HENRIQUE MADRUGUINHA"
+                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">YouTube</label>
+              <input
+                type="text"
+                value={tenant.youtube || tenant.socialMedia?.youtube || ''}
+                onChange={(e) => {
+                  handleInputChange('youtube', e.target.value)
+                  setTenant(prev => prev ? { ...prev, socialMedia: { ...prev.socialMedia, youtube: e.target.value } } : null)
+                }}
+                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 3. SEÇÃO CONTATO */}
+        <div>
+          <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-3">Contato</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">Fone</label>
+              <input
+                type="text"
+                value={tenant.phone || ''}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                placeholder="(55) 9134-3265"
+                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">Celular</label>
+              <input
+                type="text"
+                value={tenant.cellphone || tenant.mobile || ''}
+                onChange={(e) => {
+                  handleInputChange('cellphone', e.target.value)
+                  handleInputChange('mobile', e.target.value)
+                }}
+                placeholder="(55) 9 9134-3265"
+                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">E-mail</label>
+              <input
+                type="email"
+                value={tenant.email || ''}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                placeholder="luis.henrique.schreiber@hotmail.com"
+                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 4. SEÇÃO ENDEREÇO */}
+        <div>
+          <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-3">Endereço</h3>
+          <div className="space-y-4">
+            {/* Linha 1 */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+              <div className="md:col-span-3">
+                <label className="block text-xs text-slate-600 mb-1">CEP</label>
+                <div className="flex">
+                  <input
+                    type="text"
+                    value={tenant.zipCode || tenant.cep || ''}
+                    onChange={(e) => {
+                      handleInputChange('zipCode', e.target.value)
+                      handleInputChange('cep', e.target.value)
+                    }}
+                    placeholder="98700 000"
+                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-l text-slate-800 focus:outline-none focus:border-[#00c853]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCepSearch}
+                    disabled={isLoadingCep}
+                    className="px-3 bg-slate-100 border border-l-0 border-slate-300 rounded-r hover:bg-slate-200 text-slate-600 flex items-center justify-center transition"
+                    title="Buscar CEP"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="md:col-span-7">
+                <label className="block text-xs text-slate-600 mb-1">
+                  Endereço<span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={tenant.address || ''}
+                  onChange={(e) => handleInputChange('address', e.target.value)}
+                  placeholder="Rua das violetas"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs text-slate-600 mb-1">
+                  Número<span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={tenant.addressNumber || tenant.number || ''}
+                  onChange={(e) => {
+                    handleInputChange('addressNumber', e.target.value)
+                    handleInputChange('number', e.target.value)
+                  }}
+                  placeholder="109"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+                />
+              </div>
+            </div>
+
+            {/* Linha 2 */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+              <div className="md:col-span-5">
+                <label className="block text-xs text-slate-600 mb-1">
+                  Bairro<span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={tenant.neighborhood || ''}
+                  onChange={(e) => handleInputChange('neighborhood', e.target.value)}
+                  placeholder="universitario"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+                />
+              </div>
+
+              <div className="md:col-span-3">
+                <label className="block text-xs text-slate-600 mb-1">
+                  UF<span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={tenant.state || 'RS'}
+                  onChange={(e) => handleInputChange('state', e.target.value)}
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+                >
+                  <option value="RS">RS</option>
+                  <option value="SP">SP</option>
+                  <option value="RJ">RJ</option>
+                  <option value="MG">MG</option>
+                  <option value="PR">PR</option>
+                  <option value="SC">SC</option>
+                  <option value="BA">BA</option>
+                  <option value="GO">GO</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-4">
+                <label className="block text-xs text-slate-600 mb-1">
+                  Cidade<span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={tenant.city || ''}
+                  onChange={(e) => handleInputChange('city', e.target.value)}
+                  placeholder="IJUI"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+                />
+              </div>
+            </div>
+
+            {/* Linha 3 */}
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">Complemento</label>
+              <input
+                type="text"
+                value={tenant.complement || ''}
+                onChange={(e) => handleInputChange('complement', e.target.value)}
+                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 5. SEÇÃO PROPRIETÁRIOS */}
+        <div>
+          <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+            <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Proprietários</h3>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={handleClearOwners}
+                className="px-3 py-1 bg-[#e57373] hover:bg-[#ef5350] text-white text-xs font-medium rounded flex items-center space-x-1 transition shadow-xs"
+              >
+                <span>Limpar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOpenOwnerModal()}
+                className="px-3 py-1 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-medium rounded flex items-center space-x-1 transition shadow-xs"
+              >
+                <span>+ Adicionar</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {(!tenant.owners || tenant.owners.length === 0) ? (
+              <div className="p-4 border border-dashed border-slate-300 rounded text-center text-xs text-slate-400">
+                Nenhum proprietário cadastrado.
+              </div>
+            ) : (
+              tenant.owners.map((owner, idx) => (
+                <div key={owner.id || idx} className="p-4 rounded border border-slate-200 bg-white flex items-center justify-between shadow-xs">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 rounded-full bg-[#00c853] flex items-center justify-center text-white shrink-0">
+                      <UserIcon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">{owner.name}</h4>
+                      <div className="flex items-center space-x-6 text-[11px] text-slate-500 mt-0.5">
+                        <span>CPF: {owner.cpf}</span>
+                        <span>{owner.city} - {owner.state}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenOwnerModal(owner, idx)}
+                      className="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition"
+                      title="Editar"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteOwner(idx)}
+                      className="p-1.5 text-red-500 hover:bg-red-50 rounded transition"
+                      title="Excluir"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* 6. SEÇÃO IMAGEM */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm">🖼️</span>
+              <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Imagem & Identidade Visual</h3>
+            </div>
+            <span className="text-[11px] text-slate-500">
+              Personalize os logos e fundos para emissão de árvores genealógicas e crachás
+            </span>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            
+            {/* Box 1: Árvore Genealógica */}
+            <div className="border border-slate-200 rounded p-4 bg-white space-y-3 shadow-2xs hover:border-[#00c853]/40 transition">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-700 block">Árvore Genealógica</span>
+                {vc.treeLogoUrl && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded">Ativo</span>
+                )}
+              </div>
+              
+              <div 
+                onDragOver={(e) => { e.preventDefault(); setDragOverField('treeLogoUrl'); }}
+                onDragLeave={() => setDragOverField(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverField(null);
+                  if (e.dataTransfer.files?.[0]) processImageFile(e.dataTransfer.files[0], 'treeLogoUrl');
+                }}
+                onClick={() => handleOpenImageSelector('treeLogoUrl', 'Árvore Genealógica')}
+                className={`h-36 bg-slate-50 border-2 ${dragOverField === 'treeLogoUrl' ? 'border-[#00c853] bg-emerald-50/40' : 'border-dashed border-slate-200'} rounded flex items-center justify-center overflow-hidden p-2 relative group cursor-pointer`}
+              >
+                {vc.treeLogoUrl ? (
+                  <img 
+                    src={vc.treeLogoUrl} 
+                    alt="Árvore Genealógica" 
+                    className="max-h-full object-contain transition-transform duration-150" 
+                    style={{ transform: `scale(${vc.treeLogoScale || 1})` }}
+                  />
+                ) : (
+                  <div className="text-center text-slate-400 p-2">
+                    <UploadCloud className="w-7 h-7 mx-auto mb-1 text-slate-400 group-hover:text-[#00c853] transition" />
+                    <span className="text-[11px] block font-medium">Clique ou arraste a imagem aqui</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
+                  <span>Zoom / Escala</span>
+                  <span className="font-mono font-bold text-slate-600">{Math.round((vc.treeLogoScale || 1) * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.05"
+                  value={vc.treeLogoScale || 1}
+                  onChange={(e) => handleVisualConfigChange('treeLogoScale', parseFloat(e.target.value))}
+                  className="w-full accent-purple-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+
+              <div className="flex space-x-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleOpenImageSelector('treeLogoUrl', 'Árvore Genealógica')}
+                  className={`flex-1 py-1.5 px-2 text-[11px] font-medium rounded transition flex items-center justify-center gap-1.5 ${
+                    vc.treeLogoUrl 
+                      ? 'bg-[#00c853] hover:bg-[#00b84a] text-white shadow-2xs' 
+                      : 'border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white'
+                  }`}
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  <span>Selecionar image</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleClearImage('treeLogoUrl')}
+                  className="py-1.5 px-3 border border-red-400 text-red-500 hover:bg-red-500 hover:text-white text-[11px] rounded transition"
+                >
+                  Limpar
+                </button>
+              </div>
+            </div>
+
+            {/* Box 2: Background Árvore (1150x800px) */}
+            <div className="border border-slate-200 rounded p-4 bg-white space-y-3 shadow-2xs hover:border-[#00c853]/40 transition">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-700 block">Background Árvore Genealógica (1150x800px)</span>
+                {vc.treeBackgroundUrl && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded">Ativo</span>
+                )}
+              </div>
+
+              <div 
+                onDragOver={(e) => { e.preventDefault(); setDragOverField('treeBackgroundUrl'); }}
+                onDragLeave={() => setDragOverField(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverField(null);
+                  if (e.dataTransfer.files?.[0]) processImageFile(e.dataTransfer.files[0], 'treeBackgroundUrl');
+                }}
+                onClick={() => handleOpenImageSelector('treeBackgroundUrl', 'Background Árvore Genealógica (1150x800px)')}
+                className={`h-36 bg-slate-50 border-2 ${dragOverField === 'treeBackgroundUrl' ? 'border-[#00c853] bg-emerald-50/40' : 'border-dashed border-slate-200'} rounded flex items-center justify-center overflow-hidden p-2 relative group cursor-pointer`}
+              >
+                {vc.treeBackgroundUrl ? (
+                  <img 
+                    src={vc.treeBackgroundUrl} 
+                    alt="Background Árvore" 
+                    className="max-h-full w-full object-cover transition-transform duration-150 rounded" 
+                    style={{ transform: `scale(${vc.treeBackgroundScale || 1})` }}
+                  />
+                ) : (
+                  <div className="text-center text-slate-400 p-2">
+                    <UploadCloud className="w-7 h-7 mx-auto mb-1 text-slate-400 group-hover:text-[#00c853] transition" />
+                    <span className="text-[11px] block font-medium">Clique ou arraste o fundo aqui</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
+                  <span>Zoom / Escala</span>
+                  <span className="font-mono font-bold text-slate-600">{Math.round((vc.treeBackgroundScale || 1) * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.05"
+                  value={vc.treeBackgroundScale || 1}
+                  onChange={(e) => handleVisualConfigChange('treeBackgroundScale', parseFloat(e.target.value))}
+                  className="w-full accent-purple-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+
+              <div className="flex space-x-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleOpenImageSelector('treeBackgroundUrl', 'Background Árvore Genealógica (1150x800px)')}
+                  className={`flex-1 py-1.5 px-2 text-[11px] font-medium rounded transition flex items-center justify-center gap-1.5 ${
+                    vc.treeBackgroundUrl 
+                      ? 'border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white' 
+                      : 'border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white'
+                  }`}
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  <span>Selecionar image</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleClearImage('treeBackgroundUrl')}
+                  className="py-1.5 px-3 border border-red-400 text-red-500 hover:bg-red-500 hover:text-white text-[11px] rounded transition"
+                >
+                  Limpar
+                </button>
+              </div>
+            </div>
+
+            {/* Box 3: Etiqueta */}
+            <div className="border border-slate-200 rounded p-4 bg-white space-y-3 shadow-2xs hover:border-[#00c853]/40 transition">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-700 block">Etiqueta</span>
+                {vc.labelLogoUrl && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded">Ativo</span>
+                )}
+              </div>
+
+              <div 
+                onDragOver={(e) => { e.preventDefault(); setDragOverField('labelLogoUrl'); }}
+                onDragLeave={() => setDragOverField(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverField(null);
+                  if (e.dataTransfer.files?.[0]) processImageFile(e.dataTransfer.files[0], 'labelLogoUrl');
+                }}
+                onClick={() => handleOpenImageSelector('labelLogoUrl', 'Etiqueta')}
+                className={`h-36 bg-slate-50 border-2 ${dragOverField === 'labelLogoUrl' ? 'border-[#00c853] bg-emerald-50/40' : 'border-dashed border-slate-200'} rounded flex items-center justify-center overflow-hidden p-2 relative group cursor-pointer`}
+              >
+                {vc.labelLogoUrl ? (
+                  <img 
+                    src={vc.labelLogoUrl} 
+                    alt="Etiqueta" 
+                    className="max-h-full object-contain transition-transform duration-150" 
+                    style={{ transform: `scale(${vc.labelLogoScale || 1})` }}
+                  />
+                ) : (
+                  <div className="text-center text-slate-400 p-2">
+                    <UploadCloud className="w-7 h-7 mx-auto mb-1 text-slate-400 group-hover:text-[#00c853] transition" />
+                    <span className="text-[11px] block font-medium">Clique ou arraste a logo aqui</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
+                  <span>Zoom / Escala</span>
+                  <span className="font-mono font-bold text-slate-600">{Math.round((vc.labelLogoScale || 1) * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.05"
+                  value={vc.labelLogoScale || 1}
+                  onChange={(e) => handleVisualConfigChange('labelLogoScale', parseFloat(e.target.value))}
+                  className="w-full accent-purple-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+
+              <div className="flex space-x-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleOpenImageSelector('labelLogoUrl', 'Etiqueta')}
+                  className={`flex-1 py-1.5 px-2 text-[11px] font-medium rounded transition flex items-center justify-center gap-1.5 ${
+                    vc.labelLogoUrl 
+                      ? 'border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white' 
+                      : 'border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white'
+                  }`}
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  <span>Selecionar image</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleClearImage('labelLogoUrl')}
+                  className="py-1.5 px-3 border border-red-400 text-red-500 hover:bg-red-500 hover:text-white text-[11px] rounded transition"
+                >
+                  Limpar
+                </button>
+              </div>
+            </div>
+
+            {/* Box 4: Background Etiqueta Frente */}
+            <div className="border border-slate-200 rounded p-4 bg-white space-y-3 shadow-2xs hover:border-[#00c853]/40 transition">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-700 block">Background Etiqueta Frente (100x60px)</span>
+                {vc.labelFrontBackgroundUrl && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded">Ativo</span>
+                )}
+              </div>
+
+              <div 
+                onDragOver={(e) => { e.preventDefault(); setDragOverField('labelFrontBackgroundUrl'); }}
+                onDragLeave={() => setDragOverField(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverField(null);
+                  if (e.dataTransfer.files?.[0]) processImageFile(e.dataTransfer.files[0], 'labelFrontBackgroundUrl');
+                }}
+                onClick={() => handleOpenImageSelector('labelFrontBackgroundUrl', 'Background Etiqueta Frente (100x60px)')}
+                className={`h-36 bg-slate-50 border-2 ${dragOverField === 'labelFrontBackgroundUrl' ? 'border-[#00c853] bg-emerald-50/40' : 'border-dashed border-slate-200'} rounded flex items-center justify-center overflow-hidden p-2 relative group cursor-pointer`}
+              >
+                {vc.labelFrontBackgroundUrl ? (
+                  <img 
+                    src={vc.labelFrontBackgroundUrl} 
+                    alt="Etiqueta Frente" 
+                    className="max-h-full w-full object-cover transition-transform duration-150 rounded" 
+                    style={{ transform: `scale(${vc.labelFrontScale || 1})` }}
+                  />
+                ) : (
+                  <div className="text-center text-slate-400 p-2">
+                    <UploadCloud className="w-7 h-7 mx-auto mb-1 text-slate-400 group-hover:text-[#00c853] transition" />
+                    <span className="text-[11px] block font-medium">Clique ou arraste o fundo aqui</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
+                  <span>Zoom / Escala</span>
+                  <span className="font-mono font-bold text-slate-600">{Math.round((vc.labelFrontScale || 1) * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.05"
+                  value={vc.labelFrontScale || 1}
+                  onChange={(e) => handleVisualConfigChange('labelFrontScale', parseFloat(e.target.value))}
+                  className="w-full accent-purple-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+
+              <div className="flex space-x-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleOpenImageSelector('labelFrontBackgroundUrl', 'Background Etiqueta Frente (100x60px)')}
+                  className={`flex-1 py-1.5 px-2 text-[11px] font-medium rounded transition flex items-center justify-center gap-1.5 ${
+                    vc.labelFrontBackgroundUrl 
+                      ? 'border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white' 
+                      : 'border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white'
+                  }`}
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  <span>Selecionar image</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleClearImage('labelFrontBackgroundUrl')}
+                  className="py-1.5 px-3 border border-red-400 text-red-500 hover:bg-red-500 hover:text-white text-[11px] rounded transition"
+                >
+                  Limpar
+                </button>
+              </div>
+            </div>
+
+            {/* Box 5: Background Etiqueta Verso */}
+            <div className="border border-slate-200 rounded p-4 bg-white space-y-3 shadow-2xs hover:border-[#00c853]/40 transition">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-700 block">Background Etiqueta Verso (100x60px)</span>
+                {vc.labelBackBackgroundUrl && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded">Ativo</span>
+                )}
+              </div>
+
+              <div 
+                onDragOver={(e) => { e.preventDefault(); setDragOverField('labelBackBackgroundUrl'); }}
+                onDragLeave={() => setDragOverField(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverField(null);
+                  if (e.dataTransfer.files?.[0]) processImageFile(e.dataTransfer.files[0], 'labelBackBackgroundUrl');
+                }}
+                onClick={() => handleOpenImageSelector('labelBackBackgroundUrl', 'Background Etiqueta Verso (100x60px)')}
+                className={`h-36 bg-slate-50 border-2 ${dragOverField === 'labelBackBackgroundUrl' ? 'border-[#00c853] bg-emerald-50/40' : 'border-dashed border-slate-200'} rounded flex items-center justify-center overflow-hidden p-2 relative group cursor-pointer`}
+              >
+                {vc.labelBackBackgroundUrl ? (
+                  <img 
+                    src={vc.labelBackBackgroundUrl} 
+                    alt="Etiqueta Verso" 
+                    className="max-h-full w-full object-cover transition-transform duration-150 rounded" 
+                    style={{ transform: `scale(${vc.labelBackScale || 1})` }}
+                  />
+                ) : (
+                  <div className="text-center text-slate-400 p-2">
+                    <UploadCloud className="w-7 h-7 mx-auto mb-1 text-slate-400 group-hover:text-[#00c853] transition" />
+                    <span className="text-[11px] block font-medium">Clique ou arraste o fundo aqui</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
+                  <span>Zoom / Escala</span>
+                  <span className="font-mono font-bold text-slate-600">{Math.round((vc.labelBackScale || 1) * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.05"
+                  value={vc.labelBackScale || 1}
+                  onChange={(e) => handleVisualConfigChange('labelBackScale', parseFloat(e.target.value))}
+                  className="w-full accent-purple-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+
+              <div className="flex space-x-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleOpenImageSelector('labelBackBackgroundUrl', 'Background Etiqueta Verso (100x60px)')}
+                  className={`flex-1 py-1.5 px-2 text-[11px] font-medium rounded transition flex items-center justify-center gap-1.5 ${
+                    vc.labelBackBackgroundUrl 
+                      ? 'border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white' 
+                      : 'border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white'
+                  }`}
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  <span>Selecionar image</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleClearImage('labelBackBackgroundUrl')}
+                  className="py-1.5 px-3 border border-red-400 text-red-500 hover:bg-red-500 hover:text-white text-[11px] rounded transition"
+                >
+                  Limpar
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* 7. SEÇÃO CONFIGURAÇÃO */}
+        <div>
+          <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-4">Configuração</h3>
+          
+          <div className="space-y-6">
+            {/* Linha 1 de Cores */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">Cor do texto geral Árvore Genealógica</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="color"
+                    value={vc.treeTextColor || '#000000'}
+                    onChange={(e) => handleVisualConfigChange('treeTextColor', e.target.value)}
+                    className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-black"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">Cor do texto geral Etiqueta Frente</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="color"
+                    value={vc.labelFrontTextColor || '#000000'}
+                    onChange={(e) => handleVisualConfigChange('labelFrontTextColor', e.target.value)}
+                    className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-black"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">Cor do texto geral Etiqueta Verso</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="color"
+                    value={vc.labelBackTextColor || '#000000'}
+                    onChange={(e) => handleVisualConfigChange('labelBackTextColor', e.target.value)}
+                    className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-black"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleResetColor('labelBackTextColor', '#000000')}
+                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0"
+                  >
+                    Cor Padrão
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Linha 2 de Cores */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">Cor do campo</label>
+                <input
+                  type="color"
+                  value={vc.fieldBgColor || '#ffffff'}
+                  onChange={(e) => handleVisualConfigChange('fieldBgColor', e.target.value)}
+                  className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">Cor do texto do campo</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="color"
+                    value={vc.fieldTextColor || '#000000'}
+                    onChange={(e) => handleVisualConfigChange('fieldTextColor', e.target.value)}
+                    className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-black"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleResetColor('fieldTextColor', '#000000')}
+                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0"
+                  >
+                    Cor Padrão
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Linha 3 de Cores (Paleta Macho / Fêmea) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">Cor paleta do Macho</label>
+                <input
+                  type="color"
+                  value={vc.maleColor || '#dbeafe'}
+                  onChange={(e) => handleVisualConfigChange('maleColor', e.target.value)}
+                  className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-[#dbeafe]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">Cor paleta da Fêmea</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="color"
+                    value={vc.femaleColor || '#fce7f3'}
+                    onChange={(e) => handleVisualConfigChange('femaleColor', e.target.value)}
+                    className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-[#fce7f3]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleResetColor('femaleColor', '#fce7f3')}
+                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0"
+                  >
+                    Cor Padrão
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Linha 4 de Cores (Texto Macho / Fêmea) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">Cor do texto da paleta do Macho</label>
+                <input
+                  type="color"
+                  value={vc.maleTextColor || '#000000'}
+                  onChange={(e) => handleVisualConfigChange('maleTextColor', e.target.value)}
+                  className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">Cor do texto paleta da Fêmea</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="color"
+                    value={vc.femaleTextColor || '#000000'}
+                    onChange={(e) => handleVisualConfigChange('femaleTextColor', e.target.value)}
+                    className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-black"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleResetColor('femaleTextColor', '#000000')}
+                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0"
+                  >
+                    Cor Padrão
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Sliders Roxos de Exibição */}
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center space-x-4">
+                <span className="text-xs text-slate-700 min-w-[280px]">Nível de exibição das paletas da Árvore Genealógica:</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={vc.malePaletteDisplay ?? 100}
+                  onChange={(e) => handleVisualConfigChange('malePaletteDisplay', parseInt(e.target.value))}
+                  className="w-48 accent-purple-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+
+              <div className="flex items-center space-x-4">
+                <span className="text-xs text-slate-700 min-w-[280px]">Nível de exibição das paletas da Etiqueta:</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={vc.femalePaletteDisplay ?? 100}
+                  onChange={(e) => handleVisualConfigChange('femalePaletteDisplay', parseInt(e.target.value))}
+                  className="w-48 accent-purple-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Toggles Verdes Sim/Não */}
+            <div className="space-y-4 pt-2">
+              <div>
+                <p className="text-xs text-slate-700 mb-1.5">
+                  Deseja imprimir no certificado o título "CERTIFICADO Árvore Genealógica"?
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleVisualConfigChange('printCertificateTitle', !vc.printCertificateTitle)}
+                  className={`px-3 py-1 text-[11px] font-bold rounded-full transition ${
+                    (vc.printCertificateTitle ?? true)
+                      ? 'bg-[#4caf50] text-white shadow-xs'
+                      : 'bg-slate-300 text-slate-700'
+                  }`}
+                >
+                  {(vc.printCertificateTitle ?? true) ? 'SIM' : 'NÃO'}
+                </button>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-700 mb-1.5">
+                  Deseja imprimir até a sexta geração da Árvore Genealógica?
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleVisualConfigChange('printUpToSixthGeneration', !vc.printUpToSixthGeneration)}
+                  className={`px-3 py-1 text-[11px] font-bold rounded-full transition ${
+                    (vc.printUpToSixthGeneration ?? true)
+                      ? 'bg-[#4caf50] text-white shadow-xs'
+                      : 'bg-slate-300 text-slate-700'
+                  }`}
+                >
+                  {(vc.printUpToSixthGeneration ?? true) ? 'SIM' : 'NÃO'}
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom Actions Bar */}
+            <div className="pt-6 border-t border-slate-200 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => window.history.back()}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-medium rounded transition flex items-center space-x-1"
+              >
+                <span>&lt; Voltar</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSave}
+                className="px-6 py-2 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-bold rounded shadow-sm transition flex items-center space-x-1.5"
+              >
+                <Check className="w-4 h-4" />
+                <span>Salvar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Modal Adicionar / Editar Proprietário */}
+      {isOwnerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-md shadow-xl w-full max-w-md border border-slate-200 overflow-hidden animate-scale-in">
+            <div className="bg-slate-50 px-5 py-3.5 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-800">
+                {editingOwnerIndex !== null ? 'Editar Proprietário' : 'Novo Proprietário'}
+              </h3>
+              <button
+                onClick={() => setIsOwnerModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveOwner} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Nome Completo *</label>
+                <input
+                  type="text"
+                  required
+                  value={ownerForm.name}
+                  onChange={(e) => setOwnerForm({ ...ownerForm, name: e.target.value })}
+                  placeholder="Luis Henrique Schreiber júnior 'Madruguinha'"
+                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">CPF *</label>
+                <input
+                  type="text"
+                  required
+                  value={ownerForm.cpf}
+                  onChange={(e) => setOwnerForm({ ...ownerForm, cpf: e.target.value })}
+                  placeholder="022.034.960-61"
+                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Cidade</label>
+                  <input
+                    type="text"
+                    value={ownerForm.city}
+                    onChange={(e) => setOwnerForm({ ...ownerForm, city: e.target.value })}
+                    placeholder="IJUI"
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">UF</label>
+                  <input
+                    type="text"
+                    value={ownerForm.state}
+                    onChange={(e) => setOwnerForm({ ...ownerForm, state: e.target.value.toUpperCase() })}
+                    placeholder="RS"
+                    maxLength={2}
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsOwnerModalOpen(false)}
+                  className="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-bold rounded shadow-xs transition"
+                >
+                  Salvar Proprietário
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🖼️ MODAL DE IMPORTAÇÃO & SELEÇÃO DE IMAGEM */}
+      {isImageModalOpen && activeImageField && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden animate-fadeIn">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-lg bg-[#00c853]/10 text-[#00c853] flex items-center justify-center">
+                  <UploadCloud className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Importar Imagem</h3>
+                  <p className="text-[11px] text-slate-500">{activeImageTitle}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsImageModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-slate-200 bg-slate-100/70 p-1">
+              <button
+                type="button"
+                onClick={() => setImageModalTab('upload')}
+                className={`flex-1 py-2 text-xs font-semibold rounded-md flex items-center justify-center gap-1.5 transition ${
+                  imageModalTab === 'upload' 
+                    ? 'bg-white text-slate-800 shadow-xs' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <FolderUp className="w-3.5 h-3.5 text-[#00c853]" />
+                <span>Upload do Arquivo</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setImageModalTab('presets')}
+                className={`flex-1 py-2 text-xs font-semibold rounded-md flex items-center justify-center gap-1.5 transition ${
+                  imageModalTab === 'presets' 
+                    ? 'bg-white text-slate-800 shadow-xs' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>Galeria BirdPro</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setImageModalTab('url')}
+                className={`flex-1 py-2 text-xs font-semibold rounded-md flex items-center justify-center gap-1.5 transition ${
+                  imageModalTab === 'url' 
+                    ? 'bg-white text-slate-800 shadow-xs' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Link2 className="w-3.5 h-3.5 text-blue-500" />
+                <span>Link da Web</span>
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="p-5 max-h-[60vh] overflow-y-auto custom-scrollbar">
+              {/* TAB 1: UPLOAD */}
+              {imageModalTab === 'upload' && (
+                <div className="space-y-4">
+                  <label 
+                    htmlFor="modal-file-upload-input"
+                    className="border-2 border-dashed border-slate-300 hover:border-[#00c853] bg-slate-50 hover:bg-emerald-50/20 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition text-center group"
+                  >
+                    <div className="w-14 h-14 rounded-full bg-white shadow-xs border border-slate-200 flex items-center justify-center mb-3 group-hover:scale-105 group-hover:border-[#00c853] transition">
+                      <UploadCloud className="w-7 h-7 text-[#00c853]" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-800 mb-1">
+                      Clique para escolher imagem do computador ou celular
+                    </span>
+                    <span className="text-[11px] text-slate-500 max-w-xs">
+                      Suporta PNG, JPG, JPEG, WEBP ou SVG (Alta resolução com otimização automática)
+                    </span>
+                    <input
+                      id="modal-file-upload-input"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files?.[0] && activeImageField) {
+                          processImageFile(e.target.files[0], activeImageField)
+                        }
+                      }}
+                    />
+                  </label>
+
+                  {isProcessingImage && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded text-emerald-800 text-xs flex items-center justify-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#00c853]"></div>
+                      <span>Processando e otimizando imagem...</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: PRESETS */}
+              {imageModalTab === 'presets' && (
+                <div className="space-y-3">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                    {activeImageField === 'treeBackgroundUrl' 
+                      ? 'Fundos Profissionais para Árvore Genealógica (1150x800px)' 
+                      : (activeImageField === 'labelFrontBackgroundUrl' || activeImageField === 'labelBackBackgroundUrl')
+                        ? 'Fundos Elegantes para Etiquetas e Crachás (100x60px)'
+                        : 'Fotos de Pássaros & Matrizes em Alta Definição'}
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {/* Presets based on field */}
+                    {(activeImageField === 'treeBackgroundUrl' ? [
+                      { title: 'Aurora Holográfica', url: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1150&auto=format&fit=crop&q=80' },
+                      { title: 'Ouro Real Luxo', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1150&auto=format&fit=crop&q=80' },
+                      { title: 'Bosque & Natureza', url: 'https://images.unsplash.com/photo-1511497584788-87676104235f?w=1150&auto=format&fit=crop&q=80' },
+                      { title: 'Pergaminho Nobre', url: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=1150&auto=format&fit=crop&q=80' },
+                      { title: 'Azul Tecnológico', url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1150&auto=format&fit=crop&q=80' },
+                      { title: 'Textura Esmeralda', url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=1150&auto=format&fit=crop&q=80' }
+                    ] : (activeImageField === 'labelFrontBackgroundUrl' || activeImageField === 'labelBackBackgroundUrl') ? [
+                      { title: 'Pássaro Natureza', url: 'https://images.unsplash.com/photo-1552728089-57bdde30beb3?w=400&auto=format&fit=crop&q=80' },
+                      { title: 'Esmeralda & Ouro', url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=400&auto=format&fit=crop&q=80' },
+                      { title: 'Abstrato Moderno', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80' },
+                      { title: 'Aurora Gradiente', url: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=400&auto=format&fit=crop&q=80' },
+                      { title: 'Bosque Suave', url: 'https://images.unsplash.com/photo-1511497584788-87676104235f?w=400&auto=format&fit=crop&q=80' },
+                      { title: 'Minimalista Claro', url: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&auto=format&fit=crop&q=80' }
+                    ] : [
+                      { title: 'Canário da Terra', url: 'https://images.unsplash.com/photo-1552728089-57bdde30beb3?w=500&auto=format&fit=crop&q=80' },
+                      { title: 'Coleiro / Papa-Capim', url: 'https://images.unsplash.com/photo-1549608276-5786777e6587?w=500&auto=format&fit=crop&q=80' },
+                      { title: 'Trinca-Ferro', url: 'https://images.unsplash.com/photo-1444464666168-49d633b86797?w=500&auto=format&fit=crop&q=80' },
+                      { title: 'Azulão', url: 'https://images.unsplash.com/photo-1574063413132-355dbfd83e25?w=500&auto=format&fit=crop&q=80' },
+                      { title: 'Curió', url: 'https://images.unsplash.com/photo-1606567595334-d39972c85dbe?w=500&auto=format&fit=crop&q=80' },
+                      { title: 'Papagaio Verdadeiro', url: 'https://images.unsplash.com/photo-1535083783855-76ae62b2914e?w=500&auto=format&fit=crop&q=80' }
+                    ]).map((preset, idx) => (
+                      <div 
+                        key={idx}
+                        onClick={() => handleApplyPresetOrUrl(preset.url)}
+                        className="border border-slate-200 rounded-lg overflow-hidden group cursor-pointer hover:border-[#00c853] hover:shadow-md transition bg-white"
+                      >
+                        <div className="h-24 bg-slate-100 overflow-hidden relative">
+                          <img 
+                            src={preset.url} 
+                            alt={preset.title} 
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-200" 
+                          />
+                        </div>
+                        <div className="p-2 text-center bg-slate-50 border-t border-slate-100">
+                          <span className="text-[11px] font-bold text-slate-700 block truncate group-hover:text-[#00c853]">
+                            {preset.title}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: URL */}
+              {imageModalTab === 'url' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Endereço / URL Direta da Imagem
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://exemplo.com/minha-imagem.png"
+                      value={customImageUrl}
+                      onChange={(e) => setCustomImageUrl(e.target.value)}
+                      className="w-full text-xs px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:border-[#00c853]"
+                    />
+                  </div>
+
+                  {customImageUrl && (
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-semibold text-slate-500">Pré-visualização:</span>
+                      <div className="h-36 bg-slate-50 border border-slate-200 rounded-lg overflow-hidden flex items-center justify-center p-2">
+                        <img 
+                          src={customImageUrl} 
+                          alt="Preview" 
+                          className="max-h-full object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!customImageUrl) return;
+                      handleApplyPresetOrUrl(customImageUrl);
+                    }}
+                    className="w-full py-2.5 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-bold rounded-lg shadow-xs transition"
+                  >
+                    Salvar Imagem por URL
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsImageModalOpen(false)}
+                className="px-4 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded-lg transition"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
