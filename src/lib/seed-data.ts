@@ -177,6 +177,8 @@ export const INITIAL_GLOBAL_CONFIG: GlobalSystemConfig = {
   pagbankSandbox: false,
   pagbankPixKey: '5555991343265',
   pagbankWebhookUrl: 'https://www.birdpro.com.br/api/webhooks/pagbank',
+  monthlySalesGoal: 25000,
+  monthlySubscribersGoal: 50,
   smtpHost: 'smtp.birdpro.com.br',
   smtpPort: 587,
   smtpUser: 'nao-responda@birdpro.com.br',

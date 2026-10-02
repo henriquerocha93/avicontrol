@@ -23,26 +23,44 @@ import {
   Zap,
   ShoppingBag,
   Clock,
-  Headphones
+  Headphones,
+  Edit2,
+  X,
+  CheckCircle2
 } from 'lucide-react'
 import { 
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
 } from 'recharts'
 import { db } from '@/lib/db'
-import { SellerAffiliate, Tenant, AffiliateCommission } from '@/types'
+import { SellerAffiliate, Tenant, AffiliateCommission, GlobalSystemConfig } from '@/types'
 import { formatDate } from '@/lib/utils'
 
 export function AdminCommercialDashboard() {
   const [sellers, setSellers] = useState<SellerAffiliate[]>([])
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [commissions, setCommissions] = useState<AffiliateCommission[]>([])
+  const [globalConfig, setGlobalConfig] = useState<GlobalSystemConfig>(db.getGlobalConfig())
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
+  // Edit Goals Modal state
+  const [isEditGoalsModalOpen, setIsEditGoalsModalOpen] = useState(false)
+  const [formSalesGoal, setFormSalesGoal] = useState('25000')
+  const [formSubscribersGoal, setFormSubscribersGoal] = useState('50')
+  const [saveToast, setSaveToast] = useState(false)
+
+  const refreshData = () => {
+    setSellers([...db.getSellers()])
+    setTenants([...db.getAllTenants()])
+    setCommissions([...db.getCommissions()])
+    const cfg = db.getGlobalConfig()
+    setGlobalConfig({ ...cfg })
+    setFormSalesGoal((cfg.monthlySalesGoal ?? 25000).toString())
+    setFormSubscribersGoal((cfg.monthlySubscribersGoal ?? 50).toString())
+  }
+
   useEffect(() => {
-    setSellers(db.getSellers())
-    setTenants(db.getAllTenants())
-    setCommissions(db.getCommissions())
+    refreshData()
   }, [])
 
   const handleCopy = (text: string, id: string) => {
@@ -51,7 +69,33 @@ export function AdminCommercialDashboard() {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
-  // Financial calculations
+  const handleOpenEditGoals = () => {
+    setFormSalesGoal((globalConfig.monthlySalesGoal ?? 25000).toString())
+    setFormSubscribersGoal((globalConfig.monthlySubscribersGoal ?? 50).toString())
+    setIsEditGoalsModalOpen(true)
+  }
+
+  const handleSaveGoals = () => {
+    const sGoal = parseFloat(formSalesGoal) || 0
+    const subGoal = parseInt(formSubscribersGoal, 10) || 0
+
+    db.updateGlobalConfig({
+      monthlySalesGoal: sGoal,
+      monthlySubscribersGoal: subGoal
+    })
+
+    setGlobalConfig(prev => ({
+      ...prev,
+      monthlySalesGoal: sGoal,
+      monthlySubscribersGoal: subGoal
+    }))
+
+    setIsEditGoalsModalOpen(false)
+    setSaveToast(true)
+    setTimeout(() => setSaveToast(false), 3500)
+  }
+
+  // Financial calculations from real database records (no fake/mock numbers)
   const totalSalesFromAffiliates = sellers.reduce((acc, s) => acc + (s.totalSalesValue || 0), 0)
   const totalCommissionsEarned = sellers.reduce((acc, s) => acc + (s.totalCommissionsEarned || 0), 0)
   const totalCommissionsPaid = sellers.reduce((acc, s) => acc + (s.totalCommissionsPaid || 0), 0)
@@ -59,38 +103,49 @@ export function AdminCommercialDashboard() {
   const totalClicksAll = sellers.reduce((acc, s) => acc + (s.totalClicks || 0), 0)
   const totalSignupsAll = sellers.reduce((acc, s) => acc + (s.totalSignups || 0), 0)
 
+  // Real current month sales and subscribers
+  const totalCommissionsSales = commissions.reduce((acc, c) => acc + (c.saleValue || 0), 0)
+  const currentSales = totalCommissionsSales > 0 ? totalCommissionsSales : totalSalesFromAffiliates
+
+  // Count active non-exempt subscriber tenants created/active
+  const paidTenants = tenants.filter(t => t.id !== 'tenant-demo-01' && t.planStatus === 'ACTIVE' && t.billingCycle !== 'ISENTO')
+  const currentSubscribers = paidTenants.length
+
   // Monthly Sales Target
-  const salesGoal = 25000.00
-  const currentSales = totalSalesFromAffiliates + 14500.00 // Total gross with direct sales
-  const salesProgressPercent = Math.min(100, Math.round((currentSales / salesGoal) * 100))
+  const salesGoal = globalConfig.monthlySalesGoal ?? 25000.00
+  const salesProgressPercent = salesGoal > 0 ? Math.min(100, Math.round((currentSales / salesGoal) * 100)) : 0
 
   // New Subscribers Target
-  const subscribersGoal = 50
-  const currentSubscribers = 38
-  const subscribersProgressPercent = Math.min(100, Math.round((currentSubscribers / subscribersGoal) * 100))
+  const subscribersGoal = globalConfig.monthlySubscribersGoal ?? 50
+  const subscribersProgressPercent = subscribersGoal > 0 ? Math.min(100, Math.round((currentSubscribers / subscribersGoal) * 100)) : 0
 
-  // Commercial Revenue Chart
+  // Current date formatting for chart
+  const now = new Date()
+  const currentMonthLabel = `${now.toLocaleDateString('pt-BR', { month: 'short' })}/${now.getFullYear().toString().slice(-2)} (Atual)`
+
+  // Commercial Revenue Chart with zero-state transparency (real data only)
   const revenueChartData = [
-    { month: 'Out/25', vendas: 8500, comissoes: 1700, liquido: 6800 },
-    { month: 'Nov/25', vendas: 12300, comissoes: 2460, liquido: 9840 },
-    { month: 'Dez/25', vendas: 15800, comissoes: 3160, liquido: 12640 },
-    { month: 'Jan/26', vendas: 18400, comissoes: 3680, liquido: 14720 },
-    { month: 'Fev/26', vendas: 21900, comissoes: 4380, liquido: 17520 },
-    { month: 'Mar/26 (Atual)', vendas: currentSales, comissoes: totalCommissionsEarned, liquido: currentSales - totalCommissionsEarned },
-  ]
-
-  // Recent Sales Feed Mock (Privacy-Safe)
-  const recentSalesList = [
-    { id: '1', tenant: 'Assinatura Nova • Ref #BP-9821 (SP)', plan: 'Plano Anual PRO', value: 169.99, seller: 'Mariana Duarte', commission: 42.50, date: 'Hoje às 14:32', status: 'PAID' },
-    { id: '2', tenant: 'Assinatura Nova • Ref #BP-9818 (RS)', plan: 'Plano Anual PRO', value: 169.99, seller: 'Carlos Oliveira', commission: 34.00, date: 'Hoje às 11:15', status: 'PAID' },
-    { id: '3', tenant: 'Renovação Anual • Ref #BP-9792 (MG)', plan: 'Plano Anual PRO', value: 169.99, seller: 'Carlos Oliveira', commission: 34.00, date: 'Ontem às 18:40', status: 'PAID' },
-    { id: '4', tenant: 'Assinatura Mensal • Ref #BP-9780 (PR)', plan: 'Plano Mensal PRO', value: 14.99, seller: 'Federação Clubes', commission: 2.25, date: 'Ontem às 09:20', status: 'PAID' },
-    { id: '5', tenant: 'Assinatura Nova • Ref #BP-9765 (PA)', plan: 'Plano Anual PRO', value: 169.99, seller: 'Mariana Duarte', commission: 42.50, date: '28/02 às 16:10', status: 'PAID' },
+    { month: 'Jan/26', vendas: 0, comissoes: 0, liquido: 0 },
+    { month: 'Fev/26', vendas: 0, comissoes: 0, liquido: 0 },
+    { month: currentMonthLabel, vendas: currentSales, comissoes: totalCommissionsEarned, liquido: Math.max(0, currentSales - totalCommissionsEarned) },
   ]
 
   return (
     <div className="space-y-6 pb-12 w-full font-sans">
       
+      {/* Save Goals Toast */}
+      {saveToast && (
+        <div className="fixed top-6 right-6 z-50 bg-emerald-700 text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center space-x-3 border border-emerald-500 animate-in fade-in slide-in-from-top duration-300">
+          <CheckCircle2 className="w-5 h-5 text-emerald-300 shrink-0" />
+          <div>
+            <div className="font-black text-xs">Metas Comerciais Atualizadas!</div>
+            <div className="text-[11px] text-emerald-100">
+              Novas metas do mês salvas com sucesso no sistema BirdPro.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==================================================================== */}
       {/* COMMERCIAL HEADER BANNER                                             */}
       {/* ==================================================================== */}
@@ -105,11 +160,18 @@ export function AdminCommercialDashboard() {
               Gestão de Vendas, Metas &amp; Afiliados
             </h1>
             <p className="text-slate-400 text-xs sm:text-sm max-w-2xl">
-              Acompanhamento do faturamento do BirdPro, metas comerciais do mês, performance de vendedores parceiros e repasses de comissão PIX.
+              Acompanhamento do faturamento real do BirdPro, metas comerciais do mês, performance de vendedores parceiros e repasses de comissão PIX.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={handleOpenEditGoals}
+              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black rounded-xl flex items-center space-x-2 transition shadow-md cursor-pointer"
+            >
+              <Edit2 className="w-4 h-4 text-slate-950" />
+              <span>Editar Metas do Mês</span>
+            </button>
             <Link
               href="/dashboard/admin/chamados"
               className="px-4 py-2.5 bg-[#1e293b] hover:bg-slate-700 text-white text-xs font-bold rounded-xl flex items-center space-x-2 transition shadow-md border border-slate-600"
@@ -143,68 +205,90 @@ export function AdminCommercialDashboard() {
       {/* ==================================================================== */}
       {/* SALES TARGETS / METAS COMERCIAIS DO MÊS                              */}
       {/* ==================================================================== */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Meta 1: Faturamento do Mês */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <Target className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="text-xs font-bold text-slate-800 uppercase tracking-wide block">
-                  Meta de Faturamento do Mês
-                </span>
-                <span className="text-[11px] text-slate-500">
-                  Objetivo: R$ {salesGoal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-            <span className="text-lg font-black text-emerald-600">{salesProgressPercent}%</span>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center space-x-2">
+            <Target className="w-4 h-4 text-emerald-600" />
+            <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+              Metas Comerciais do Mês Vigente
+            </h2>
           </div>
-
-          <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-            <div 
-              className="bg-gradient-to-r from-emerald-500 to-[#00c853] h-full rounded-full transition-all duration-500"
-              style={{ width: `${salesProgressPercent}%` }}
-            />
-          </div>
-
-          <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
-            <span>Realizado: <strong className="text-slate-800">R$ {currentSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></span>
-            <span>Faltam: <strong className="text-amber-600">R$ {Math.max(0, salesGoal - currentSales).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></span>
-          </div>
+          <button
+            onClick={handleOpenEditGoals}
+            className="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center space-x-1 hover:underline cursor-pointer"
+          >
+            <Edit2 className="w-3 h-3" />
+            <span>Personalizar Metas</span>
+          </button>
         </div>
 
-        {/* Meta 2: Novos Criatórios Assinantes */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <Building2 className="w-5 h-5" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Meta 1: Faturamento do Mês */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Target className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wide block">
+                    Meta de Faturamento do Mês
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    Objetivo: R$ {salesGoal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
               </div>
-              <div>
-                <span className="text-xs font-bold text-slate-800 uppercase tracking-wide block">
-                  Meta de Novos Criatórios
-                </span>
-                <span className="text-[11px] text-slate-500">
-                  Objetivo: {subscribersGoal} novos criatórios este mês
-                </span>
+              <div className="text-right">
+                <span className="text-lg font-black text-emerald-600">{salesProgressPercent}%</span>
               </div>
             </div>
-            <span className="text-lg font-black text-emerald-600">{subscribersProgressPercent}%</span>
+
+            <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-emerald-500 to-[#00c853] h-full rounded-full transition-all duration-500"
+                style={{ width: `${salesProgressPercent}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+              <span>Realizado: <strong className="text-slate-800">R$ {currentSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></span>
+              <span>Faltam: <strong className="text-amber-600">R$ {Math.max(0, salesGoal - currentSales).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></span>
+            </div>
           </div>
 
-          <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-            <div 
-              className="bg-gradient-to-r from-emerald-500 to-[#00c853] h-full rounded-full transition-all duration-500"
-              style={{ width: `${subscribersProgressPercent}%` }}
-            />
-          </div>
+          {/* Meta 2: Novos Criatórios Assinantes */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wide block">
+                    Meta de Novos Criatórios
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    Objetivo: {subscribersGoal} novos criatórios este mês
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-lg font-black text-emerald-600">{subscribersProgressPercent}%</span>
+              </div>
+            </div>
 
-          <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
-            <span>Conquistados: <strong className="text-slate-800">{currentSubscribers} criatórios</strong></span>
-            <span>Faltam: <strong className="text-emerald-600">{Math.max(0, subscribersGoal - currentSubscribers)} criatórios</strong></span>
+            <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-emerald-500 to-[#00c853] h-full rounded-full transition-all duration-500"
+                style={{ width: `${subscribersProgressPercent}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+              <span>Conquistados: <strong className="text-slate-800">{currentSubscribers} criatórios</strong></span>
+              <span>Faltam: <strong className="text-emerald-600">{Math.max(0, subscribersGoal - currentSubscribers)} criatórios</strong></span>
+            </div>
           </div>
         </div>
       </div>
@@ -242,7 +326,7 @@ export function AdminCommercialDashboard() {
               R$ {totalCommissionsEarned.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </span>
             <span className="text-[10px] text-slate-500 font-medium mt-0.5 block">
-              Média de 20% sobre as vendas
+              Repasse sobre vendas
             </span>
           </div>
           <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
@@ -305,7 +389,7 @@ export function AdminCommercialDashboard() {
               </p>
             </div>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
-              Crescimento +28% M/M
+              Tempo Real
             </span>
           </div>
 
@@ -354,33 +438,40 @@ export function AdminCommercialDashboard() {
             </div>
 
             <div className="divide-y divide-slate-100">
-              {sellers.map((s, idx) => (
-                <div key={s.id} className="p-3.5 hover:bg-slate-50/70 transition flex items-center justify-between gap-2">
-                  <div className="flex items-center space-x-2.5 min-w-0">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[11px] shrink-0 ${
-                      idx === 0 ? 'bg-amber-100 text-amber-700' :
-                      idx === 1 ? 'bg-slate-200 text-slate-700' :
-                      idx === 2 ? 'bg-amber-900/10 text-amber-800' :
-                      'bg-slate-100 text-slate-500'
-                    }`}>
-                      {idx + 1}º
-                    </span>
-                    <div className="min-w-0">
-                      <span className="font-bold text-xs text-slate-800 block truncate">{s.name}</span>
-                      <span className="text-[10px] text-slate-400 font-mono block">Cupom: {s.couponCode} • {s.totalSignups} vendas</span>
+              {sellers.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400 space-y-1">
+                  <p className="font-bold text-slate-600">Nenhum afiliado cadastrado ainda.</p>
+                  <p className="text-[11px]">Cadastre seus primeiros parceiros comerciais no botão acima.</p>
+                </div>
+              ) : (
+                sellers.slice(0, 5).map((s, idx) => (
+                  <div key={s.id} className="p-3.5 hover:bg-slate-50/70 transition flex items-center justify-between gap-2">
+                    <div className="flex items-center space-x-2.5 min-w-0">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[11px] shrink-0 ${
+                        idx === 0 ? 'bg-amber-100 text-amber-700' :
+                        idx === 1 ? 'bg-slate-200 text-slate-700' :
+                        idx === 2 ? 'bg-amber-900/10 text-amber-800' :
+                        'bg-slate-100 text-slate-500'
+                      }`}>
+                        {idx + 1}º
+                      </span>
+                      <div className="min-w-0">
+                        <span className="font-bold text-xs text-slate-800 block truncate">{s.name}</span>
+                        <span className="text-[10px] text-slate-400 font-mono block">Cupom: {s.couponCode} • {s.totalSignups} vendas</span>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="font-black text-xs text-slate-800 block">
+                        R$ {s.totalSalesValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="text-[10px] text-emerald-600 font-semibold block">
+                        +R$ {s.totalCommissionsEarned.toFixed(2)} comissão
+                      </span>
                     </div>
                   </div>
-
-                  <div className="text-right shrink-0">
-                    <span className="font-black text-xs text-slate-800 block">
-                      R$ {s.totalSalesValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-[10px] text-emerald-600 font-semibold block">
-                      +R$ {s.totalCommissionsEarned.toFixed(2)} comissão
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
@@ -434,33 +525,164 @@ export function AdminCommercialDashboard() {
               </tr>
             </thead>
             <tbody>
-              {recentSalesList.map((sale) => (
-                <tr key={sale.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition">
-                  <td className="px-4 py-3 font-bold text-slate-800">{sale.tenant}</td>
-                  <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                      {sale.plan}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 font-semibold text-slate-700">{sale.seller}</td>
-                  <td className="px-4 py-3 text-right font-black text-slate-900">
-                    R$ {sale.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-4 py-3 text-right font-bold text-emerald-600">
-                    R$ {sale.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-4 py-3 text-center text-slate-500 font-mono text-[11px]">{sale.date}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700">
-                      PAGO / ATIVO
-                    </span>
+              {commissions.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <ShoppingBag className="w-8 h-8 text-slate-300" />
+                      <p className="font-bold text-slate-700 text-xs">Nenhuma venda registrada até o momento</p>
+                      <p className="text-[11px] text-slate-400 max-w-md">
+                        As novas assinaturas via PagBank (Cartão / PIX) e indicações de parceiros aparecerão aqui em tempo real.
+                      </p>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                commissions.map((sale) => (
+                  <tr key={sale.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition">
+                    <td className="px-4 py-3 font-bold text-slate-800">{sale.tenantName}</td>
+                    <td className="px-4 py-3">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        {sale.planName}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-slate-700">{sale.affiliateName}</td>
+                    <td className="px-4 py-3 text-right font-black text-slate-900">
+                      R$ {sale.saleValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold text-emerald-600">
+                      R$ {sale.commissionAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-3 text-center text-slate-500 font-mono text-[11px]">{formatDate(sale.createdAt)}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700">
+                        {sale.status === 'APPROVED' ? 'PAGO / ATIVO' : sale.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* ==================================================================== */}
+      {/* MODAL: EDITAR METAS COMERCIAIS DO MÊS                                */}
+      {/* ==================================================================== */}
+      {isEditGoalsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 bg-[#171b21] text-white flex items-center justify-between">
+              <span className="font-bold text-sm uppercase tracking-wider flex items-center gap-2">
+                <Target className="w-5 h-5 text-emerald-400" />
+                <span>Editar Metas Comerciais do Mês</span>
+              </span>
+              <button onClick={() => setIsEditGoalsModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-slate-500">
+                Ajuste os objetivos comerciais mensais da plataforma BirdPro. Os gráficos e barras de progresso do painel refletirão estas metas imediatamente.
+              </p>
+
+              {/* Input 1: Meta de Faturamento */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4 text-emerald-600" />
+                  <span>Meta de Faturamento Mensal (R$)</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">R$</span>
+                  <input
+                    type="number"
+                    step="500"
+                    value={formSalesGoal}
+                    onChange={(e) => setFormSalesGoal(e.target.value)}
+                    placeholder="25000"
+                    className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500 font-bold text-slate-800"
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  {[10000, 25000, 50000, 100000].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setFormSalesGoal(preset.toString())}
+                      className="px-2 py-0.5 text-[10px] font-semibold bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 rounded text-slate-600 transition cursor-pointer"
+                    >
+                      R$ {preset >= 1000 ? `${preset / 1000}k` : preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Input 2: Meta de Novos Criatórios */}
+              <div className="space-y-1.5 pt-2">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-emerald-600" />
+                  <span>Meta de Novos Criatórios no Mês (Assinantes)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="5"
+                    value={formSubscribersGoal}
+                    onChange={(e) => setFormSubscribersGoal(e.target.value)}
+                    placeholder="50"
+                    className="w-full h-9 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500 font-bold text-slate-800"
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  {[10, 25, 50, 100].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setFormSubscribersGoal(preset.toString())}
+                      className="px-2 py-0.5 text-[10px] font-semibold bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 rounded text-slate-600 transition cursor-pointer"
+                    >
+                      {preset} criatórios
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-[11px] text-emerald-800 space-y-1 mt-2">
+                <div className="font-bold flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Cálculo em Tempo Real:</span>
+                </div>
+                <div>
+                  Faturamento atual: <strong>R$ {currentSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                </div>
+                <div>
+                  Criatórios conquistados: <strong>{currentSubscribers} criatórios</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setIsEditGoalsModalOpen(false)}
+                className="px-4 py-2 text-xs text-slate-600 hover:text-slate-900 font-medium cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveGoals}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-lg transition shadow-xs cursor-pointer flex items-center space-x-1.5"
+              >
+                <Check className="w-4 h-4" />
+                <span>Salvar Metas</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )

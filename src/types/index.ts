@@ -148,6 +148,8 @@ export interface GlobalSystemConfig {
   pagbankAppId?: string;
   pagbankAppKey?: string;
   pagbankWebhookUrl?: string;
+  monthlySalesGoal?: number;
+  monthlySubscribersGoal?: number;
   smtpHost?: string;
   smtpPort?: number;
   smtpUser?: string;
