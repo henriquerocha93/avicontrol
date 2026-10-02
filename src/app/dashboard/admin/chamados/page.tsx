@@ -110,6 +110,26 @@ export default function AdminChamadosPage() {
     loadTickets();
   };
 
+  const handleFinalizeTicket = () => {
+    if (!selectedTicket) return;
+    db.updateTicketStatus(selectedTicket.id, 'RESOLVED');
+    loadTickets();
+  };
+
+  const handleReopenTicket = () => {
+    if (!selectedTicket) return;
+    db.updateTicketStatus(selectedTicket.id, 'IN_PROGRESS');
+    loadTickets();
+  };
+
+  const handleDeleteTicket = (id: string) => {
+    if (confirm('Tem certeza que deseja excluir este chamado permanentemente?')) {
+      db.deleteTicket(id);
+      setSelectedTicketId(null);
+      loadTickets();
+    }
+  };
+
   const handleQuickReply = (text: string) => {
     setReplyText(text);
   };
@@ -473,11 +493,40 @@ export default function AdminChamadosPage() {
                     <span>Conversar no WhatsApp</span>
                   </a>
 
+                  {/* Primary Finalize Button */}
+                  {selectedTicket.status !== 'RESOLVED' && selectedTicket.status !== 'CLOSED' ? (
+                    <button
+                      type="button"
+                      onClick={handleFinalizeTicket}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-950/60 transition transform hover:-translate-y-0.5 cursor-pointer uppercase tracking-wider"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Finalizar Atendimento</span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-black flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        Concluído
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleReopenTicket}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold rounded-xl transition cursor-pointer"
+                        title="Reabrir Chamado"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Reabrir</span>
+                      </button>
+                    </div>
+                  )}
+
                   {/* Status Switcher Button Group */}
                   <div className="flex items-center gap-1 p-1 bg-[#141a20] rounded-xl border border-[#30363d]">
                     <button
+                      type="button"
                       onClick={() => handleUpdateStatus('IN_PROGRESS')}
-                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
                         selectedTicket.status === 'IN_PROGRESS'
                           ? 'bg-amber-500 text-slate-950 shadow-xs'
                           : 'text-slate-400 hover:text-white'
@@ -486,8 +535,9 @@ export default function AdminChamadosPage() {
                       Em Atendimento
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleUpdateStatus('RESOLVED')}
-                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
                         selectedTicket.status === 'RESOLVED'
                           ? 'bg-emerald-500 text-slate-950 shadow-xs'
                           : 'text-slate-400 hover:text-white'
@@ -496,6 +546,16 @@ export default function AdminChamadosPage() {
                       Resolvido
                     </button>
                   </div>
+
+                  {/* Delete Ticket Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTicket(selectedTicket.id)}
+                    title="Excluir Chamado Permanentemente"
+                    className="p-2 bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 hover:text-rose-200 border border-rose-800/50 rounded-xl transition cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
 
                 </div>
 

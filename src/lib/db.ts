@@ -875,6 +875,9 @@ class DataService {
     if (tkt) {
       tkt.status = status;
       tkt.updatedAt = new Date().toISOString();
+      if (status === 'RESOLVED' || status === 'CLOSED') {
+        tkt.unreadByAdmin = false;
+      }
       this.saveToStorage();
       return tkt;
     }
