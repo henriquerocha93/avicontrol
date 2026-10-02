@@ -3,7 +3,8 @@ import {
   Treatment, SexingRecord, GenotypingRecord, BirdTimelineEvent, 
   NotificationItem, Tenant, User, SupportTicket, BirdDocument, BirdPhoto, AuditLog,
   SellerAffiliate, AffiliateCommission, AffiliatePayout, GlobalSystemConfig,
-  CalendarEvent, NoteItem, AiLearnedInsight, UserReferralProgram, ReferredFriend, PlanType
+  CalendarEvent, NoteItem, AiLearnedInsight, UserReferralProgram, ReferredFriend, PlanType,
+  CouponValidationResult
 } from '@/types';
 import { 
   INITIAL_TENANT, INITIAL_ALL_TENANTS, INITIAL_USERS, INITIAL_BIRDS, INITIAL_CAGES, 
@@ -231,6 +232,10 @@ class DataService {
   }
 
   // --- TENANTS & USERS ---
+  getAllTenants(): Tenant[] {
+    return this.state.tenants || [];
+  }
+
   getTenant(id = 'tenant-demo-01'): Tenant {
     return this.state.tenants.find(t => t.id === id) || this.state.tenants[0] || INITIAL_TENANT;
   }
@@ -250,8 +255,13 @@ class DataService {
     return this.updateTenant(tenant, tenant.id || 'tenant-demo-01');
   }
 
-  getAllTenants(): Tenant[] {
-    return this.state.tenants;
+  getAllUsers(): User[] {
+    return this.state.users || [];
+  }
+
+  getUserByEmail(email: string): User | undefined {
+    const clean = email.toLowerCase().trim();
+    return (this.state.users || []).find(u => u.email.toLowerCase().trim() === clean);
   }
 
   getUsers(tenantId = 'tenant-demo-01'): User[] {
@@ -1176,6 +1186,76 @@ class DataService {
     return newFriend;
   }
 
+  validateCoupon(rawCode: string): CouponValidationResult {
+    if (!rawCode || !rawCode.trim()) {
+      return { valid: false, code: '', discountPercent: 0, message: 'Digite um cupom de desconto válido.' };
+    }
+
+    const code = rawCode.trim().toUpperCase();
+
+    // 1. Check seller / affiliate coupons
+    const seller = (this.state.sellers || []).find(
+      s => s.status === 'ACTIVE' && (
+        (s.couponCode && s.couponCode.toUpperCase() === code) ||
+        (s.affiliateCode && s.affiliateCode.toUpperCase() === code)
+      )
+    );
+
+    if (seller) {
+      const discount = 10; // 10% standard partner discount for buyers
+      return {
+        valid: true,
+        code,
+        discountPercent: discount,
+        sellerId: seller.id,
+        sellerName: seller.name,
+        message: `Cupom Oficial de Parceiro (${seller.name}) aplicado: ${discount}% de desconto!`
+      };
+    }
+
+    // 2. Check user referral coupons
+    const referrals = this.state.userReferrals || {};
+    for (const tenantId in referrals) {
+      const prog = referrals[tenantId];
+      if (prog.couponCode && prog.couponCode.toUpperCase() === code) {
+        const tenant = this.getTenant(tenantId);
+        return {
+          valid: true,
+          code,
+          discountPercent: prog.friendDiscountPercent || 10,
+          sellerId: tenantId,
+          sellerName: tenant?.name || 'Criatório Amigo',
+          message: `Cupom de Indicação Amigo (${tenant?.name || 'Criatório'}) aplicado: ${prog.friendDiscountPercent || 10}% de desconto!`
+        };
+      }
+    }
+
+    // 3. Check system platform promo codes
+    const PROMO_CODES: Record<string, { percent: number; label: string }> = {
+      'BIRDPRO10': { percent: 10, label: 'Cupom BIRDPRO: 10% de desconto' },
+      'BIRDPRO20': { percent: 20, label: 'Cupom Especial: 20% de desconto' },
+      'PRIMEIROANO': { percent: 15, label: 'Cupom Primeiro Ano: 15% de desconto' },
+      'CRIADORVIP': { percent: 25, label: 'Cupom Criador VIP: 25% de desconto' },
+      'BIRDPRO50': { percent: 50, label: 'Cupom Promocional: 50% de desconto' }
+    };
+
+    if (PROMO_CODES[code]) {
+      return {
+        valid: true,
+        code,
+        discountPercent: PROMO_CODES[code].percent,
+        message: `${PROMO_CODES[code].label} aplicado com sucesso!`
+      };
+    }
+
+    return {
+      valid: false,
+      code,
+      discountPercent: 0,
+      message: 'Cupom inválido ou expirado. Verifique o código e tente novamente.'
+    };
+  }
+
   // --- GLOBAL SYSTEM CONFIG ---
   getGlobalConfig(): GlobalSystemConfig {
     return this.state.globalConfig || { ...INITIAL_GLOBAL_CONFIG };
@@ -1248,6 +1328,7 @@ class DataService {
       name: data.responsibleName || data.name,
       email: data.email,
       phone: data.phone,
+      password: data.password || '123456',
       role: 'OWNER',
       tenantId: tenantId,
       active: true,

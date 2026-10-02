@@ -44,20 +44,21 @@ export default function AdminCriatoriosPage() {
   const [formName, setFormName] = useState('')
   const [formResponsible, setFormResponsible] = useState('')
   const [formEmail, setFormEmail] = useState('')
+  const [formPassword, setFormPassword] = useState('123456')
   const [formPhone, setFormPhone] = useState('')
   const [formDocument, setFormDocument] = useState('')
-  const [formPlan, setFormPlan] = useState<PlanType>('PRO')
+  const [formPlan, setFormPlan] = useState<PlanType>('PREMIUM')
   const [formBillingCycle, setFormBillingCycle] = useState<'MENSAL' | 'ANUAL' | 'ISENTO'>('MENSAL')
-  const [formMaxBirds, setFormMaxBirds] = useState('200')
+  const [formMaxBirds, setFormMaxBirds] = useState('9999')
   const [formCustomExpires, setFormCustomExpires] = useState('')
   const [formPlanStatus, setFormPlanStatus] = useState<'ACTIVE' | 'TRIAL'>('ACTIVE')
 
   // Edit form states
-  const [editPlan, setEditPlan] = useState<PlanType>('PRO')
+  const [editPlan, setEditPlan] = useState<PlanType>('PREMIUM')
   const [editBillingCycle, setEditBillingCycle] = useState<'MENSAL' | 'ANUAL' | 'ISENTO'>('MENSAL')
   const [editPlanStatus, setEditPlanStatus] = useState<'ACTIVE' | 'TRIAL' | 'PAST_DUE' | 'CANCELLED' | 'BLOCKED'>('ACTIVE')
   const [editExpiresAt, setEditExpiresAt] = useState('')
-  const [editMaxBirds, setEditMaxBirds] = useState(100)
+  const [editMaxBirds, setEditMaxBirds] = useState(9999)
 
   useEffect(() => {
     refresh()
@@ -71,11 +72,12 @@ export default function AdminCriatoriosPage() {
     setFormName('')
     setFormResponsible('')
     setFormEmail('')
+    setFormPassword('123456')
     setFormPhone('')
     setFormDocument('')
-    setFormPlan('PRO')
+    setFormPlan('PREMIUM')
     setFormBillingCycle('MENSAL')
-    setFormMaxBirds('200')
+    setFormMaxBirds('9999')
     setFormCustomExpires('')
     setFormPlanStatus('ACTIVE')
   }
@@ -97,11 +99,12 @@ export default function AdminCriatoriosPage() {
       name: formName.trim(),
       responsibleName: formResponsible.trim() || undefined,
       email: formEmail.trim(),
+      password: formPassword.trim() || '123456',
       phone: formPhone.trim() || undefined,
       document: formDocument.trim() || undefined,
-      plan: formPlan,
+      plan: 'PREMIUM',
       billingCycle: formBillingCycle,
-      maxBirds: parseInt(formMaxBirds, 10) || 200,
+      maxBirds: parseInt(formMaxBirds, 10) || 9999,
       expiresAt: calculatedExpires,
       planStatus: formPlanStatus
     })
@@ -109,7 +112,7 @@ export default function AdminCriatoriosPage() {
     refresh()
     setIsNewModalOpen(false)
     resetNewForm()
-    alert('✅ Criatório e usuário cadastrados com sucesso!')
+    alert('✅ Criatório e usuário cadastrados com sucesso! O criador já pode fazer login com o e-mail e senha cadastrados.')
   }
 
   const handleOpenEdit = (t: Tenant) => {
@@ -547,25 +550,36 @@ export default function AdminCriatoriosPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 block">E-mail de Acesso <span className="text-red-500">*</span></label>
+                  <label className="text-[11px] font-bold text-slate-700 block">E-mail de Login <span className="text-red-500">*</span></label>
                   <input
                     type="email"
                     value={formEmail}
                     onChange={(e) => setFormEmail(e.target.value)}
                     placeholder="criador@email.com"
-                    className="w-full h-9 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500"
+                    className="w-full h-9 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500 font-medium"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 block">WhatsApp / Telefone</label>
+                  <label className="text-[11px] font-bold text-slate-700 block">Senha de Acesso Inicial <span className="text-red-500">*</span></label>
                   <input
                     type="text"
-                    value={formPhone}
-                    onChange={(e) => setFormPhone(e.target.value)}
-                    placeholder="(00) 00000-0000"
-                    className="w-full h-9 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500"
+                    value={formPassword}
+                    onChange={(e) => setFormPassword(e.target.value)}
+                    placeholder="Ex: 123456"
+                    className="w-full h-9 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500 font-medium font-mono"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-700 block">WhatsApp / Telefone</label>
+                <input
+                  type="text"
+                  value={formPhone}
+                  onChange={(e) => setFormPhone(e.target.value)}
+                  placeholder="(00) 00000-0000"
+                  className="w-full h-9 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500"
+                />
               </div>
 
               {/* Plan parameters */}
@@ -575,16 +589,15 @@ export default function AdminCriatoriosPage() {
                   <span>Configuração da Licença</span>
                 </span>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[11px] font-medium text-slate-600 block">Plano</label>
                     <select
-                      value={formPlan}
-                      onChange={(e) => setFormPlan(e.target.value as PlanType)}
-                      className="w-full h-8.5 px-2.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500"
+                      value="PREMIUM"
+                      disabled
+                      className="w-full h-8.5 px-2.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none font-bold text-emerald-800"
                     >
-                      <option value="PRO">PRO (Plantel, Anilhas, Reprodução, SISPASS)</option>
-                      <option value="PREMIUM">PREMIUM VIP (Genealogia, A4, QR Code, Ilimitado)</option>
+                      <option value="PREMIUM">PLANO COMPLETO BIRDPRO (Tudo Incluso: Genealogia, SISPASS, Pedigree A4, QR Code, Ilimitado)</option>
                     </select>
                   </div>
 
@@ -594,8 +607,8 @@ export default function AdminCriatoriosPage() {
                       type="number"
                       value={formMaxBirds}
                       onChange={(e) => setFormMaxBirds(e.target.value)}
-                      placeholder="200"
-                      className="w-full h-8.5 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500"
+                      placeholder="9999"
+                      className="w-full h-8.5 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500 font-medium"
                     />
                   </div>
                 </div>
@@ -695,12 +708,11 @@ export default function AdminCriatoriosPage() {
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-slate-700 block">Plano de Assinatura</label>
                 <select
-                  value={editPlan}
-                  onChange={(e) => setEditPlan(e.target.value as PlanType)}
-                  className="w-full h-8.5 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#00c853]"
+                  value="PREMIUM"
+                  disabled
+                  className="w-full h-8.5 px-3 text-xs bg-slate-100 border border-slate-300 rounded-lg focus:outline-none font-bold text-emerald-800"
                 >
-                  <option value="PRO">Plano PRO (Gestão &amp; SISPASS)</option>
-                  <option value="PREMIUM">Plano PREMIUM (Genealogia VIP &amp; A4)</option>
+                  <option value="PREMIUM">PLANO COMPLETO BIRDPRO (Tudo Incluso: Genealogia, SISPASS, Pedigree A4, QR Code, Ilimitado)</option>
                 </select>
               </div>
 

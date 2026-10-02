@@ -136,10 +136,18 @@ export interface GlobalSystemConfig {
   cookieDurationDays: number;
   allowSelfRegistration: boolean;
   maintenanceMode: boolean;
-  gatewayProvider: 'MERCADOPAGO' | 'ASAAS' | 'STRIPE' | 'MANUAL';
+  gatewayProvider: 'PAGBANK' | 'MERCADOPAGO' | 'ASAAS' | 'STRIPE' | 'MANUAL';
   gatewayApiKey?: string;
   gatewayWebhookSecret?: string;
   gatewayLiveMode: boolean;
+  // PagBank (PagSeguro) specific config
+  pagbankToken?: string;
+  pagbankEmail?: string;
+  pagbankSandbox?: boolean;
+  pagbankPixKey?: string;
+  pagbankAppId?: string;
+  pagbankAppKey?: string;
+  pagbankWebhookUrl?: string;
   smtpHost?: string;
   smtpPort?: number;
   smtpUser?: string;
@@ -147,10 +155,21 @@ export interface GlobalSystemConfig {
   smtpFromEmail?: string;
 }
 
+export interface CouponValidationResult {
+  valid: boolean;
+  code: string;
+  discountPercent: number;
+  discountAmount?: number;
+  sellerId?: string;
+  sellerName?: string;
+  message: string;
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
+  password?: string;
   role: UserRole;
   tenantId: string;
   phone?: string;

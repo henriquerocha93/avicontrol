@@ -114,10 +114,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return true;
     }
 
-    // Standard user login
-    const users = db.getUsers();
-    const found = users.find(u => u.email.toLowerCase() === cleanEmail) || users[0];
+    // Standard user login: search by email
+    const found = db.getUserByEmail(cleanEmail);
     if (found) {
+      if (found.password && pass && found.password !== pass) {
+        setIsLoading(false);
+        return false;
+      }
       const userRole = found.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : found.role === 'SELLER' ? 'SELLER' : 'OWNER';
       const normalUser: User = {
         ...found,

@@ -157,35 +157,110 @@ export default function AdminConfiguracoesPage() {
 
         {/* Section 3: Gateway de Pagamento */}
         <div className="bg-white rounded border border-slate-200 shadow-xs overflow-hidden">
-          <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center space-x-2">
-            <CreditCard className="w-4 h-4 text-emerald-600" />
-            <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              3. Gateway de Pagamento Automático
-            </h2>
-          </div>
-          <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <label className="text-[11px] font-medium text-slate-600 block">Provedor de Pagamento</label>
-              <select
-                value={config.gatewayProvider}
-                onChange={(e) => setConfig({ ...config, gatewayProvider: e.target.value as any })}
-                className="w-full h-8 px-2.5 text-xs bg-white border border-slate-300 rounded focus:outline-none focus:border-[#00c853]"
-              >
-                <option value="MERCADOPAGO">Mercado Pago (PIX + Boleto + Cartão)</option>
-                <option value="ASAAS">Asaas (Cobranças &amp; PIX)</option>
-                <option value="STRIPE">Stripe</option>
-                <option value="MANUAL">Manual / Transferência</option>
-              </select>
+          <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <CreditCard className="w-4 h-4 text-emerald-600" />
+              <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                3. Gateway de Pagamento Automático (PagBank PagSeguro)
+              </h2>
             </div>
-            <div className="space-y-1 col-span-2">
-              <label className="text-[11px] font-medium text-slate-600 block">Access Token / Chave de API</label>
-              <input
-                type="password"
-                value={config.gatewayApiKey || ''}
-                onChange={(e) => setConfig({ ...config, gatewayApiKey: e.target.value })}
-                placeholder="APP_USR-..."
-                className="w-full h-8 px-2.5 text-xs bg-white border border-slate-300 rounded focus:outline-none focus:border-[#00c853]"
-              />
+            <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+              {config.gatewayProvider === 'PAGBANK' ? '⚡ PagBank Ativo' : config.gatewayProvider}
+            </span>
+          </div>
+          <div className="p-5 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-700 block">Provedor de Pagamento</label>
+                <select
+                  value={config.gatewayProvider || 'PAGBANK'}
+                  onChange={(e) => setConfig({ ...config, gatewayProvider: e.target.value as any })}
+                  className="w-full h-8 px-2.5 text-xs bg-white border border-slate-300 rounded font-semibold text-emerald-800 focus:outline-none focus:border-[#00c853]"
+                >
+                  <option value="PAGBANK">PagBank (PagSeguro) - Recomendado</option>
+                  <option value="MERCADOPAGO">Mercado Pago (PIX + Boleto + Cartão)</option>
+                  <option value="ASAAS">Asaas (Cobranças &amp; PIX)</option>
+                  <option value="STRIPE">Stripe</option>
+                  <option value="MANUAL">Manual / Transferência</option>
+                </select>
+              </div>
+
+              {config.gatewayProvider === 'PAGBANK' ? (
+                <>
+                  <div className="space-y-1 col-span-2">
+                    <label className="text-[11px] font-bold text-slate-700 block">
+                      Token de Acesso / API Token (PagBank PagSeguro)
+                    </label>
+                    <input
+                      type="password"
+                      value={config.pagbankToken || ''}
+                      onChange={(e) => setConfig({ ...config, pagbankToken: e.target.value })}
+                      placeholder="Cole o Token de Acesso gerado no Painel do PagBank/PagSeguro"
+                      className="w-full h-8 px-2.5 text-xs bg-white border border-slate-300 rounded font-mono focus:outline-none focus:border-[#00c853]"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-slate-600 block">E-mail da Conta PagBank</label>
+                    <input
+                      type="email"
+                      value={config.pagbankEmail || ''}
+                      onChange={(e) => setConfig({ ...config, pagbankEmail: e.target.value })}
+                      placeholder="pagamentos@birdpro.com.br"
+                      className="w-full h-8 px-2.5 text-xs bg-white border border-slate-300 rounded focus:outline-none focus:border-[#00c853]"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-slate-600 block">Chave PIX PagBank (Chave do Banco)</label>
+                    <input
+                      type="text"
+                      value={config.pagbankPixKey || ''}
+                      onChange={(e) => setConfig({ ...config, pagbankPixKey: e.target.value })}
+                      placeholder="Ex: Celular, CNPJ ou E-mail PagBank"
+                      className="w-full h-8 px-2.5 text-xs bg-white border border-slate-300 rounded font-mono focus:outline-none focus:border-[#00c853]"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-slate-600 block">Ambiente</label>
+                    <select
+                      value={config.pagbankSandbox ? 'SANDBOX' : 'PRODUCTION'}
+                      onChange={(e) => setConfig({ ...config, pagbankSandbox: e.target.value === 'SANDBOX' })}
+                      className="w-full h-8 px-2.5 text-xs bg-white border border-slate-300 rounded focus:outline-none focus:border-[#00c853]"
+                    >
+                      <option value="PRODUCTION">Produção Oficial (Cobranças Reais)</option>
+                      <option value="SANDBOX">Sandbox / Modo de Testes</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1 sm:col-span-3">
+                    <label className="text-[11px] font-medium text-slate-600 block">
+                      URL de Webhook para Retorno Automático PagBank
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={config.pagbankWebhookUrl || 'https://www.birdpro.com.br/api/webhooks/pagbank'}
+                      className="w-full h-8 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded font-mono text-slate-600 select-all"
+                    />
+                    <p className="text-[10px] text-slate-400">
+                      Cadastre esta URL nas configurações de Notificações / Webhooks da sua conta PagBank para baixa automática de PIX e Cartão.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-1 col-span-2">
+                  <label className="text-[11px] font-medium text-slate-600 block">Access Token / Chave de API</label>
+                  <input
+                    type="password"
+                    value={config.gatewayApiKey || ''}
+                    onChange={(e) => setConfig({ ...config, gatewayApiKey: e.target.value })}
+                    placeholder="APP_USR-..."
+                    className="w-full h-8 px-2.5 text-xs bg-white border border-slate-300 rounded focus:outline-none focus:border-[#00c853]"
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

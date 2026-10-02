@@ -34,7 +34,7 @@ import {
   Flame
 } from 'lucide-react'
 import { db } from '@/lib/db'
-import { SellerAffiliate, AffiliateCommission, AffiliatePayout, PartnerType } from '@/types'
+import { SellerAffiliate, AffiliateCommission, AffiliatePayout, PartnerType, Tenant } from '@/types'
 
 export default function AdminVendedoresPage() {
   const [sellers, setSellers] = useState<SellerAffiliate[]>([])
@@ -92,14 +92,14 @@ export default function AdminVendedoresPage() {
     setSellers([...db.getSellers()])
   }
 
-  const allTenants = useMemo(() => {
+  const allTenants: Tenant[] = useMemo(() => {
     return db.getAllTenants()
   }, [isNewSellerModalOpen])
 
-  const filteredTenantsForSelect = useMemo(() => {
+  const filteredTenantsForSelect: Tenant[] = useMemo(() => {
     if (!creatorSearch.trim()) return allTenants
     const q = creatorSearch.toLowerCase()
-    return allTenants.filter(t => 
+    return allTenants.filter((t: Tenant) => 
       t.name.toLowerCase().includes(q) || 
       t.email.toLowerCase().includes(q) || 
       (t.slug && t.slug.toLowerCase().includes(q)) ||
@@ -766,7 +766,7 @@ export default function AdminVendedoresPage() {
                     {s.linkedTenantId ? (
                       <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200 flex items-center gap-1">
                         <span>🔗 Criador Vinculado:</span>
-                        <strong className="truncate max-w-[130px]">{allTenants.find(t => t.id === s.linkedTenantId)?.name || 'Criatório'}</strong>
+                        <strong className="truncate max-w-[130px]">{allTenants.find((t: Tenant) => t.id === s.linkedTenantId)?.name || 'Criatório'}</strong>
                       </span>
                     ) : (
                       <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
@@ -1171,13 +1171,13 @@ export default function AdminVendedoresPage() {
                       <select
                         value={selectedTenantId}
                         onChange={(e) => {
-                          const target = allTenants.find(t => t.id === e.target.value)
+                          const target = allTenants.find((t: Tenant) => t.id === e.target.value)
                           if (target) handleSelectCreator(target)
                         }}
                         className="w-full h-9 px-3 text-xs bg-white border border-blue-300 rounded-lg focus:outline-none focus:border-blue-600 font-bold text-slate-800"
                       >
                         <option value="">-- Selecione o Criatório --</option>
-                        {filteredTenantsForSelect.map(t => (
+                        {filteredTenantsForSelect.map((t: Tenant) => (
                           <option key={t.id} value={t.id}>
                             {t.name} ({t.email}) • {t.billingCycle || 'Plano'}
                           </option>
