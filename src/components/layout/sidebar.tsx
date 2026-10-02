@@ -180,26 +180,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               })}
 
               <div className="pt-4 px-4 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Acesso aos Criatórios
+                Sessão
               </div>
-
-              {/* Link to view criatório as a demo owner */}
-              <Link
-                href="/dashboard"
-                onClick={onClose}
-                className="flex items-center gap-3 px-4 py-2.5 text-xs font-medium text-slate-400 hover:text-white hover:bg-[#2d333b] transition-colors"
-              >
-                <Layers className="w-4 h-4 text-slate-400" />
-                <span>Ver Visão do Criatório</span>
-              </Link>
 
               {/* Logout button */}
               <button
+                type="button"
                 onClick={logout}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-medium text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition-colors text-left cursor-pointer"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition-colors text-left cursor-pointer"
               >
-                <LogOut className="w-4 h-4" />
-                <span>Sair do Modo ADM</span>
+                <LogOut className="w-4 h-4 text-rose-400" />
+                <span>Sair da Conta (Logout)</span>
               </button>
             </div>
           ) : isSeller ? (
