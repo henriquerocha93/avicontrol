@@ -9,7 +9,7 @@ interface AuthContextType {
   tenant: Tenant | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, pass: string) => Promise<boolean>;
+  login: (email: string, pass?: string) => Promise<boolean>;
   logout: () => void;
   register: (data: { name: string; email: string; creatorName: string; phone: string; password: string }) => Promise<boolean>;
   updateRole: (role: UserRole) => void;
@@ -24,18 +24,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Check if user was explicitly logged out
+    const isLoggedOut = typeof window !== 'undefined' ? localStorage.getItem('birdpro_logged_out') : null;
+    if (isLoggedOut === 'true') {
+      setUser(null);
+      setTenant(null);
+      setIsLoading(false);
+      return;
+    }
+
     // Initial load from storage if present
     const rawStored = typeof window !== 'undefined' ? localStorage.getItem('birdpro_current_user') : null;
     if (rawStored) {
       try {
         const parsed = JSON.parse(rawStored);
-        setUser(parsed);
-        const t = db.getTenant(parsed.tenantId || 'tenant-demo-01');
-        setTenant(t);
-        setIsLoading(false);
-        return;
-      } catch (e) {}
+        if (parsed && parsed.email) {
+          setUser(parsed);
+          const t = db.getTenant(parsed.tenantId || 'tenant-demo-01');
+          setTenant(t);
+          setIsLoading(false);
+          return;
+        }
+      } catch (e) {
+        console.error('Error parsing stored user:', e);
+      }
     }
+
+    // Default master admin user if fresh visit
     const users = db.getUsers();
     const activeTenant = db.getTenant();
     setUser(users[0] || null);
@@ -50,6 +65,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, pass = ''): Promise<boolean> => {
     setIsLoading(true);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('birdpro_logged_out');
+    }
     const cleanEmail = email.toLowerCase().trim();
 
     // Check if master admin
@@ -100,7 +118,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const users = db.getUsers();
     const found = users.find(u => u.email.toLowerCase() === cleanEmail) || users[0];
     if (found) {
-      // Retain SELLER role if user is explicitly a seller, otherwise SUPER_ADMIN or OWNER
       const userRole = found.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : found.role === 'SELLER' ? 'SELLER' : 'OWNER';
       const normalUser: User = {
         ...found,
@@ -115,12 +132,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
       return true;
     }
+
     setIsLoading(false);
     return false;
   };
 
   const register = async (data: { name: string; email: string; creatorName: string; phone: string; password: string }): Promise<boolean> => {
     setIsLoading(true);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('birdpro_logged_out');
+    }
+
     const newTenant: Tenant = {
       id: `tenant-${Date.now()}`,
       name: data.creatorName,
@@ -166,16 +188,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('birdpro_current_user');
+      localStorage.setItem('birdpro_logged_out', 'true');
+      sessionStorage.clear();
     }
-    // Set to standard user or null
-    const users = db.getUsers();
-    setUser(users[0] ? { ...users[0], role: 'OWNER' } : null);
+    setUser(null);
+    setTenant(null);
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
   };
 
   const updateRole = (role: UserRole) => {
     if (user) {
       const updated = { ...user, role };
       setUser(updated);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('birdpro_current_user', JSON.stringify(updated));
+      }
     }
   };
 

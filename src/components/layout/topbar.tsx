@@ -127,38 +127,46 @@ export function Topbar({ onOpenSidebar }: TopbarProps) {
           </button>
 
           {isProfileOpen && (
-            <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-slate-200 py-1.5 z-50 text-xs">
-              <div className="px-4 py-2 border-b border-slate-100">
-                <p className="font-bold text-slate-800 truncate">{tenant?.name || 'Luis Henrique'}</p>
-                <p className="text-[11px] text-slate-400 truncate">{user?.email || 'criador@birdpro.com'}</p>
+            <>
+              {/* Backdrop to close on outside click */}
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setIsProfileOpen(false)} 
+              />
+              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-800 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
+                  <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{tenant?.name || user?.name || 'Luis Henrique'}</p>
+                  <p className="text-[11px] text-slate-400 truncate">{user?.email || 'criador@birdpro.com'}</p>
+                </div>
+                <Link
+                  href="/dashboard/configuracoes/criatorio"
+                  onClick={() => setIsProfileOpen(false)}
+                  className="flex items-center space-x-2 px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                >
+                  <Building2 className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Dados do Criatório</span>
+                </Link>
+                <Link
+                  href="/dashboard/configuracoes"
+                  onClick={() => setIsProfileOpen(false)}
+                  className="flex items-center space-x-2 px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                >
+                  <Settings className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Configurações</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileOpen(false)
+                    logout()
+                  }}
+                  className="w-full text-left flex items-center space-x-2 px-4 py-2.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition border-t border-slate-100 dark:border-slate-800 font-semibold cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Sair da Conta</span>
+                </button>
               </div>
-              <Link
-                href="/dashboard/configuracoes/criatorio"
-                onClick={() => setIsProfileOpen(false)}
-                className="flex items-center space-x-2 px-4 py-2 text-slate-700 hover:bg-slate-50 transition"
-              >
-                <Building2 className="w-3.5 h-3.5 text-slate-500" />
-                <span>Dados do Criatório</span>
-              </Link>
-              <Link
-                href="/dashboard/configuracoes"
-                onClick={() => setIsProfileOpen(false)}
-                className="flex items-center space-x-2 px-4 py-2 text-slate-700 hover:bg-slate-50 transition"
-              >
-                <Settings className="w-3.5 h-3.5 text-slate-500" />
-                <span>Configurações</span>
-              </Link>
-              <button
-                onClick={() => {
-                  setIsProfileOpen(false)
-                  logout()
-                }}
-                className="w-full text-left flex items-center space-x-2 px-4 py-2 text-red-600 hover:bg-red-50 transition border-t border-slate-100"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Sair da Conta</span>
-              </button>
-            </div>
+            </>
           )}
         </div>
       </div>
