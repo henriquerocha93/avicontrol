@@ -164,7 +164,7 @@ export default function LandingPage() {
                 Entrar
               </Button>
             </Link>
-            <Link href="/cadastro">
+            <Link href="/checkout?plano=anual">
               <Button size="sm" className="bg-[#00c853] hover:bg-emerald-600 text-white font-black text-xs shadow-lg shadow-emerald-950/50">
                 Assinar Agora →
               </Button>
@@ -173,7 +173,7 @@ export default function LandingPage() {
 
           {/* Mobile Hamburger Button */}
           <div className="flex md:hidden items-center gap-2">
-            <Link href="/cadastro" className="sm:hidden">
+            <Link href="/checkout?plano=anual" className="sm:hidden">
               <Button size="sm" className="bg-[#00c853] hover:bg-emerald-600 text-white font-black text-[11px] px-3 py-1.5 shadow-md">
                 Assinar
               </Button>
@@ -245,7 +245,7 @@ export default function LandingPage() {
                   Fazer Login
                 </Button>
               </Link>
-              <Link href="/cadastro" onClick={() => setIsMobileMenuOpen(false)}>
+              <Link href="/checkout?plano=anual" onClick={() => setIsMobileMenuOpen(false)}>
                 <Button className="w-full bg-[#00c853] hover:bg-emerald-600 text-white font-black py-2.5 shadow-lg shadow-emerald-950/60">
                   Assinar BIRDPRO Agora →
                 </Button>
@@ -590,7 +590,7 @@ export default function LandingPage() {
               </div>
 
               <div className="pt-4">
-                <Link href="/cadastro" className="block">
+                <Link href="/checkout?plano=mensal" className="block">
                   <Button variant="outline" className="w-full border-emerald-700 hover:bg-emerald-950/80 text-white font-bold py-3 text-sm rounded-xl">
                     Assinar Plano Mensal →
                   </Button>
@@ -641,7 +641,7 @@ export default function LandingPage() {
               </div>
 
               <div className="pt-4">
-                <Link href="/cadastro" className="block">
+                <Link href="/checkout?plano=anual" className="block">
                   <Button className="w-full bg-[#00c853] hover:bg-emerald-600 font-black py-3 text-sm text-white rounded-xl shadow-lg shadow-emerald-700/40">
                     Assinar Plano Anual →
                   </Button>
