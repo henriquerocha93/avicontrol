@@ -827,8 +827,12 @@ function CheckoutContent() {
                     <span>QR Code PIX PagBank PagSeguro</span>
                   </div>
 
-                  <div className="w-44 h-44 mx-auto bg-white p-2.5 rounded-2xl border-2 border-emerald-500/40 shadow-xs flex flex-col items-center justify-center">
-                    <QrCode className="w-36 h-36 text-slate-900" />
+                  <div className="w-48 h-48 mx-auto bg-white p-2 rounded-2xl border-2 border-emerald-500/40 shadow-xs flex flex-col items-center justify-center">
+                    <img 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(currentPixCode)}`} 
+                      alt="QR Code PIX PagBank" 
+                      className="w-40 h-40 object-contain rounded-lg"
+                    />
                   </div>
 
                   <p className="text-[11px] text-slate-500">
