@@ -13,7 +13,8 @@ import {
   Bird, 
   KeyRound,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  AlertCircle
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { db } from '@/lib/db';
@@ -24,11 +25,17 @@ export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
   
-  const [email, setEmail] = useState('luis.henrique.schreiber@hotmail.com');
-  const [password, setPassword] = useState('123456');
+  // Clean initial state (no pre-filled email or password)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [captchaInput, setCaptchaInput] = useState('');
-  const [captchaCode, setCaptchaCode] = useState('9184');
-  const [captchaError, setCaptchaError] = useState(false);
+  const [captchaCode, setCaptchaCode] = useState('3505');
+  
+  // Validation error states
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [captchaError, setCaptchaError] = useState('');
+  const [authError, setAuthError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   // Generate random 4-digit captcha
@@ -36,41 +43,95 @@ export default function LoginPage() {
     const newCode = Math.floor(1000 + Math.random() * 9000).toString();
     setCaptchaCode(newCode);
     setCaptchaInput('');
-    setCaptchaError(false);
+    setCaptchaError('');
   };
 
   useEffect(() => {
     generateCaptcha();
   }, []);
 
+  const validateForm = (): boolean => {
+    let isValid = true;
+    setEmailError('');
+    setPasswordError('');
+    setCaptchaError('');
+    setAuthError('');
+
+    // 1. Email validation
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      setEmailError('Por favor, informe seu e-mail.');
+      isValid = false;
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanEmail) && cleanEmail !== 'admin') {
+        setEmailError('Informe um endereço de e-mail válido (ex: seu.email@exemplo.com).');
+        isValid = false;
+      }
+    }
+
+    // 2. Password validation
+    if (!password) {
+      setPasswordError('Por favor, digite sua senha.');
+      isValid = false;
+    } else if (password.length < 3) {
+      setPasswordError('A senha deve ter pelo menos 3 caracteres.');
+      isValid = false;
+    }
+
+    // 3. Captcha / Number validation
+    const cleanCaptcha = captchaInput.trim();
+    if (!cleanCaptcha) {
+      setCaptchaError(`Digite o número de 4 dígitos (${captchaCode}) exibido abaixo.`);
+      isValid = false;
+    } else if (cleanCaptcha !== captchaCode) {
+      setCaptchaError(`Número incorreto. Digite exatamente o código exibido: ${captchaCode}.`);
+      isValid = false;
+    }
+
+    return isValid;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Optional captcha validation (accepts correct captcha or empty if bypassing)
-    if (captchaInput.trim() && captchaInput.trim() !== captchaCode) {
-      setCaptchaError(true);
+    if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
-    const success = await login(email, password);
-    setIsLoading(false);
+    setAuthError('');
 
-    const clean = email.toLowerCase().trim();
-    if (
-      clean === 'henrique_rocha@live.com' ||
-      clean === 'admin@birdpro.com.br' ||
-      clean === 'adm@birdpro.com.br' ||
-      clean === 'admin'
-    ) {
-      router.push('/dashboard/admin');
-    } else {
-      const seller = db.getSellerByEmail(clean);
-      if (seller && (seller.isIndependentSeller || seller.password)) {
-        router.push('/dashboard/vendedor');
-      } else {
-        router.push('/dashboard');
+    try {
+      const success = await login(email, password);
+      setIsLoading(false);
+
+      if (!success) {
+        setAuthError('E-mail ou senha incorretos. Verifique suas credenciais e tente novamente.');
+        generateCaptcha();
+        return;
       }
+
+      const clean = email.toLowerCase().trim();
+      if (
+        clean === 'henrique_rocha@live.com' ||
+        clean === 'admin@birdpro.com.br' ||
+        clean === 'adm@birdpro.com.br' ||
+        clean === 'admin'
+      ) {
+        router.push('/dashboard/admin');
+      } else {
+        const seller = db.getSellerByEmail(clean);
+        if (seller && (seller.isIndependentSeller || seller.password)) {
+          router.push('/dashboard/vendedor');
+        } else {
+          router.push('/dashboard');
+        }
+      }
+    } catch (err) {
+      setIsLoading(false);
+      setAuthError('Ocorreu um erro ao processar o login. Tente novamente.');
+      generateCaptcha();
     }
   };
 
@@ -92,64 +153,100 @@ export default function LoginPage() {
         </svg>
       </div>
 
-      {/* Main Dual-Column Login Card (Matching Reference Photo) */}
+      {/* Main Dual-Column Login Card */}
       <div className="max-w-3xl w-full bg-white rounded-2xl shadow-2xl border border-slate-200/80 overflow-hidden flex flex-col md:flex-row relative z-10 my-auto">
         
         {/* Left Column: Login Form */}
-        <div className="p-8 sm:p-10 flex-1 flex flex-col justify-center space-y-6">
+        <div className="p-8 sm:p-10 flex-1 flex flex-col justify-center space-y-5">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">
               Faça login em sua conta
             </h1>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {authError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-2.5 text-xs text-rose-700 font-medium">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <span>{authError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             
             {/* Field 1: Email */}
-            <div className="flex rounded-lg overflow-hidden border border-slate-200 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 bg-[#edf3fa] transition-all">
-              <div className="w-12 bg-slate-200/60 flex items-center justify-center text-slate-500 shrink-0 border-r border-slate-200">
-                <User className="w-5 h-5 text-slate-400" />
+            <div className="space-y-1">
+              <div className={`flex rounded-lg overflow-hidden border ${emailError ? 'border-rose-400 bg-rose-50/20' : 'border-slate-200 bg-[#edf3fa]'} focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all`}>
+                <div className="w-12 bg-slate-200/60 flex items-center justify-center text-slate-500 shrink-0 border-r border-slate-200">
+                  <User className="w-5 h-5 text-slate-400" />
+                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (emailError) setEmailError('');
+                  }}
+                  placeholder="seu.email@exemplo.com"
+                  autoComplete="email"
+                  className="w-full px-3.5 py-3 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-medium"
+                />
               </div>
-              <input
-                type="text"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu.email@exemplo.com"
-                className="w-full px-3.5 py-3 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-medium"
-              />
+              {emailError && (
+                <p className="text-[11px] font-bold text-rose-600 pl-1">
+                  * {emailError}
+                </p>
+              )}
             </div>
 
             {/* Field 2: Password */}
-            <div className="flex rounded-lg overflow-hidden border border-slate-200 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 bg-[#edf3fa] transition-all">
-              <div className="w-12 bg-slate-200/60 flex items-center justify-center text-slate-500 shrink-0 border-r border-slate-200">
-                <Lock className="w-5 h-5 text-slate-400" />
+            <div className="space-y-1">
+              <div className={`flex rounded-lg overflow-hidden border ${passwordError ? 'border-rose-400 bg-rose-50/20' : 'border-slate-200 bg-[#edf3fa]'} focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all`}>
+                <div className="w-12 bg-slate-200/60 flex items-center justify-center text-slate-500 shrink-0 border-r border-slate-200">
+                  <Lock className="w-5 h-5 text-slate-400" />
+                </div>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (passwordError) setPasswordError('');
+                  }}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  className="w-full px-3.5 py-3 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-medium"
+                />
               </div>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-3.5 py-3 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-medium"
-              />
+              {passwordError && (
+                <p className="text-[11px] font-bold text-rose-600 pl-1">
+                  * {passwordError}
+                </p>
+              )}
             </div>
 
             {/* Field 3: Captcha Input */}
-            <div className="flex rounded-lg overflow-hidden border border-slate-200 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 bg-white transition-all">
-              <div className="w-12 bg-slate-100 flex items-center justify-center text-slate-500 shrink-0 border-r border-slate-200">
-                <Star className="w-5 h-5 text-slate-400" />
+            <div className="space-y-1">
+              <div className={`flex rounded-lg overflow-hidden border ${captchaError ? 'border-rose-400 bg-rose-50/20' : 'border-slate-200 bg-white'} focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all`}>
+                <div className="w-12 bg-slate-100 flex items-center justify-center text-slate-500 shrink-0 border-r border-slate-200">
+                  <Star className="w-5 h-5 text-slate-400" />
+                </div>
+                <input
+                  type="text"
+                  maxLength={4}
+                  value={captchaInput}
+                  onChange={(e) => {
+                    setCaptchaInput(e.target.value);
+                    if (captchaError) setCaptchaError('');
+                  }}
+                  placeholder="Número de confirmação"
+                  autoComplete="off"
+                  className="w-full px-3.5 py-3 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-medium"
+                />
               </div>
-              <input
-                type="text"
-                value={captchaInput}
-                onChange={(e) => {
-                  setCaptchaInput(e.target.value);
-                  setCaptchaError(false);
-                }}
-                placeholder="Número"
-                className="w-full px-3.5 py-3 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-medium"
-              />
+              {captchaError && (
+                <p className="text-[11px] font-bold text-rose-600 pl-1">
+                  * {captchaError}
+                </p>
+              )}
             </div>
 
             {/* Stylized Captcha Verification Banner */}
@@ -181,18 +278,12 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {captchaError && (
-              <p className="text-xs font-bold text-rose-600">
-                * Código de verificação incorreto. Digite {captchaCode}.
-              </p>
-            )}
-
             {/* Action Bar: Submit & Forgot Password */}
             <div className="pt-2 flex items-center justify-between gap-4">
               <Button
                 type="submit"
                 isLoading={isLoading}
-                className="bg-[#00c853] hover:bg-emerald-600 text-white font-bold text-sm px-6 py-3 rounded-lg shadow-md flex items-center gap-2"
+                className="bg-[#00c853] hover:bg-emerald-600 text-white font-bold text-sm px-6 py-3 rounded-lg shadow-md flex items-center gap-2 cursor-pointer"
               >
                 <LogIn className="w-4 h-4" />
                 <span>Entrar</span>
@@ -208,7 +299,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        {/* Right Column: Solid Brand Banner (Matching Photo Layout with BirdPro) */}
+        {/* Right Column: Solid Brand Banner */}
         <div className="bg-gradient-to-br from-[#00c853] via-[#047857] to-[#022c22] p-8 sm:p-10 md:w-80 lg:w-96 flex flex-col items-center justify-center text-center text-white relative overflow-hidden">
           
           {/* Subtle nature circle glow in background */}
@@ -223,7 +314,7 @@ export default function LoginPage() {
               <Logo variant="light" size="lg" href="/" />
             </div>
 
-            {/* Catchphrase Matching Photo */}
+            {/* Catchphrase */}
             <p className="text-sm sm:text-base font-medium text-emerald-50 leading-relaxed max-w-xs drop-shadow-sm">
               A melhor plataforma de gestão de pássaros na palma da sua mão!
             </p>
@@ -237,7 +328,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Footer Below Card (Matching Reference Photo) */}
+      {/* Footer Below Card */}
       <div className="mt-6 flex flex-col items-center gap-1.5 text-xs text-slate-500 relative z-10">
         <button
           onClick={() => window.location.reload()}
@@ -246,7 +337,7 @@ export default function LoginPage() {
           <RotateCw className="w-3.5 h-3.5" />
           <span>Atualizar Página!</span>
         </button>
-        <span className="text-[11px] text-slate-400 font-mono">v1.0.97</span>
+        <span className="text-[11px] text-slate-400 font-mono">v1.0.98</span>
       </div>
     </div>
   );
