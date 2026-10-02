@@ -1245,6 +1245,59 @@ class DataService {
     return { tenant: newTenant, user: newUser };
   }
 
+  getTenantOwnerUser(tenantId: string): User | undefined {
+    return (this.state.users || []).find(u => u.tenantId === tenantId && (u.role === 'OWNER' || u.role === 'ADMIN')) || 
+           (this.state.users || []).find(u => u.tenantId === tenantId);
+  }
+
+  updateTenantAndCredentials(
+    tenantId: string,
+    data: {
+      name?: string;
+      email?: string;
+      password?: string;
+      plan: PlanType;
+      billingCycle: 'MENSAL' | 'ANUAL' | 'ISENTO';
+      planStatus: any;
+      expiresAt: string;
+      maxBirds: number;
+    }
+  ): void {
+    const t = this.state.tenants.find(x => x.id === tenantId);
+    if (t) {
+      if (data.name) t.name = data.name;
+      if (data.email) t.email = data.email;
+      t.plan = data.plan;
+      t.billingCycle = data.billingCycle;
+      t.planStatus = data.planStatus;
+      t.expiresAt = data.expiresAt;
+      t.maxBirds = data.maxBirds;
+    }
+
+    // Also update linked owner user credentials
+    const user = (this.state.users || []).find(u => u.tenantId === tenantId && (u.role === 'OWNER' || u.role === 'ADMIN')) || 
+                 (this.state.users || []).find(u => u.tenantId === tenantId);
+    if (user) {
+      if (data.email) user.email = data.email;
+      if (data.password && data.password.trim()) user.password = data.password.trim();
+    } else if (data.email && t) {
+      const newUser: User = {
+        id: `user-${Date.now()}`,
+        name: t.name,
+        email: data.email,
+        password: data.password || '123456',
+        role: 'OWNER',
+        tenantId,
+        active: true,
+        createdAt: new Date().toISOString()
+      };
+      this.state.users.push(newUser);
+    }
+
+    this.logAction(tenantId, 'UPDATE_CREDENTIALS', 'ADMIN_TENANTS', `Dados e credenciais de acesso do criatório ${t?.name || tenantId} atualizados`);
+    this.saveToStorage();
+  }
+
   updateTenantPlan(
     tenantId: string, 
     plan: PlanType, 
@@ -1253,16 +1306,13 @@ class DataService {
     expiresAt: string, 
     maxBirds: number
   ): void {
-    const t = this.state.tenants.find(x => x.id === tenantId);
-    if (t) {
-      t.plan = plan;
-      t.billingCycle = billingCycle;
-      t.planStatus = planStatus;
-      t.expiresAt = expiresAt;
-      t.maxBirds = maxBirds;
-      this.logAction(tenantId, 'UPDATE', 'TENANTS', `Licença do criatório ${t.name} atualizada: ${plan} (${billingCycle} - ${planStatus})`);
-      this.saveToStorage();
-    }
+    this.updateTenantAndCredentials(tenantId, {
+      plan,
+      billingCycle,
+      planStatus,
+      expiresAt,
+      maxBirds
+    });
   }
 
   renewTenantPlan(tenantId: string, monthsToAdd: number = 1): Tenant | undefined {

@@ -25,7 +25,10 @@ import {
   Trash2,
   Phone,
   Mail,
-  FileText
+  FileText,
+  Eye,
+  EyeOff,
+  Key
 } from 'lucide-react'
 import { db } from '@/lib/db'
 import { Tenant, PlanType } from '@/types'
@@ -59,6 +62,9 @@ export default function AdminCriatoriosPage() {
   const [editPlanStatus, setEditPlanStatus] = useState<'ACTIVE' | 'TRIAL' | 'PAST_DUE' | 'CANCELLED' | 'BLOCKED'>('ACTIVE')
   const [editExpiresAt, setEditExpiresAt] = useState('')
   const [editMaxBirds, setEditMaxBirds] = useState(9999)
+  const [editEmail, setEditEmail] = useState('')
+  const [editPassword, setEditPassword] = useState('')
+  const [showEditPassword, setShowEditPassword] = useState(false)
 
   useEffect(() => {
     refresh()
@@ -121,19 +127,40 @@ export default function AdminCriatoriosPage() {
     setEditBillingCycle(t.billingCycle || 'ANUAL')
     setEditPlanStatus(t.planStatus || 'ACTIVE')
     setEditExpiresAt(t.expiresAt ? t.expiresAt.split('T')[0] : '')
-    setEditMaxBirds(t.maxBirds || 100)
+    setEditMaxBirds(t.maxBirds || 9999)
+
+    // Load linked user credentials
+    const linkedUser = db.getTenantOwnerUser(t.id)
+    setEditEmail(linkedUser?.email || t.email || '')
+    setEditPassword(linkedUser?.password || '')
+    setShowEditPassword(false)
   }
 
   const handleSaveEdit = () => {
     if (!editingTenant) return
+    if (!editEmail.trim()) {
+      alert('O e-mail de login é obrigatório.')
+      return
+    }
+
     let expDate = editExpiresAt ? new Date(editExpiresAt).toISOString() : editingTenant.expiresAt
     if (editBillingCycle === 'ISENTO') {
       expDate = '2099-12-31T23:59:59Z'
     }
-    db.updateTenantPlan(editingTenant.id, editPlan, editBillingCycle, editPlanStatus, expDate, editMaxBirds)
+
+    db.updateTenantAndCredentials(editingTenant.id, {
+      email: editEmail.trim(),
+      password: editPassword.trim() || undefined,
+      plan: 'PREMIUM',
+      billingCycle: editBillingCycle,
+      planStatus: editPlanStatus,
+      expiresAt: expDate,
+      maxBirds: editMaxBirds
+    })
+
     refresh()
     setEditingTenant(null)
-    alert('Alterações salvas com sucesso!')
+    alert('✅ Alterações e credenciais de login/senha salvas com sucesso!')
   }
 
   const handleQuickRenew = (t: Tenant, months = 1) => {
@@ -659,10 +686,65 @@ export default function AdminCriatoriosPage() {
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1">
                 <div>Criatório: <strong>{editingTenant.name}</strong></div>
-                <div className="text-slate-500">ID: {editingTenant.id} • {editingTenant.email}</div>
+                <div className="text-slate-500">ID: {editingTenant.id}</div>
+              </div>
+
+              {/* Login Email & Password Fields */}
+              <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Credenciais de Acesso do Criatório</span>
+                  </span>
+                  <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-md">
+                    Login do Criador
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 block">
+                    E-mail de Login <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                    <input
+                      type="email"
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      placeholder="criador@email.com"
+                      className="w-full h-8.5 pl-8 pr-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#00c853] font-medium text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 block">
+                    Senha de Acesso (Login)
+                  </label>
+                  <div className="relative flex items-center">
+                    <Key className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                    <input
+                      type={showEditPassword ? 'text' : 'password'}
+                      value={editPassword}
+                      onChange={(e) => setEditPassword(e.target.value)}
+                      placeholder="Digite a nova senha do criador"
+                      className="w-full h-8.5 pl-8 pr-18 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#00c853] font-mono font-medium text-slate-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowEditPassword(!showEditPassword)}
+                      className="absolute right-1.5 px-2 py-1 text-[10px] font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded transition cursor-pointer"
+                    >
+                      {showEditPassword ? 'Ocultar' : 'Mostrar'}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    O criador utilizará este e-mail e senha para acessar o painel do criatório.
+                  </p>
+                </div>
               </div>
 
               {/* Billing Cycle Selector */}
