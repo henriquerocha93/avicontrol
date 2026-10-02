@@ -64,14 +64,9 @@ export default function VendedorDashboardPage() {
   const loadSellerData = () => {
     const sellers = db.getSellers()
     const userEmail = user?.email?.toLowerCase().trim() || ''
-    
-    // Find seller by email or linked user or fallback to first seller for demo
     let found = sellers.find(s => s.email.toLowerCase().trim() === userEmail)
     if (!found && user?.id) {
       found = sellers.find(s => s.linkedUserId === user.id || s.id === user.tenantId?.replace('seller-tenant-', ''))
-    }
-    if (!found) {
-      found = sellers[0] // Fallback to demo seller
     }
 
     if (found) {
@@ -80,6 +75,10 @@ export default function VendedorDashboardPage() {
       setPixTypeForm(found.pixKeyType || 'CPF')
       setCommissions(db.getCommissions(found.id))
       setPayouts(db.getPayouts(found.id))
+    } else {
+      setSeller(null)
+      setCommissions([])
+      setPayouts([])
     }
   }
 

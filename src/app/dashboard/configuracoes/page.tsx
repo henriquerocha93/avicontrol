@@ -119,15 +119,6 @@ export default function ConfiguracoesPage() {
     reader.readAsText(file);
   };
 
-  const handleResetDemo = () => {
-    if (confirm('Deseja recarregar os dados de demonstração iniciais?')) {
-      db.resetToDemoData();
-      loadData();
-      refreshTenant();
-      alert('Dados resetados com sucesso!');
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -398,16 +389,6 @@ export default function ConfiguracoesPage() {
                 Carregar Arquivo de Backup (.json)
               </span>
             </label>
-          </div>
-
-          <div className="md:col-span-2 bg-amber-50 rounded-3xl p-6 border border-amber-200 flex items-center justify-between">
-            <div>
-              <h4 className="font-bold text-sm text-amber-900">Ambiente de Demonstração</h4>
-              <p className="text-xs text-amber-800 mt-0.5">Deseja reiniciar a base com as 16 aves modelo, linhagens e anilhas de demonstração?</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={handleResetDemo} className="border-amber-400 text-amber-900 hover:bg-amber-100">
-              Recarregar Dados Demo
-            </Button>
           </div>
         </div>
       )}

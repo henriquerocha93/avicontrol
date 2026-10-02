@@ -328,7 +328,7 @@ export default function AdminVendedoresPage() {
       id: `comm-${Date.now()}`,
       affiliateId: targetSellerForSale.id,
       affiliateName: targetSellerForSale.name,
-      tenantId: 'tenant-demo-01',
+      tenantId: `tenant-${Date.now()}`,
       tenantName: saleTenantName || 'Criatório Novo Assinante',
       planName: salePlanName,
       saleValue: saleVal,
@@ -360,7 +360,7 @@ export default function AdminVendedoresPage() {
       amount: amountVal,
       pixKey: targetSellerForPayout.pixKey,
       status: 'COMPLETED',
-      receiptUrl: payoutReceipt || 'https://comprovante-pix-demo',
+      receiptUrl: payoutReceipt || undefined,
       createdAt: new Date().toISOString(),
       completedAt: new Date().toISOString()
     }

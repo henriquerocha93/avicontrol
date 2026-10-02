@@ -145,10 +145,6 @@ export default function AdminCriatoriosPage() {
   }
 
   const handleDeleteTenant = (id: string, name: string) => {
-    if (id === 'tenant-demo-01') {
-      alert('O criatório principal de demonstração não pode ser excluído.')
-      return
-    }
     if (confirm(`Tem certeza que deseja excluir o criatório "${name}" e todos os seus dados?`)) {
       db.deleteTenant(id)
       refresh()
@@ -416,15 +412,13 @@ export default function AdminCriatoriosPage() {
                             </button>
                           )}
 
-                          {t.id !== 'tenant-demo-01' && (
-                            <button
-                              onClick={() => handleDeleteTenant(t.id, t.name)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
-                              title="Excluir criatório"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleDeleteTenant(t.id, t.name)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                            title="Excluir criatório"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>

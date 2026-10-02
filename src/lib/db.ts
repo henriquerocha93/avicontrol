@@ -46,7 +46,7 @@ interface DatabaseState {
   insights: AiLearnedInsight[];
 }
 
-const STORAGE_KEY = 'birdpro_saas_db_v1';
+const STORAGE_KEY = 'birdpro_production_db_v2';
 
 class DataService {
   private state: DatabaseState;
@@ -88,18 +88,7 @@ class DataService {
       events: [...INITIAL_CALENDAR_EVENTS],
       notes: [...INITIAL_NOTES],
       insights: [],
-      auditLogs: [
-        {
-          id: 'log-01',
-          tenantId: 'tenant-demo-01',
-          userId: 'user-demo-01',
-          userName: 'Dr. Roberto Silveira',
-          action: 'LOGIN',
-          module: 'AUTENTICACAO',
-          details: 'Acesso realizado com sucesso ao painel principal.',
-          createdAt: new Date().toISOString()
-        }
-      ]
+      auditLogs: []
     };
   }
 
@@ -110,95 +99,6 @@ class DataService {
       if (stored) {
         const parsed = JSON.parse(stored);
         this.state = { ...this.getInitialState(), ...parsed };
-
-        // Migrate and clean any outdated placeholder images
-        const OLD_IMGS = [
-          'photo-1552728089-57bdde30beb3',
-          'photo-1573496359142-b8d87734a5a2',
-          'photo-1534528741775-53994a69daeb',
-          'photo-1598755257130-c2aaca1f061c',
-          'photo-1549608276-5786777e6587'
-        ];
-        const CANARY_IMG = 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&auto=format&fit=crop&q=80';
-        let hasChanges = false;
-
-        this.state.birds = this.state.birds.map(b => {
-          if (b.id === 'bird-01' || b.id === 'bird-02' || b.id === 'bird-03' || (b.photoUrl && OLD_IMGS.some(img => b.photoUrl?.includes(img)))) {
-            hasChanges = true;
-            return { ...b, photoUrl: '' };
-          }
-          return b;
-        });
-
-        this.state.tenants = this.state.tenants.map(t => {
-          let updated = { ...t };
-          if (t.logoUrl && OLD_IMGS.some(img => t.logoUrl?.includes(img))) {
-            updated.logoUrl = CANARY_IMG;
-            hasChanges = true;
-          }
-          if (t.visualConfig) {
-            const vc = { ...t.visualConfig };
-            if (vc.treeLogoUrl && OLD_IMGS.some(img => vc.treeLogoUrl?.includes(img))) { vc.treeLogoUrl = CANARY_IMG; hasChanges = true; }
-            if (vc.logoGenealogyUrl && OLD_IMGS.some(img => vc.logoGenealogyUrl?.includes(img))) { vc.logoGenealogyUrl = CANARY_IMG; hasChanges = true; }
-            if (vc.labelLogoUrl && OLD_IMGS.some(img => vc.labelLogoUrl?.includes(img))) { vc.labelLogoUrl = CANARY_IMG; hasChanges = true; }
-            if (vc.bgLabelFrontUrl && OLD_IMGS.some(img => vc.bgLabelFrontUrl?.includes(img))) { vc.bgLabelFrontUrl = CANARY_IMG; hasChanges = true; }
-            if (vc.bgLabelBackUrl && OLD_IMGS.some(img => vc.bgLabelBackUrl?.includes(img))) { vc.bgLabelBackUrl = CANARY_IMG; hasChanges = true; }
-            updated.visualConfig = vc;
-          }
-          if (!updated.billingCycle) {
-            updated.billingCycle = updated.id === 'tenant-demo-04' ? 'ISENTO' : updated.id === 'tenant-demo-02' || updated.id === 'tenant-demo-03' ? 'MENSAL' : 'ANUAL';
-            hasChanges = true;
-          }
-          return updated;
-        });
-
-        if (this.state.tenants.length <= 1) {
-          INITIAL_ALL_TENANTS.forEach(it => {
-            if (!this.state.tenants.some(t => t.id === it.id)) {
-              this.state.tenants.push(it);
-              hasChanges = true;
-            }
-          });
-        }
-
-        if (!this.state.events || this.state.events.length === 0) {
-          this.state.events = [...INITIAL_CALENDAR_EVENTS];
-          hasChanges = true;
-        }
-
-        if (!this.state.notes || this.state.notes.length === 0) {
-          this.state.notes = [...INITIAL_NOTES];
-          hasChanges = true;
-        }
-
-        if (!this.state.sellers || this.state.sellers.length === 0) {
-          this.state.sellers = [...INITIAL_SELLERS];
-          hasChanges = true;
-        } else {
-          this.state.sellers = this.state.sellers.map(s => {
-            const initial = INITIAL_SELLERS.find(i => i.id === s.id);
-            return {
-              ...s,
-              type: s.type || (initial?.type ?? 'VENDEDOR'),
-              monthlySalesGoal: s.monthlySalesGoal ?? initial?.monthlySalesGoal ?? 5000,
-              monthlySignupsGoal: s.monthlySignupsGoal ?? initial?.monthlySignupsGoal ?? 25,
-              goalBonusPercent: s.goalBonusPercent ?? initial?.goalBonusPercent ?? 5,
-              goalBonusFixed: s.goalBonusFixed ?? initial?.goalBonusFixed ?? 0,
-              instagram: s.instagram ?? initial?.instagram,
-              youtube: s.youtube ?? initial?.youtube,
-            };
-          });
-          hasChanges = true;
-        }
-
-        if (!this.state.userReferrals || Object.keys(this.state.userReferrals).length === 0) {
-          this.state.userReferrals = { ...INITIAL_USER_REFERRALS };
-          hasChanges = true;
-        }
-
-        if (hasChanges) {
-          this.saveToStorage();
-        }
       } else {
         this.saveToStorage();
       }
@@ -1383,11 +1283,17 @@ class DataService {
   }
 
   deleteTenant(tenantId: string): boolean {
-    if (tenantId === 'tenant-demo-01') return false; // Protect demo master
     const initialLen = this.state.tenants.length;
     this.state.tenants = this.state.tenants.filter(t => t.id !== tenantId);
     this.state.users = this.state.users.filter(u => u.tenantId !== tenantId);
     this.state.birds = this.state.birds.filter(b => b.tenantId !== tenantId);
+    this.state.cages = this.state.cages.filter(c => c.tenantId !== tenantId);
+    this.state.rings = this.state.rings.filter(r => r.tenantId !== tenantId);
+    this.state.pairs = this.state.pairs.filter(p => p.tenantId !== tenantId);
+    this.state.clutches = this.state.clutches.filter(c => c.tenantId !== tenantId);
+    this.state.eggs = this.state.eggs.filter(e => e.tenantId !== tenantId);
+    this.state.events = (this.state.events || []).filter(e => e.tenantId !== tenantId);
+    this.state.notes = (this.state.notes || []).filter(n => n.tenantId !== tenantId);
     if (this.state.tenants.length < initialLen) {
       this.saveToStorage();
       return true;

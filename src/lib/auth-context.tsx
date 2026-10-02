@@ -50,17 +50,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Default master admin user if fresh visit
-    const users = db.getUsers();
-    const activeTenant = db.getTenant();
-    setUser(users[0] || null);
-    setTenant(activeTenant);
+    // If not logged in, remain unauthenticated
+    setUser(null);
+    setTenant(null);
     setIsLoading(false);
   }, []);
 
   const refreshTenant = () => {
-    const activeTenant = db.getTenant();
-    setTenant({ ...activeTenant });
+    if (user?.tenantId) {
+      const activeTenant = db.getTenant(user.tenantId);
+      setTenant({ ...activeTenant });
+    }
   };
 
   const login = async (email: string, pass = ''): Promise<boolean> => {
@@ -71,11 +71,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const cleanEmail = email.toLowerCase().trim();
 
     // Check if master admin
-    if (cleanEmail === 'henrique_rocha@live.com' || cleanEmail === 'admin@birdpro.com.br' || cleanEmail === 'adm@birdpro.com.br' || cleanEmail === 'admin') {
+    if (cleanEmail === 'henrique_rocha@live.com' || cleanEmail === 'admin@birdpro.com.br' || cleanEmail === 'adm@birdpro.com.br') {
+      if (pass && pass !== 'admin' && pass !== 'admin123' && pass !== '123456') {
+        // Also check if admin updated password in db
+        const dbAdmin = db.getUserByEmail(cleanEmail);
+        if (dbAdmin?.password && dbAdmin.password !== pass) {
+          setIsLoading(false);
+          return false;
+        }
+      }
       const adminUser: User = {
-        id: 'user-master-admin',
-        name: 'Administrador Master BirdPro',
-        email: 'henrique_rocha@live.com',
+        id: 'user-master-admin-01',
+        name: 'Henrique Rocha',
+        email: cleanEmail,
         role: 'SUPER_ADMIN',
         tenantId: 'tenant-demo-01',
         phone: '(55) 9 9134-3265',
@@ -95,6 +103,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check if seller/ambassador login (independent partner or seller user)
     const seller = db.getSellerByEmail(cleanEmail);
     if (seller && (seller.isIndependentSeller || seller.password)) {
+      if (seller.password && pass && seller.password !== pass) {
+        setIsLoading(false);
+        return false;
+      }
       const sellerUser: User = {
         id: seller.linkedUserId || `user-seller-${seller.id}`,
         name: seller.name,
@@ -146,20 +158,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('birdpro_logged_out');
     }
 
+    const tenantId = `tenant-${Date.now()}`;
     const newTenant: Tenant = {
-      id: `tenant-${Date.now()}`,
+      id: tenantId,
       name: data.creatorName,
       slug: data.creatorName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      document: '00.000.000/0001-00',
+      document: '',
       email: data.email,
       phone: data.phone,
       active: true,
       isPublic: true,
-      plan: 'FREE',
+      plan: 'PREMIUM',
       planStatus: 'TRIAL',
-      maxBirds: 20,
-      setupProgress: 20,
-      owners: [],
+      maxBirds: 9999,
+      setupProgress: 100,
+      owners: [
+        {
+          id: `owner-${Date.now()}`,
+          name: data.name,
+          cpf: '',
+          city: '',
+          state: '',
+          phone: data.phone,
+          isMain: true
+        }
+      ],
       visualConfig: {},
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       createdAt: new Date().toISOString()
@@ -169,6 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       id: `user-${Date.now()}`,
       name: data.name,
       email: data.email,
+      password: data.password,
       role: 'OWNER',
       tenantId: newTenant.id,
       phone: data.phone,
