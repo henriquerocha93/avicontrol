@@ -320,12 +320,6 @@ export default function LandingPage() {
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
-            <Link href="/dashboard" className="w-full sm:w-auto">
-              <Button variant="outline" size="lg" className="w-full sm:w-auto border-emerald-800/60 bg-slate-900/60 backdrop-blur-sm text-slate-200 hover:bg-emerald-950/60 hover:text-white hover:border-emerald-500/50 text-sm sm:text-base px-6">
-                <PlayCircle className="w-5 h-5 mr-2 text-emerald-400" />
-                Explorar Painel Demonstrativo
-              </Button>
-            </Link>
           </div>
 
           {/* Trust Badges */}
@@ -515,7 +509,7 @@ export default function LandingPage() {
               Gere documentos profissionais com a identidade visual do seu criatório, foto da ave, árvore genealógica de 4 e 5 gerações, laudos laboratoriais e QR Code de autenticidade instantânea.
             </p>
             <div className="pt-3 flex flex-wrap gap-3">
-              <Link href="/dashboard/aves">
+              <Link href="/cadastro">
                 <Button className="bg-[#00c853] hover:bg-emerald-600 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-950/60 px-6 py-2.5">
                   Conhecer Emissão de Pedigree →
                 </Button>
