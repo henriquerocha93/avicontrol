@@ -23,8 +23,32 @@ export interface PagBankPixOrderResponse {
   qrCodeUrl?: string;
   expirationDate: string;
   amount: number;
-  status: 'WAITING' | 'PAID' | 'FAILED';
+  status: 'WAITING' | 'PAID' | 'DECLINED' | 'CANCELED';
   raw?: any;
+}
+
+// In-memory set of webhook-confirmed paid transactions for fast lookups
+declare global {
+  var __BIRDPRO_PAID_REFERENCES__: Set<string> | undefined;
+}
+
+if (!globalThis.__BIRDPRO_PAID_REFERENCES__) {
+  globalThis.__BIRDPRO_PAID_REFERENCES__ = new Set<string>();
+}
+
+export function registerPaidReference(referenceId: string) {
+  if (globalThis.__BIRDPRO_PAID_REFERENCES__ && referenceId) {
+    globalThis.__BIRDPRO_PAID_REFERENCES__.add(referenceId.trim().toUpperCase());
+    globalThis.__BIRDPRO_PAID_REFERENCES__.add(referenceId.trim());
+  }
+}
+
+export function isReferencePaidInWebhook(referenceId: string): boolean {
+  if (!globalThis.__BIRDPRO_PAID_REFERENCES__ || !referenceId) return false;
+  return (
+    globalThis.__BIRDPRO_PAID_REFERENCES__.has(referenceId.trim()) ||
+    globalThis.__BIRDPRO_PAID_REFERENCES__.has(referenceId.trim().toUpperCase())
+  );
 }
 
 /**
@@ -170,7 +194,7 @@ export async function createPagBankPixOrder(params: PagBankPixOrderRequest): Pro
 
   // Standalone dynamic PagBank PIX payload (EMVCo BR Code format)
   const txid = `PAGBANK${Date.now().toString().slice(-8)}`;
-  const pixKey = '6f33236f-92cb-4012-b0a8-332e3af35039'; // Chave PIX cadastrada do PagBank BirdPro
+  const pixKey = '6f33236f-92cb-4012-b0a8-332e3af35039'; // Chave PIX oficial do PagBank BirdPro
   const generatedCode = generateEmvCoPix(pixKey, 'BIRDPRO TECNOLOGIA', 'SAO PAULO', amount, txid);
 
   return {
@@ -182,4 +206,73 @@ export async function createPagBankPixOrder(params: PagBankPixOrderRequest): Pro
     amount,
     status: 'WAITING'
   };
+}
+
+/**
+ * Checks the real status of an order on PagBank API
+ */
+export async function checkPagBankOrderStatus(params: {
+  orderId?: string;
+  referenceId?: string;
+  token?: string;
+  isSandbox?: boolean;
+}): Promise<{ paid: boolean; status: string; raw?: any }> {
+  const { orderId, referenceId, token, isSandbox } = params;
+  const baseUrl = isSandbox ? 'https://sandbox.api.pagseguro.com' : 'https://api.pagseguro.com';
+
+  // 1. Check if received via webhook first
+  if (referenceId && isReferencePaidInWebhook(referenceId)) {
+    return { paid: true, status: 'PAID' };
+  }
+
+  if (!token || token.length < 20 || token.includes('DEMO')) {
+    return { paid: false, status: 'WAITING' };
+  }
+
+  try {
+    // Check by Order ID if it's a real PagBank order ID (e.g. ORDE_...)
+    if (orderId && !orderId.startsWith('PGB-')) {
+      const res = await fetch(`${baseUrl}/orders/${orderId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const chargeStatus = data.charges?.[0]?.status || data.qr_codes?.[0]?.status || data.status;
+        const isPaid = chargeStatus === 'PAID' || chargeStatus === 'AUTHORIZED';
+        if (isPaid && referenceId) {
+          registerPaidReference(referenceId);
+        }
+        return { paid: isPaid, status: chargeStatus || 'WAITING', raw: data };
+      }
+    }
+
+    // Check by reference_id query
+    if (referenceId) {
+      const res = await fetch(`${baseUrl}/orders?reference_id=${encodeURIComponent(referenceId)}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const order = Array.isArray(data.orders) ? data.orders[0] : (Array.isArray(data) ? data[0] : data);
+        if (order) {
+          const chargeStatus = order.charges?.[0]?.status || order.qr_codes?.[0]?.status || order.status;
+          const isPaid = chargeStatus === 'PAID' || chargeStatus === 'AUTHORIZED';
+          if (isPaid) {
+            registerPaidReference(referenceId);
+          }
+          return { paid: isPaid, status: chargeStatus || 'WAITING', raw: order };
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao consultar status da ordem no PagBank:', err);
+  }
+
+  return { paid: false, status: 'WAITING' };
 }

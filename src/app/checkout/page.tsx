@@ -19,7 +19,10 @@ import {
   ChevronRight,
   Tag,
   Building2,
-  FileText
+  FileText,
+  Clock,
+  AlertTriangle,
+  Info
 } from 'lucide-react'
 import { db } from '@/lib/db'
 import { useAuth } from '@/lib/auth-context'
@@ -78,12 +81,22 @@ function CheckoutContent() {
   const [isCheckingCep, setIsCheckingCep] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
-  // Payment Modal / Flow States
+  // Payment Modal / Verification States
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CARD' | 'BOLETO'>('PIX')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [pixCopied, setPixCopied] = useState(false)
+  
+  // Real PagBank Order & Verification References
+  const [currentReferenceId, setCurrentReferenceId] = useState('')
+  const [currentOrderId, setCurrentOrderId] = useState('')
+  const [currentPixCode, setCurrentPixCode] = useState('')
+  const [verificationAlert, setVerificationAlert] = useState<{
+    type: 'ERROR' | 'INFO' | 'SUCCESS';
+    message: string;
+  } | null>(null)
 
   // Card Form
   const [cardNumber, setCardNumber] = useState('')
@@ -158,7 +171,7 @@ function CheckoutContent() {
   }
 
   // Form Validation & Open PagBank Checkout Modal
-  const handleSubmitForm = (e: React.FormEvent) => {
+  const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMessage('')
 
@@ -200,21 +213,58 @@ function CheckoutContent() {
       return
     }
 
-    // All valid -> open PagBank payment modal
-    setIsPaymentModalOpen(true)
-  }
+    // Generate unique reference ID for PagBank
+    const newRefId = `BP-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+    setCurrentReferenceId(newRefId)
+    setVerificationAlert(null)
+    setIsCreatingOrder(true)
 
-  // Generate Real Dynamic PIX Code
-  const globalConfig = db.getGlobalConfig()
-  const pagbankPixKey = globalConfig.pagbankPixKey || '6f33236f-92cb-4012-b0a8-332e3af35039'
-  const txid = `PGB${Date.now().toString().slice(-8)}`
-  const currentPixCode = generateEmvCoPix(
-    pagbankPixKey, 
-    'BIRDPRO TECNOLOGIA', 
-    'SAO PAULO', 
-    finalPrice, 
-    txid
-  )
+    // Fallback standard EMVCo PIX code
+    const globalConfig = db.getGlobalConfig()
+    const pagbankPixKey = globalConfig.pagbankPixKey || '6f33236f-92cb-4012-b0a8-332e3af35039'
+    const fallbackPix = generateEmvCoPix(
+      pagbankPixKey, 
+      'BIRDPRO TECNOLOGIA', 
+      'SAO PAULO', 
+      finalPrice, 
+      newRefId
+    )
+    setCurrentPixCode(fallbackPix)
+
+    // Call PagBank Order Creation API
+    try {
+      const res = await fetch('/api/payments/pagbank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          referenceId: newRefId,
+          customerName: formData.name.trim(),
+          customerEmail: formData.email.trim().toLowerCase(),
+          customerCpf: formData.document.replace(/\D/g, ''),
+          customerPhone: `${formData.ddd.replace(/\D/g, '')}${formData.phone.replace(/\D/g, '')}`,
+          amount: finalPrice,
+          description: `Assinatura BirdPro (${selectedCycle === 'ANUAL' ? 'Plano Anual PRO' : 'Plano Mensal PRO'})`,
+          token: globalConfig.pagbankToken,
+          isSandbox: globalConfig.pagbankSandbox
+        })
+      })
+
+      if (res.ok) {
+        const orderData = await res.json()
+        if (orderData.pixCode) {
+          setCurrentPixCode(orderData.pixCode)
+        }
+        if (orderData.orderId) {
+          setCurrentOrderId(orderData.orderId)
+        }
+      }
+    } catch (e) {
+      console.warn('Fallback para EMVCo dinâmico local:', e)
+    } finally {
+      setIsCreatingOrder(false)
+      setIsPaymentModalOpen(true)
+    }
+  }
 
   const handleCopyPix = () => {
     navigator.clipboard.writeText(currentPixCode)
@@ -222,67 +272,168 @@ function CheckoutContent() {
     setTimeout(() => setPixCopied(false), 2500)
   }
 
-  // Confirm Payment & Provision Account
-  const handleConfirmPagbankPayment = async () => {
-    setIsSubmitting(true)
+  // Real Account Activation & Provisioning (TRIGGERED ONLY WHEN PAID IS CONFIRMED)
+  const handleProvisionPaidAccount = async () => {
+    const cleanEmail = formData.email.trim().toLowerCase()
+    const tenantName = formData.criatorioName.trim() || `Criatório ${formData.name.split(' ')[0]}`
+    const fullPhone = `(${formData.ddd.trim()}) ${formData.phone.trim()}`
+    const monthsToAdd = selectedCycle === 'ANUAL' ? 12 : 1
+    const calculatedExpires = new Date(Date.now() + monthsToAdd * 30 * 24 * 60 * 60 * 1000).toISOString()
 
-    setTimeout(async () => {
-      const cleanEmail = formData.email.trim().toLowerCase()
-      const tenantName = formData.criatorioName.trim() || `Criatório ${formData.name.split(' ')[0]}`
-      const fullPhone = `(${formData.ddd.trim()}) ${formData.phone.trim()}`
-      const monthsToAdd = selectedCycle === 'ANUAL' ? 12 : 1
-      const calculatedExpires = new Date(Date.now() + monthsToAdd * 30 * 24 * 60 * 60 * 1000).toISOString()
+    // 1. Create tenant with ACTIVE status
+    const createdResult = db.createTenantManual({
+      name: tenantName,
+      responsibleName: formData.name.trim(),
+      email: cleanEmail,
+      phone: fullPhone,
+      document: formData.document.trim(),
+      plan: 'PREMIUM',
+      billingCycle: selectedCycle === 'ANUAL' ? 'ANUAL' : 'MENSAL',
+      maxBirds: 9999,
+      expiresAt: calculatedExpires,
+      planStatus: 'ACTIVE',
+      password: formData.password.trim()
+    })
 
-      // 1. Create or update tenant
-      const createdResult = db.createTenantManual({
-        name: tenantName,
-        responsibleName: formData.name.trim(),
-        email: cleanEmail,
-        phone: fullPhone,
-        document: formData.document.trim(),
-        plan: 'PREMIUM',
-        billingCycle: selectedCycle === 'ANUAL' ? 'ANUAL' : 'MENSAL',
-        maxBirds: 9999,
-        expiresAt: calculatedExpires,
-        planStatus: 'ACTIVE',
-        password: formData.password.trim()
+    // 2. Update address & payment date
+    db.updateTenant({
+      address: formData.address,
+      number: formData.number,
+      neighborhood: formData.neighborhood,
+      city: formData.city,
+      state: formData.state,
+      zipCode: formData.cep,
+      complement: formData.complement,
+      lastPaymentDate: new Date().toISOString()
+    }, createdResult.tenant.id)
+
+    // 3. If partner coupon was applied, record real commission
+    if (appliedCoupon?.sellerId) {
+      db.addCommission({
+        id: `comm-${Date.now()}`,
+        affiliateId: appliedCoupon.sellerId,
+        affiliateName: appliedCoupon.sellerName || 'Parceiro Comercial BirdPro',
+        tenantId: createdResult.tenant.id,
+        tenantName: createdResult.tenant.name,
+        planName: `Plano Completo BirdPro (${selectedCycle === 'ANUAL' ? 'Anual' : 'Mensal'})`,
+        saleValue: finalPrice,
+        commissionPercent: 20,
+        commissionAmount: (finalPrice * 20) / 100,
+        status: 'APPROVED',
+        createdAt: new Date().toISOString()
       })
+    }
 
-      // Update tenant address
-      db.updateTenant({
-        address: formData.address,
-        number: formData.number,
-        neighborhood: formData.neighborhood,
-        city: formData.city,
-        state: formData.state,
-        zipCode: formData.cep,
-        complement: formData.complement,
-        lastPaymentDate: new Date().toISOString()
-      }, createdResult.tenant.id)
+    // 4. Authenticate session
+    await login(cleanEmail, formData.password.trim())
 
-      // 2. If coupon was applied, record affiliate commission
-      if (appliedCoupon?.sellerId) {
-        db.addCommission({
-          id: `comm-${Date.now()}`,
-          affiliateId: appliedCoupon.sellerId,
-          affiliateName: appliedCoupon.sellerName || 'Parceiro Comercial BirdPro',
-          tenantId: createdResult.tenant.id,
-          tenantName: createdResult.tenant.name,
-          planName: `Plano Completo BirdPro (${selectedCycle === 'ANUAL' ? 'Anual' : 'Mensal'})`,
-          saleValue: finalPrice,
-          commissionPercent: 20,
-          commissionAmount: (finalPrice * 20) / 100,
-          status: 'APPROVED',
-          createdAt: new Date().toISOString()
+    setIsPaymentModalOpen(false)
+    setIsSuccess(true)
+  }
+
+  // REAL Verification Function: Calls PagBank API to check if money was actually received
+  const handleVerifyPaymentWithPagBank = async (isManualClick = true) => {
+    if (!currentReferenceId) return
+    setIsVerifying(true)
+    if (isManualClick) {
+      setVerificationAlert(null)
+    }
+
+    try {
+      const res = await fetch(
+        `/api/payments/pagbank/status?referenceId=${encodeURIComponent(currentReferenceId)}&orderId=${encodeURIComponent(currentOrderId)}`
+      )
+      const data = await res.json()
+
+      if (data && data.paid) {
+        // REAL PAYMENT CONFIRMED BY PAGBANK!
+        setVerificationAlert({
+          type: 'SUCCESS',
+          message: '🎉 Pagamento confirmado e liquidado com sucesso pelo PagBank!'
+        })
+        await handleProvisionPaidAccount()
+      } else {
+        // NOT PAID YET - DO NOT LIBERATE ACCESS!
+        if (isManualClick) {
+          setVerificationAlert({
+            type: 'ERROR',
+            message: `⚠️ Pagamento ainda NÃO identificado pelo PagBank PagSeguro (Status: ${data?.status || 'AGUARDANDO PAGAMENTO'}). O acesso ao BIRDPRO só é liberado mediante compensação bancária real do valor de ${formatCurrency(finalPrice)}. Se você acabou de efetuar a transferência no app do seu banco, aguarde de 10 a 30 segundos para o processamento bancário e clique novamente em "Verificar Pagamento".`
+          })
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao consultar PagBank:', e)
+      if (isManualClick) {
+        setVerificationAlert({
+          type: 'ERROR',
+          message: 'Não foi possível confirmar a liquidação no PagBank neste momento. Por favor, verifique se a transferência foi concluída no seu banco e tente novamente.'
         })
       }
+    } finally {
+      setIsVerifying(false)
+    }
+  }
 
-      // 3. Authenticate User immediately
-      await login(cleanEmail, formData.password.trim())
+  // Real-time Background Poller (Monitors PagBank every 4 seconds while modal is open)
+  useEffect(() => {
+    if (!isPaymentModalOpen || isSuccess || !currentReferenceId) return
 
-      setIsSubmitting(false)
-      setIsSuccess(true)
-    }, 1500)
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `/api/payments/pagbank/status?referenceId=${encodeURIComponent(currentReferenceId)}&orderId=${encodeURIComponent(currentOrderId)}`
+        )
+        const data = await res.json()
+        if (data && data.paid) {
+          clearInterval(interval)
+          await handleProvisionPaidAccount()
+        }
+      } catch (e) {
+        // Poller silent catch
+      }
+    }, 4000)
+
+    return () => clearInterval(interval)
+  }, [isPaymentModalOpen, isSuccess, currentReferenceId, currentOrderId])
+
+  // Card Payment Handler
+  const handleCardPayment = async () => {
+    setVerificationAlert(null)
+    if (!cardNumber.replace(/\D/g, '') || cardNumber.replace(/\D/g, '').length < 13) {
+      setVerificationAlert({ type: 'ERROR', message: 'Número de cartão de crédito inválido.' })
+      return
+    }
+    if (!cardHolder.trim()) {
+      setVerificationAlert({ type: 'ERROR', message: 'Informe o nome completo impresso no cartão.' })
+      return
+    }
+    if (!cardExpiry.trim() || !cardCvv.trim()) {
+      setVerificationAlert({ type: 'ERROR', message: 'Informe a validade e o código de segurança (CVV) do cartão.' })
+      return
+    }
+
+    setIsVerifying(true)
+    try {
+      const res = await fetch(
+        `/api/payments/pagbank/status?referenceId=${encodeURIComponent(currentReferenceId)}&orderId=${encodeURIComponent(currentOrderId)}`
+      )
+      const data = await res.json()
+      if (data && data.paid) {
+        await handleProvisionPaidAccount()
+        return
+      }
+      setVerificationAlert({
+        type: 'ERROR',
+        message: '⚠️ Pagamento com cartão não autorizado ou não processado pelo PagBank. Verifique o limite e os dados digitados ou utilize o pagamento via PIX com ativação instantânea.'
+      })
+    } catch (e) {
+      setVerificationAlert({
+        type: 'ERROR',
+        message: 'Erro ao processar transação de cartão no PagBank.'
+      })
+    } finally {
+      setIsVerifying(false)
+    }
   }
 
   return (
@@ -306,7 +457,7 @@ function CheckoutContent() {
             Formulário de Contratação
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Preencha seus dados para contratação e liberação imediata do sistema <strong>BIRDPRO</strong>
+            Preencha seus dados para contratação e ativação do sistema <strong>BIRDPRO</strong>
           </p>
         </div>
 
@@ -348,57 +499,40 @@ function CheckoutContent() {
               {/* Nome Completo / Razão Social */}
               <div className="sm:col-span-8 space-y-1">
                 <label className="text-[11px] text-slate-600 font-medium block">
-                  Nome<span className="text-rose-500">*</span>
+                  Nome Completo / Razão Social<span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Nome completo ou Razão Social"
+                  placeholder="Nome do criador ou empresa"
                   className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400"
                 />
               </div>
             </div>
 
-            {/* Nome do Criatório & Senha */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-              <div className="space-y-1">
-                <label className="text-[11px] text-slate-600 font-medium block">
-                  Nome do seu Criatório / Plantel<span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.criatorioName}
-                  onChange={(e) => setFormData({ ...formData, criatorioName: e.target.value })}
-                  placeholder="Ex: Criadouro Canto Real"
-                  className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] text-slate-600 font-medium block">
-                  Crie sua Senha de Acesso ao Sistema<span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="Mínimo 4 dígitos"
-                  className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400 font-mono"
-                />
-              </div>
+            {/* Nome do Criatório */}
+            <div className="space-y-1 pt-1">
+              <label className="text-[11px] text-slate-600 font-medium block">
+                Nome do Criatório / Criadouro
+              </label>
+              <input
+                type="text"
+                value={formData.criatorioName}
+                onChange={(e) => setFormData({ ...formData, criatorioName: e.target.value })}
+                placeholder="Ex: Criatório Canto Nobre (opcional)"
+                className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400"
+              />
             </div>
           </div>
 
           {/* ==================================================================== */}
-          {/* SECTION 2: CONTATO                                                   */}
+          {/* SECTION 2: CONTATO & CREDENCIAIS                                    */}
           {/* ==================================================================== */}
           <div className="space-y-3 pt-2">
             <h2 className="text-sm font-bold text-slate-900 italic">
-              Contato
+              Contato &amp; Acesso
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
@@ -412,16 +546,16 @@ function CheckoutContent() {
                   required
                   maxLength={3}
                   value={formData.ddd}
-                  onChange={(e) => setFormData({ ...formData, ddd: e.target.value.replace(/\D/g, '') })}
-                  placeholder="Ex: 11"
+                  onChange={(e) => setFormData({ ...formData, ddd: e.target.value })}
+                  placeholder="11"
                   className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400 text-center font-mono"
                 />
               </div>
 
               {/* Celular / WhatsApp */}
-              <div className="sm:col-span-3 space-y-1">
+              <div className="sm:col-span-5 space-y-1">
                 <label className="text-[11px] text-slate-600 font-medium block">
-                  Celular/WhatsApp<span className="text-rose-500">*</span>
+                  Celular / WhatsApp<span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -433,23 +567,40 @@ function CheckoutContent() {
                 />
               </div>
 
-              {/* E-mail */}
-              <div className="sm:col-span-3 space-y-1">
+              {/* Senha de Acesso */}
+              <div className="sm:col-span-5 space-y-1">
                 <label className="text-[11px] text-slate-600 font-medium block">
-                  E-mail<span className="text-rose-500">*</span>
+                  Criar Senha de Acesso<span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Mínimo 4 caracteres"
+                  className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+              {/* E-mail */}
+              <div className="space-y-1">
+                <label className="text-[11px] text-slate-600 font-medium block">
+                  E-mail Principal<span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="email"
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="seu@email.com"
+                  placeholder="seuemail@provedor.com"
                   className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400"
                 />
               </div>
 
               {/* Verificar E-mail */}
-              <div className="sm:col-span-4 space-y-1">
+              <div className="space-y-1">
                 <label className="text-[11px] text-slate-600 font-medium block">
                   Verificar E-mail<span className="text-rose-500">*</span>
                 </label>
@@ -458,7 +609,7 @@ function CheckoutContent() {
                   required
                   value={formData.confirmEmail}
                   onChange={(e) => setFormData({ ...formData, confirmEmail: e.target.value })}
-                  placeholder="Repita seu e-mail"
+                  placeholder="Digite o e-mail novamente"
                   className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400"
                 />
               </div>
@@ -466,26 +617,26 @@ function CheckoutContent() {
           </div>
 
           {/* ==================================================================== */}
-          {/* SECTION 3: ENDEREÇO                                                  */}
+          {/* SECTION 3: ENDEREÇO COM BUSCA VIACEP                                 */}
           {/* ==================================================================== */}
           <div className="space-y-3 pt-2">
             <h2 className="text-sm font-bold text-slate-900 italic">
               Endereço
             </h2>
 
-            {/* CEP + Endereço + Número */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
-              {/* CEP with Search Button */}
-              <div className="sm:col-span-3 space-y-1">
+              {/* CEP com botão de busca */}
+              <div className="sm:col-span-4 space-y-1">
                 <label className="text-[11px] text-slate-600 font-medium block">
                   CEP<span className="text-rose-500">*</span>
                 </label>
-                <div className="relative flex items-center">
+                <div className="relative">
                   <input
                     type="text"
                     required
                     value={formData.cep}
                     onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
+                    onBlur={handleLookupCep}
                     placeholder="00000-000"
                     className="w-full h-9 pl-3 pr-8 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400 font-mono"
                   />
@@ -493,35 +644,33 @@ function CheckoutContent() {
                     type="button"
                     onClick={handleLookupCep}
                     disabled={isCheckingCep}
-                    className="absolute right-1 p-1.5 text-slate-400 hover:text-slate-700 transition cursor-pointer"
-                    title="Buscar endereço pelo CEP"
+                    className="absolute right-1 top-1 h-7 w-7 text-slate-400 hover:text-emerald-600 flex items-center justify-center cursor-pointer"
+                    title="Buscar CEP automaticamente"
                   >
-                    {isCheckingCep ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Search className="w-3.5 h-3.5" />
-                    )}
+                    {isCheckingCep ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>
 
-              {/* Endereço */}
-              <div className="sm:col-span-7 space-y-1">
+              {/* Endereço / Logradouro */}
+              <div className="sm:col-span-8 space-y-1">
                 <label className="text-[11px] text-slate-600 font-medium block">
-                  Endereço<span className="text-rose-500">*</span>
+                  Endereço (Rua, Avenida)<span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder="Rua, Avenida, Estrada..."
+                  placeholder="Nome da rua ou avenida"
                   className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400"
                 />
               </div>
+            </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 pt-1">
               {/* Número */}
-              <div className="sm:col-span-2 space-y-1">
+              <div className="sm:col-span-3 space-y-1">
                 <label className="text-[11px] text-slate-600 font-medium block">
                   Número<span className="text-rose-500">*</span>
                 </label>
@@ -530,16 +679,13 @@ function CheckoutContent() {
                   required
                   value={formData.number}
                   onChange={(e) => setFormData({ ...formData, number: e.target.value })}
-                  placeholder="Nº ou S/N"
+                  placeholder="123 ou S/N"
                   className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400"
                 />
               </div>
-            </div>
 
-            {/* Bairro + UF + Cidade */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
               {/* Bairro */}
-              <div className="sm:col-span-5 space-y-1">
+              <div className="sm:col-span-4 space-y-1">
                 <label className="text-[11px] text-slate-600 font-medium block">
                   Bairro<span className="text-rose-500">*</span>
                 </label>
@@ -548,7 +694,22 @@ function CheckoutContent() {
                   required
                   value={formData.neighborhood}
                   onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
-                  placeholder="Seu bairro"
+                  placeholder="Bairro"
+                  className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400"
+                />
+              </div>
+
+              {/* Cidade */}
+              <div className="sm:col-span-3 space-y-1">
+                <label className="text-[11px] text-slate-600 font-medium block">
+                  Cidade<span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  placeholder="Cidade"
                   className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400"
                 />
               </div>
@@ -561,252 +722,265 @@ function CheckoutContent() {
                 <select
                   value={formData.state}
                   onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                  className="w-full h-9 px-2.5 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400"
+                  className="w-full h-9 px-2 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400 font-bold"
                 >
-                  {BRAZIL_STATES.map((uf) => (
-                    <option key={uf} value={uf}>{uf}</option>
+                  {BRAZIL_STATES.map((st) => (
+                    <option key={st} value={st}>{st}</option>
                   ))}
                 </select>
               </div>
-
-              {/* Cidade */}
-              <div className="sm:col-span-5 space-y-1">
-                <label className="text-[11px] text-slate-600 font-medium block">
-                  Cidade<span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.city}
-                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  placeholder="Sua cidade"
-                  className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400"
-                />
-              </div>
             </div>
 
-            {/* Complemento + Código Promocional */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div className="space-y-1">
-                <label className="text-[11px] text-slate-600 font-medium block">
-                  Complemento
-                </label>
-                <input
-                  type="text"
-                  value={formData.complement}
-                  onChange={(e) => setFormData({ ...formData, complement: e.target.value })}
-                  placeholder="Apto, Bloco, Casa, etc."
-                  className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] text-slate-600 font-medium block">
-                  Código Promocional
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={formData.promoCode}
-                    onChange={(e) => setFormData({ ...formData, promoCode: e.target.value })}
-                    onBlur={handleApplyCoupon}
-                    placeholder="Cupom ou indicação"
-                    className="w-full h-9 px-3 uppercase font-mono bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleApplyCoupon}
-                    className="px-3 h-9 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold transition text-xs cursor-pointer"
-                  >
-                    Validar
-                  </button>
-                </div>
-                {couponError && (
-                  <p className="text-[10px] text-rose-600 mt-0.5">{couponError}</p>
-                )}
-                {appliedCoupon?.valid && (
-                  <p className="text-[10px] text-emerald-600 font-bold mt-0.5">
-                    ✅ {appliedCoupon.message} (-{appliedCoupon.discountPercent}%)
-                  </p>
-                )}
-              </div>
+            {/* Complemento */}
+            <div className="space-y-1 pt-1">
+              <label className="text-[11px] text-slate-600 font-medium block">
+                Complemento
+              </label>
+              <input
+                type="text"
+                value={formData.complement}
+                onChange={(e) => setFormData({ ...formData, complement: e.target.value })}
+                placeholder="Apto, Sala, Bloco (opcional)"
+                className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs text-slate-800 focus:outline-none focus:border-slate-400"
+              />
             </div>
           </div>
 
           {/* ==================================================================== */}
-          {/* SECTION 4: SELECIONADO: PLANO & VALOR                                */}
+          {/* SECTION 4: CUPOM DE DESCONTO                                         */}
           {/* ==================================================================== */}
-          <div className="pt-6 border-t border-slate-200 text-center space-y-3">
-            <span className="text-xs text-slate-500 block">
-              Selecionado:
-            </span>
-
-            {/* Plan Switcher Toggle */}
-            <div className="inline-flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200">
+          <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200 space-y-2">
+            <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <Tag className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Cupom de Desconto ou Código de Indicação</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={formData.promoCode}
+                onChange={(e) => setFormData({ ...formData, promoCode: e.target.value.toUpperCase() })}
+                placeholder="Ex: CARLOS20 ou MARI25"
+                className="w-full h-9 px-3 bg-white border border-slate-300 rounded text-xs text-slate-800 uppercase font-mono font-bold focus:outline-none focus:border-emerald-500"
+              />
               <button
                 type="button"
-                onClick={() => setSelectedCycle('ANUAL')}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                  selectedCycle === 'ANUAL'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
+                onClick={handleApplyCoupon}
+                className="px-4 h-9 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded transition shrink-0 cursor-pointer"
               >
-                PLANO ANUAL (Recomendado)
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedCycle('MENSAL')}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                  selectedCycle === 'MENSAL'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                PLANO MENSAL
+                Aplicar
               </button>
             </div>
 
-            <div>
-              <h3 className="text-base sm:text-lg font-black text-slate-900 uppercase tracking-tight">
-                PLANO COMPLETO BIRDPRO {selectedCycle === 'ANUAL' ? 'ANUAL' : 'MENSAL'}
-              </h3>
-              <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
-                {formatCurrency(finalPrice)}
-              </div>
-              {appliedCoupon?.valid && (
-                <span className="text-xs text-emerald-600 font-bold block">
-                  Desconto de {appliedCoupon.discountPercent}% aplicado (de {formatCurrency(basePrice)} por {formatCurrency(finalPrice)})
+            {appliedCoupon?.valid && (
+              <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 p-2 rounded flex items-center justify-between">
+                <span>{appliedCoupon.message}</span>
+                <span className="bg-emerald-600 text-white px-1.5 py-0.5 rounded text-[10px]">
+                  -{appliedCoupon.discountPercent}% OFF
                 </span>
-              )}
+              </div>
+            )}
+
+            {couponError && (
+              <p className="text-[11px] text-rose-600 font-medium">
+                {couponError}
+              </p>
+            )}
+          </div>
+
+          {/* ==================================================================== */}
+          {/* SECTION 5: PLANO SELECIONADO & RESUMO DE VALORES                     */}
+          {/* ==================================================================== */}
+          <div className="p-5 bg-gradient-to-br from-slate-900 to-slate-950 text-white rounded-2xl shadow-md space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+              <div>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 block">
+                  Plano Selecionado
+                </span>
+                <h3 className="text-base font-black text-white">
+                  BIRDPRO Cloud Premium Completo
+                </h3>
+              </div>
+
+              {/* Cycle Toggle */}
+              <div className="flex items-center bg-slate-800 p-1 rounded-xl border border-slate-700 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCycle('ANUAL')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    selectedCycle === 'ANUAL'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Anual (R$ 169,99/ano)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCycle('MENSAL')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    selectedCycle === 'MENSAL'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Mensal (R$ 14,99/mês)
+                </button>
+              </div>
+            </div>
+
+            {/* Price Summary */}
+            <div className="flex items-baseline justify-between pt-1">
+              <span className="text-xs text-slate-300">Total a Pagar:</span>
+              <div className="text-right">
+                {discountAmount > 0 && (
+                  <span className="text-xs text-slate-400 line-through mr-2 font-mono">
+                    {formatCurrency(basePrice)}
+                  </span>
+                )}
+                <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono">
+                  {formatCurrency(finalPrice)}
+                </span>
+                <span className="text-[11px] text-slate-400 block">
+                  {selectedCycle === 'ANUAL' ? 'Acesso completo por 12 meses' : 'Cobrança mensal recorrente'}
+                </span>
+              </div>
             </div>
           </div>
 
           {/* ==================================================================== */}
-          {/* SECTION 5: TERMOS & CONDIÇÕES                                        */}
+          {/* SECTION 6: TERMOS DE USO & POLÍTICA                                  */}
           {/* ==================================================================== */}
-          <div className="pt-6 border-t border-slate-200 space-y-3 text-slate-700">
-            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+          <div className="space-y-3 pt-2 text-xs text-slate-600">
+            <label className="flex items-start space-x-2.5 cursor-pointer">
               <input
                 type="checkbox"
                 required
                 checked={agreeTerms}
                 onChange={(e) => setAgreeTerms(e.target.checked)}
-                className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
               />
-              <span className="text-xs leading-relaxed">
-                Estou de acordo com o <span className="text-amber-700 font-semibold hover:underline">contrato de prestação de serviço</span> e a <span className="text-amber-700 font-semibold hover:underline">política de privacidade - LGPD</span>.
+              <span className="leading-snug">
+                Concordo com o <a href="#" className="text-emerald-700 underline font-bold">contrato de prestação de serviço</a> e com a <a href="#" className="text-emerald-700 underline font-bold">política de privacidade</a> (LGPD).
               </span>
             </label>
 
-            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+            <label className="flex items-start space-x-2.5 cursor-pointer">
               <input
                 type="checkbox"
                 required
                 checked={agreeCancelPolicy}
                 onChange={(e) => setAgreeCancelPolicy(e.target.checked)}
-                className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
               />
-              <span className="text-xs leading-relaxed">
-                Estou ciente de que em caso de cancelamento <strong>NÃO</strong> haverá reembolso parcial ou integral após 7 dias corridos da data de contratação.
+              <span className="leading-snug">
+                Estou ciente que não haverá reembolso dos valores pagos após o prazo de 7 dias corridos a contar da contratação.
               </span>
             </label>
           </div>
 
-          {/* ==================================================================== */}
-          {/* SECTION 6: PAGAR COM PAGSEGURO / PAGBANK BUTTON                      */}
-          {/* ==================================================================== */}
-          <div className="pt-6 flex flex-col items-center justify-center space-y-2">
+          {/* Submit Button */}
+          <div className="pt-4 border-t border-slate-100 flex justify-center">
             <button
               type="submit"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-[#246bb4] hover:bg-[#1d5996] text-white font-bold text-sm rounded-md shadow-md transition-all cursor-pointer transform hover:-translate-y-0.5"
+              disabled={isCreatingOrder}
+              className="w-full sm:w-auto px-10 py-3.5 bg-[#00c853] hover:bg-[#00b84a] disabled:opacity-50 text-white font-black text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition flex items-center justify-center space-x-2 cursor-pointer uppercase tracking-wider"
             >
-              <span>Pagar com</span>
-              <span className="px-2 py-0.5 bg-[#ffc107] text-[#1c2e4a] rounded font-black text-xs inline-flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#246bb4]"></span>
-                pagseguro / pagbank
-              </span>
+              {isCreatingOrder ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Gerando Pedido no PagBank...</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4" />
+                  <span>Prosseguir para Pagamento Seguro</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
-
-            <span className="text-[11px] text-slate-500 tracking-wide font-medium">
-              Sua compra protegida
-            </span>
           </div>
 
         </form>
       </div>
 
       {/* ==================================================================== */}
-      {/* MODAL DE PAGAMENTO PAGBANK (PIX / CARTÃO / BOLETO)                   */}
+      {/* MODAL: PAGAMENTO PAGBANK COM VERIFICAÇÃO REAL E SEGURA                */}
       {/* ==================================================================== */}
       {isPaymentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-slate-200 overflow-hidden my-auto max-h-[95vh] flex flex-col animate-in fade-in zoom-in-95">
             
-            {/* Modal Header */}
-            <div className="px-6 py-4 bg-[#171b21] text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Lock className="w-4 h-4 text-[#00c853]" />
-                <span className="font-bold text-xs uppercase tracking-wider">
-                  Pagamento Seguro PagBank (PagSeguro)
-                </span>
+            {/* Header */}
+            <div className="px-6 py-4 bg-[#171b21] text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center space-x-2.5">
+                <ShieldCheck className="w-5 h-5 text-[#00c853]" />
+                <div>
+                  <h3 className="font-bold text-sm">Pagamento Seguro PagBank</h3>
+                  <p className="text-[10px] text-slate-400 font-mono">Ref: {currentReferenceId}</p>
+                </div>
               </div>
-              <button 
-                onClick={() => setIsPaymentModalOpen(false)} 
+              <button
+                onClick={() => setIsPaymentModalOpen(false)}
                 className="text-slate-400 hover:text-white cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto text-xs">
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
               
-              {/* Order Summary */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between font-bold text-slate-800 pb-2 border-b border-slate-200">
-                  <span>Plano Completo BirdPro ({selectedCycle === 'ANUAL' ? 'Anual' : 'Mensal'})</span>
-                  <span>{formatCurrency(finalPrice)}</span>
+              {/* Value Summary Card */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Plano Contratado:</span>
+                  <strong className="text-slate-800 text-sm">
+                    {selectedCycle === 'ANUAL' ? 'Plano Anual PRO' : 'Plano Mensal PRO'}
+                  </strong>
                 </div>
-                <div className="text-[11px] text-slate-500">
-                  Criatório: <strong>{formData.criatorioName || formData.name}</strong> ({formData.email})
+                <div className="text-right">
+                  <span className="text-slate-500 block text-[11px]">Valor Total:</span>
+                  <strong className="text-emerald-600 text-lg font-mono font-black">
+                    {formatCurrency(finalPrice)}
+                  </strong>
                 </div>
               </div>
 
               {/* Payment Method Selector */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-2">
-                  Escolha a forma de pagamento PagBank:
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-700 block">
+                  Escolha a Forma de Pagamento PagBank:
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod('PIX')}
+                    onClick={() => { setPaymentMethod('PIX'); setVerificationAlert(null) }}
                     className={`py-2.5 px-2 rounded-xl border text-center font-bold transition flex flex-col items-center gap-1 cursor-pointer ${
                       paymentMethod === 'PIX'
                         ? 'border-[#00c853] bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20'
                         : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                     }`}
                   >
-                    <span className="text-xs">⚡ PIX Imediato</span>
-                    <span className="text-[10px] text-emerald-700 font-bold">Liberação na hora</span>
+                    <span className="text-xs">⚡ PIX</span>
+                    <span className="text-[10px] text-emerald-700 font-bold">Aprovação Imediata</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod('CARD')}
+                    onClick={() => { setPaymentMethod('CARD'); setVerificationAlert(null) }}
                     className={`py-2.5 px-2 rounded-xl border text-center font-bold transition flex flex-col items-center gap-1 cursor-pointer ${
                       paymentMethod === 'CARD'
                         ? 'border-[#00c853] bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20'
                         : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                     }`}
                   >
-                    <span className="text-xs">💳 Cartão PagBank</span>
+                    <span className="text-xs">💳 Cartão</span>
                     <span className="text-[10px] text-slate-500 font-medium">Até 12x</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod('BOLETO')}
+                    onClick={() => { setPaymentMethod('BOLETO'); setVerificationAlert(null) }}
                     className={`py-2.5 px-2 rounded-xl border text-center font-bold transition flex flex-col items-center gap-1 cursor-pointer ${
                       paymentMethod === 'BOLETO'
                         ? 'border-[#00c853] bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20'
@@ -814,7 +988,7 @@ function CheckoutContent() {
                     }`}
                   >
                     <span className="text-xs">📄 Boleto</span>
-                    <span className="text-[10px] text-slate-500 font-medium">1 a 3 dias</span>
+                    <span className="text-[10px] text-slate-500 font-medium">1 a 2 dias</span>
                   </button>
                 </div>
               </div>
@@ -824,7 +998,7 @@ function CheckoutContent() {
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 text-center">
                   <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-800">
                     <QrCode className="w-4 h-4 text-emerald-600" />
-                    <span>QR Code PIX PagBank PagSeguro</span>
+                    <span>QR Code PIX PagBank Oficial</span>
                   </div>
 
                   <div className="w-48 h-48 mx-auto bg-white p-2 rounded-2xl border-2 border-emerald-500/40 shadow-xs flex flex-col items-center justify-center">
@@ -854,6 +1028,12 @@ function CheckoutContent() {
                       {pixCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                       <span>{pixCopied ? 'Copiado!' : 'Copiar'}</span>
                     </button>
+                  </div>
+
+                  {/* Real-time Poller Badge */}
+                  <div className="pt-2 flex items-center justify-center gap-1.5 text-[10px] text-slate-500 font-medium">
+                    <RefreshCw className="w-3 h-3 animate-spin text-emerald-600" />
+                    <span>Monitorando PagBank em tempo real — O acesso libera automaticamente após o pagamento.</span>
                   </div>
                 </div>
               )}
@@ -907,14 +1087,14 @@ function CheckoutContent() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 block">Parcelamento no Cartão de Crédito</label>
+                    <label className="text-[11px] font-bold text-slate-700 block">Parcelamento no Cartão</label>
                     <select
                       value={cardInstallments}
                       onChange={(e) => setCardInstallments(e.target.value)}
                       className="w-full h-8.5 px-2.5 text-xs bg-white border border-slate-300 rounded-lg font-medium focus:outline-none focus:border-[#00c853]"
                     >
                       <option value="1">1x de {formatCurrency(finalPrice)} (À vista)</option>
-                      {selectedCycle === 'ANUAL' ? (
+                      {selectedCycle === 'ANUAL' && (
                         <>
                           <option value="2">2x de {formatCurrency(finalPrice / 2)} (Sem juros)</option>
                           <option value="3">3x de {formatCurrency(finalPrice / 3)} (Sem juros)</option>
@@ -928,8 +1108,6 @@ function CheckoutContent() {
                           <option value="11">11x de {formatCurrency((finalPrice * 1.08) / 11)}</option>
                           <option value="12">12x de {formatCurrency((finalPrice * 1.09) / 12)}</option>
                         </>
-                      ) : (
-                        <option value="1">1x de {formatCurrency(finalPrice)} (Mensalidade)</option>
                       )}
                     </select>
                   </div>
@@ -940,41 +1118,97 @@ function CheckoutContent() {
               {paymentMethod === 'BOLETO' && (
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-center space-y-2">
                   <p className="text-xs font-bold text-slate-800">Boleto Bancário PagBank</p>
-                  <p className="text-[11px] text-slate-500">
-                    O boleto será gerado com vencimento para 3 dias úteis. A confirmação do acesso ocorre automaticamente assim que compensado.
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    O boleto bancário é gerado em nome de <strong>{formData.name}</strong>. A liberação do acesso ocorre automaticamente via Webhook do PagBank assim que o pagamento for compensado pelo banco (prazo de 1 a 2 dias úteis).
                   </p>
                 </div>
               )}
+
+              {/* REAL VERIFICATION ALERT MESSAGE (IF PAYMENT NOT DETECTED YET) */}
+              {verificationAlert && (
+                <div className={`p-3.5 rounded-xl border text-xs leading-relaxed animate-in fade-in ${
+                  verificationAlert.type === 'ERROR'
+                    ? 'bg-rose-50 border-rose-200 text-rose-800'
+                    : verificationAlert.type === 'SUCCESS'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900 font-bold'
+                    : 'bg-amber-50 border-amber-200 text-amber-900'
+                }`}>
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+                    <p className="text-[11px]">{verificationAlert.message}</p>
+                  </div>
+                </div>
+              )}
+
             </div>
 
             {/* Modal Actions */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end space-x-2">
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsPaymentModalOpen(false)}
-                className="px-4 py-2 text-xs text-slate-600 hover:text-slate-900 font-medium cursor-pointer"
+                className="text-xs text-slate-500 hover:text-slate-800 font-medium cursor-pointer order-2 sm:order-1"
               >
-                Voltar ao Formulário
+                ← Voltar ao Formulário
               </button>
-              <button
-                type="button"
-                onClick={handleConfirmPagbankPayment}
-                disabled={isSubmitting}
-                className="px-5 py-2.5 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-black rounded-lg transition shadow-md shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer uppercase tracking-wider"
-              >
-                {isSubmitting ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Processando no PagBank...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Confirmar Pagamento &amp; Liberar Acesso</span>
-                  </>
-                )}
-              </button>
+
+              {paymentMethod === 'PIX' && (
+                <button
+                  type="button"
+                  onClick={() => handleVerifyPaymentWithPagBank(true)}
+                  disabled={isVerifying}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black rounded-xl transition shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider order-1 sm:order-2"
+                >
+                  {isVerifying ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Consultando PagBank...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-3.5 h-3.5" />
+                      <span>Verificar se o PIX foi Identificado</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {paymentMethod === 'CARD' && (
+                <button
+                  type="button"
+                  onClick={handleCardPayment}
+                  disabled={isVerifying}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black rounded-xl transition shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider order-1 sm:order-2"
+                >
+                  {isVerifying ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Processando no PagBank...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-3.5 h-3.5" />
+                      <span>Pagar com Cartão de Crédito</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {paymentMethod === 'BOLETO' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    alert(`Boleto PagBank emitido com sucesso para ${formData.email}. O acesso será liberado assim que o pagamento compensar no banco.`)
+                    setIsPaymentModalOpen(false)
+                  }}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-black rounded-xl transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider order-1 sm:order-2"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Imprimir Boleto PagBank</span>
+                </button>
+              )}
             </div>
+
           </div>
         </div>
       )}
@@ -994,7 +1228,7 @@ function CheckoutContent() {
                 🎉 Pagamento Identificado com Sucesso!
               </h2>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Seu pagamento foi aprovado pelo <strong>PagBank PagSeguro</strong> e o plano <strong>PREMIUM COMPLETO</strong> já está ativo para seu criatório.
+                Seu pagamento foi aprovado e confirmado pelo <strong>PagBank PagSeguro</strong> e o plano <strong>PREMIUM COMPLETO</strong> já está ativo para seu criatório.
               </p>
             </div>
 

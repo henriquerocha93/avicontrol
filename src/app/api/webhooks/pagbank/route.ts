@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { registerPaidReference } from '@/lib/pagbank';
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,9 +10,11 @@ export async function POST(req: NextRequest) {
     const status = payload?.charges?.[0]?.status || payload?.status;
     const referenceId = payload?.reference_id || payload?.referenceId;
 
-    if (status === 'PAID') {
+    if (status === 'PAID' || status === 'AUTHORIZED') {
       console.log(`[PagBank Webhook] Pagamento confirmado com sucesso para referência: ${referenceId}`);
-      // Return 200 OK to PagBank
+      if (referenceId) {
+        registerPaidReference(referenceId);
+      }
       return NextResponse.json({ received: true, status: 'PAID', referenceId });
     }
 
