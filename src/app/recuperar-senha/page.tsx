@@ -14,8 +14,7 @@ import {
   Eye, 
   EyeOff, 
   Smartphone,
-  RefreshCw,
-  Sparkles,
+  CreditCard,
   Check
 } from 'lucide-react';
 import { db } from '@/lib/db';
@@ -25,7 +24,7 @@ import { Logo } from '@/components/ui/logo';
 export default function RecuperarSenhaPage() {
   const router = useRouter();
 
-  // Current Step: 1 = Email, 2 = Verification Code / Identity, 3 = New Password, 4 = Success
+  // Current Step: 1 = Email, 2 = Identity Verification, 3 = New Password, 4 = Success
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Form Fields
@@ -33,13 +32,15 @@ export default function RecuperarSenhaPage() {
   const [accountInfo, setAccountInfo] = useState<{
     email: string;
     name: string;
-    phoneLast4?: string;
+    hasDocument: boolean;
+    hasPhone: boolean;
+    phoneHint?: string;
+    documentHint?: string;
   } | null>(null);
 
-  // Verification code
-  const [securityCode, setSecurityCode] = useState('');
-  const [inputCode, setInputCode] = useState('');
-  const [phoneLast4Input, setPhoneLast4Input] = useState('');
+  // Verification Inputs (Confirmação segura de titularidade)
+  const [documentInput, setDocumentInput] = useState('');
+  const [phoneInput, setPhoneInput] = useState('');
 
   // Password fields
   const [newPassword, setNewPassword] = useState('');
@@ -50,11 +51,6 @@ export default function RecuperarSenhaPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Generate random 6-digit code
-  const generateNewCode = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  };
-
   // STEP 1: Search Account
   const handleSearchAccount = (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +58,7 @@ export default function RecuperarSenhaPage() {
     const clean = identifier.trim();
 
     if (!clean) {
-      setErrorMessage('Por favor, informe seu e-mail ou telefone cadastrado.');
+      setErrorMessage('Por favor, informe seu e-mail cadastrado.');
       return;
     }
 
@@ -72,19 +68,22 @@ export default function RecuperarSenhaPage() {
       const result = db.findAccountForPasswordReset(clean);
 
       if (!result.found) {
-        setErrorMessage('Nenhuma conta encontrada com esses dados. Verifique a digitação ou cadastre-se.');
+        setErrorMessage('Nenhuma conta encontrada com este e-mail. Verifique se digitou corretamente.');
         setIsLoading(false);
         return;
       }
 
-      const generatedCode = generateNewCode();
-      setSecurityCode(generatedCode);
       setAccountInfo({
         email: result.email,
         name: result.name,
-        phoneLast4: result.phoneLast4
+        hasDocument: result.hasDocument,
+        hasPhone: result.hasPhone,
+        phoneHint: result.phoneHint,
+        documentHint: result.documentHint
       });
 
+      setDocumentInput('');
+      setPhoneInput('');
       setIsLoading(false);
       setStep(2);
     } catch (err: any) {
@@ -93,32 +92,43 @@ export default function RecuperarSenhaPage() {
     }
   };
 
-  // STEP 2: Validate Identity (Code OR Phone confirmation)
+  // STEP 2: Validate Identity (CPF/CNPJ OR Full Phone - ONLY Known by Real Owner)
   const handleValidateIdentity = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
-    const cleanCode = inputCode.trim();
-    const cleanPhone = phoneLast4Input.trim();
-
-    // Check by 6-digit code
-    if (cleanCode && cleanCode === securityCode) {
-      setStep(3);
+    if (!accountInfo?.email) {
+      setErrorMessage('Sessão expirada. Volte e informe seu e-mail novamente.');
       return;
     }
 
-    // Check by last 4 digits of phone
-    if (accountInfo?.phoneLast4 && cleanPhone && cleanPhone === accountInfo.phoneLast4) {
-      setStep(3);
+    const cleanDoc = documentInput.trim();
+    const cleanPhone = phoneInput.trim();
+
+    if (!cleanDoc && !cleanPhone) {
+      setErrorMessage('Por favor, informe o CPF/CNPJ ou o Celular/WhatsApp cadastrado para comprovar sua identidade.');
       return;
     }
 
-    if (!cleanCode && !cleanPhone) {
-      setErrorMessage('Digite o código de verificação de 6 dígitos ou os 4 últimos dígitos do seu telefone.');
-      return;
-    }
+    setIsLoading(true);
 
-    setErrorMessage('Código de verificação ou dígitos do telefone incorretos. Verifique e tente novamente.');
+    try {
+      const isValid = db.validateAccountIdentity(accountInfo.email, {
+        cpfOrCnpj: cleanDoc,
+        phone: cleanPhone
+      });
+
+      setIsLoading(false);
+
+      if (isValid) {
+        setStep(3);
+      } else {
+        setErrorMessage('Os dados informados (CPF/CNPJ ou Celular) não coincidem com o cadastro desta conta. Por segurança, a redefinição só é permitida ao titular.');
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMessage('Erro ao validar identidade: ' + err.message);
+    }
   };
 
   // STEP 3: Save New Password
@@ -202,12 +212,12 @@ export default function RecuperarSenhaPage() {
           <div className="flex items-center justify-center gap-2 pb-2 border-b border-slate-100">
             <div className={`flex items-center gap-1 text-[11px] font-bold ${step >= 1 ? 'text-emerald-700' : 'text-slate-400'}`}>
               <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 1 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100'}`}>1</span>
-              <span>Conta</span>
+              <span>Identificação</span>
             </div>
             <span className="text-slate-300">→</span>
             <div className={`flex items-center gap-1 text-[11px] font-bold ${step >= 2 ? 'text-emerald-700' : 'text-slate-400'}`}>
               <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 2 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100'}`}>2</span>
-              <span>Validação</span>
+              <span>Segurança</span>
             </div>
             <span className="text-slate-300">→</span>
             <div className={`flex items-center gap-1 text-[11px] font-bold ${step >= 3 ? 'text-emerald-700' : 'text-slate-400'}`}>
@@ -238,14 +248,14 @@ export default function RecuperarSenhaPage() {
                 Redefinir Senha
               </h1>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Digite seu e-mail cadastrado no sistema para redefinir sua senha de acesso de forma autônoma.
+                Digite o e-mail cadastrado na sua conta para iniciar a redefinição de senha segura.
               </p>
             </div>
 
             <form onSubmit={handleSearchAccount} className="space-y-4 text-xs">
               <div className="space-y-1">
                 <label className="block font-bold text-slate-700">
-                  E-mail do Criatório / Usuário
+                  E-mail Cadastrado
                 </label>
                 <div className="relative flex rounded-xl border border-slate-300 overflow-hidden bg-slate-50 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
                   <div className="w-10 flex items-center justify-center text-slate-400 shrink-0">
@@ -267,14 +277,14 @@ export default function RecuperarSenhaPage() {
                 isLoading={isLoading}
                 className="w-full bg-[#00c853] hover:bg-emerald-600 text-white font-bold h-11 text-xs rounded-xl shadow-md cursor-pointer"
               >
-                Continuar
+                Avançar
               </Button>
             </form>
           </div>
         )}
 
         {/* ==================================================================== */}
-        {/* STEP 2: CONFIRMAÇÃO DE IDENTIDADE AUTÔNOMA                          */}
+        {/* STEP 2: CONFIRMAÇÃO DE IDENTIDADE SEGURA (SEM CÓDIGO VAZADO EM TELA)  */}
         {/* ==================================================================== */}
         {step === 2 && accountInfo && (
           <div className="space-y-4">
@@ -283,65 +293,81 @@ export default function RecuperarSenhaPage() {
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <h1 className="text-xl font-black text-slate-800 tracking-tight">
-                Confirmação de Segurança
+                Verificação de Titularidade
               </h1>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Conta localizada: <strong className="text-slate-800">{accountInfo.name}</strong> ({maskEmail(accountInfo.email)}).
+                Conta: <strong className="text-slate-800">{accountInfo.name}</strong> ({maskEmail(accountInfo.email)})
               </p>
             </div>
 
-            {/* Display Self-Service Security Code */}
-            <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 text-center space-y-1">
-              <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
-                Seu Código de Segurança Autônomo:
-              </span>
-              <div className="font-mono font-black text-2xl text-emerald-900 tracking-widest select-all">
-                {securityCode}
-              </div>
-              <p className="text-[10px] text-emerald-700">
-                💡 Copie o código acima ou digite abaixo para confirmar sua identidade:
+            <div className="p-3 bg-blue-50/70 rounded-2xl border border-blue-200 text-blue-900 text-xs space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-[11px]">
+                <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>Proteção de Dados &amp; Antifraude</span>
+              </p>
+              <p className="text-[11px] text-blue-800 leading-relaxed">
+                Para comprovar que você é o verdadeiro titular da conta, confirme <strong>um dos dados cadastrados</strong> abaixo:
               </p>
             </div>
 
-            <form onSubmit={handleValidateIdentity} className="space-y-4 text-xs">
+            <form onSubmit={handleValidateIdentity} className="space-y-3.5 text-xs">
+              
+              {/* Option A: CPF / CNPJ */}
               <div className="space-y-1">
                 <label className="block font-bold text-slate-700">
-                  Opção 1: Digite o Código de 6 Dígitos
+                  Opção 1: Digite seu CPF ou CNPJ cadastrado
                 </label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={inputCode}
-                  onChange={(e) => setInputCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="000000"
-                  className="w-full text-center py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl font-mono text-base font-bold text-slate-800 tracking-widest focus:outline-none focus:border-emerald-500"
-                />
+                <div className="relative flex rounded-xl border border-slate-300 overflow-hidden bg-slate-50 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
+                  <div className="w-10 flex items-center justify-center text-slate-400 shrink-0">
+                    <CreditCard className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    value={documentInput}
+                    onChange={(e) => setDocumentInput(e.target.value)}
+                    placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                    className="w-full py-2.5 pr-3 bg-transparent text-slate-800 text-xs font-mono font-medium focus:outline-none"
+                  />
+                </div>
               </div>
 
-              {accountInfo.phoneLast4 && (
-                <div className="space-y-1 pt-1 border-t border-slate-100">
-                  <label className="block font-bold text-slate-700">
-                    Opção 2: Ou confirme os 4 últimos dígitos do seu Celular
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400 font-mono text-xs">(**) *****-</span>
-                    <input
-                      type="text"
-                      maxLength={4}
-                      value={phoneLast4Input}
-                      onChange={(e) => setPhoneLast4Input(e.target.value.replace(/\D/g, ''))}
-                      placeholder="****"
-                      className="w-24 text-center py-2 px-3 bg-slate-50 border border-slate-300 rounded-xl font-mono text-sm font-bold text-slate-800 tracking-widest focus:outline-none focus:border-emerald-500"
-                    />
+              {/* Divider */}
+              <div className="flex items-center gap-2 my-1">
+                <div className="h-px bg-slate-200 flex-1" />
+                <span className="text-[10px] uppercase font-bold text-slate-400">ou</span>
+                <div className="h-px bg-slate-200 flex-1" />
+              </div>
+
+              {/* Option B: Telefone / WhatsApp Completo */}
+              <div className="space-y-1">
+                <label className="block font-bold text-slate-700">
+                  Opção 2: Digite seu Celular / WhatsApp completo (com DDD)
+                </label>
+                <div className="relative flex rounded-xl border border-slate-300 overflow-hidden bg-slate-50 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20">
+                  <div className="w-10 flex items-center justify-center text-slate-400 shrink-0">
+                    <Smartphone className="w-4 h-4" />
                   </div>
+                  <input
+                    type="text"
+                    value={phoneInput}
+                    onChange={(e) => setPhoneInput(e.target.value)}
+                    placeholder="(00) 00000-0000"
+                    className="w-full py-2.5 pr-3 bg-transparent text-slate-800 text-xs font-mono font-medium focus:outline-none"
+                  />
                 </div>
-              )}
+                {accountInfo.phoneHint && (
+                  <p className="text-[10px] text-slate-400 pl-1">
+                    Dica: final {accountInfo.phoneHint.slice(-5)}
+                  </p>
+                )}
+              </div>
 
               <Button
                 type="submit"
-                className="w-full bg-[#00c853] hover:bg-emerald-600 text-white font-bold h-11 text-xs rounded-xl shadow-md cursor-pointer"
+                isLoading={isLoading}
+                className="w-full mt-2 bg-[#00c853] hover:bg-emerald-600 text-white font-bold h-11 text-xs rounded-xl shadow-md cursor-pointer"
               >
-                Validar Identidade
+                Comprovar Titularidade
               </Button>
             </form>
           </div>
@@ -360,7 +386,7 @@ export default function RecuperarSenhaPage() {
                 Criar Nova Senha
               </h1>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Defina sua nova senha de acesso para <strong>{accountInfo?.email}</strong>.
+                Identidade confirmada! Defina sua nova senha de acesso para <strong>{accountInfo?.email}</strong>.
               </p>
             </div>
 
@@ -454,7 +480,7 @@ export default function RecuperarSenhaPage() {
 
       {/* Footer Below Card */}
       <div className="py-4 text-center text-xs text-slate-400">
-        BIRDPRO • Recuperação Autônoma e Segura de Acesso
+        BIRDPRO • Recuperação Segura com Verificação de Titularidade
       </div>
 
     </div>

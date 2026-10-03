@@ -181,11 +181,22 @@ class DataService {
     found: boolean; 
     email: string; 
     name: string; 
-    phoneLast4?: string;
+    hasDocument: boolean;
+    hasPhone: boolean;
+    phoneHint?: string;
+    documentHint?: string;
     accountType: 'USER' | 'TENANT' | 'SELLER' | 'ADMIN';
   } {
     const clean = identifier.toLowerCase().trim();
     const cleanDigits = identifier.replace(/\D/g, '');
+
+    // Helper to format phone hint
+    const makePhoneHint = (phoneStr?: string) => {
+      if (!phoneStr) return undefined;
+      const digits = phoneStr.replace(/\D/g, '');
+      if (digits.length < 8) return undefined;
+      return `(**) *****-${digits.slice(-4)}`;
+    };
 
     // 1. Search in users
     const user = (this.state.users || []).find(u => 
@@ -193,12 +204,16 @@ class DataService {
       (cleanDigits.length >= 8 && u.phone?.replace(/\D/g, '').endsWith(cleanDigits))
     );
     if (user) {
-      const phoneDigits = user.phone ? user.phone.replace(/\D/g, '') : '';
+      const tenant = (this.state.tenants || []).find(t => t.id === user.tenantId);
+      const doc = tenant?.document || (tenant?.owners?.[0]?.cpf);
       return {
         found: true,
         email: user.email,
         name: user.name,
-        phoneLast4: phoneDigits ? phoneDigits.slice(-4) : undefined,
+        hasDocument: !!doc,
+        hasPhone: !!user.phone,
+        phoneHint: makePhoneHint(user.phone),
+        documentHint: doc ? (doc.replace(/\D/g, '').length > 11 ? '**.***.***/****-**' : '***.***.***-**') : undefined,
         accountType: user.role === 'SUPER_ADMIN' ? 'ADMIN' : 'USER'
       };
     }
@@ -209,12 +224,16 @@ class DataService {
       (cleanDigits.length >= 8 && t.phone?.replace(/\D/g, '').endsWith(cleanDigits))
     );
     if (tenant) {
-      const phoneDigits = tenant.phone ? tenant.phone.replace(/\D/g, '') : '';
+      const doc = tenant.document || tenant.owners?.[0]?.cpf;
+      const ph = tenant.phone || tenant.mobile || tenant.whatsapp;
       return {
         found: true,
         email: tenant.email,
         name: tenant.name,
-        phoneLast4: phoneDigits ? phoneDigits.slice(-4) : undefined,
+        hasDocument: !!doc,
+        hasPhone: !!ph,
+        phoneHint: makePhoneHint(ph),
+        documentHint: doc ? (doc.replace(/\D/g, '').length > 11 ? '**.***.***/****-**' : '***.***.***-**') : undefined,
         accountType: 'TENANT'
       };
     }
@@ -225,12 +244,15 @@ class DataService {
       (cleanDigits.length >= 8 && s.phone?.replace(/\D/g, '').endsWith(cleanDigits))
     );
     if (seller) {
-      const phoneDigits = seller.phone ? seller.phone.replace(/\D/g, '') : '';
+      const isPixCpf = seller.pixKeyType === 'CPF' || seller.pixKeyType === 'CNPJ';
       return {
         found: true,
         email: seller.email,
         name: seller.name,
-        phoneLast4: phoneDigits ? phoneDigits.slice(-4) : undefined,
+        hasDocument: isPixCpf,
+        hasPhone: !!seller.phone,
+        phoneHint: makePhoneHint(seller.phone),
+        documentHint: isPixCpf ? '***.***.***-**' : undefined,
         accountType: 'SELLER'
       };
     }
@@ -241,12 +263,67 @@ class DataService {
         found: true,
         email: clean === 'admin' ? 'admin@birdpro.com.br' : clean,
         name: 'Administrador BirdPro',
-        phoneLast4: '3265',
+        hasDocument: false,
+        hasPhone: true,
+        phoneHint: '(55) *****-3265',
         accountType: 'ADMIN'
       };
     }
 
-    return { found: false, email: clean, name: '', accountType: 'USER' };
+    return { found: false, email: clean, name: '', hasDocument: false, hasPhone: false, accountType: 'USER' };
+  }
+
+  validateAccountIdentity(email: string, answer: { cpfOrCnpj?: string; phone?: string }): boolean {
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanDoc = (answer.cpfOrCnpj || '').replace(/\D/g, '');
+    const cleanPhone = (answer.phone || '').replace(/\D/g, '');
+
+    // Find linked entities
+    const user = (this.state.users || []).find(u => u.email.toLowerCase().trim() === cleanEmail);
+    const tenant = (this.state.tenants || []).find(t => 
+      t.email.toLowerCase().trim() === cleanEmail || 
+      (user && t.id === user.tenantId)
+    );
+    const seller = (this.state.sellers || []).find(s => s.email.toLowerCase().trim() === cleanEmail);
+
+    // List of valid documents for this account
+    const validDocs: string[] = [];
+    if (tenant?.document) validDocs.push(tenant.document.replace(/\D/g, ''));
+    if (tenant?.owners) {
+      tenant.owners.forEach(o => {
+        if (o.cpf) validDocs.push(o.cpf.replace(/\D/g, ''));
+      });
+    }
+    if (seller?.pixKey && (seller.pixKeyType === 'CPF' || seller.pixKeyType === 'CNPJ')) {
+      validDocs.push(seller.pixKey.replace(/\D/g, ''));
+    }
+
+    // List of valid phones for this account
+    const validPhones: string[] = [];
+    if (user?.phone) validPhones.push(user.phone.replace(/\D/g, ''));
+    if (tenant?.phone) validPhones.push(tenant.phone.replace(/\D/g, ''));
+    if (tenant?.mobile) validPhones.push(tenant.mobile.replace(/\D/g, ''));
+    if (tenant?.whatsapp) validPhones.push(tenant.whatsapp.replace(/\D/g, ''));
+    if (seller?.phone) validPhones.push(seller.phone.replace(/\D/g, ''));
+
+    // Master admin credentials check
+    if (cleanEmail === 'henrique_rocha@live.com' || cleanEmail === 'admin@birdpro.com.br' || cleanEmail === 'adm@birdpro.com.br' || cleanEmail === 'admin') {
+      validPhones.push('55991343265', '5555991343265', '991343265', '91343265');
+    }
+
+    // Check Document Match
+    if (cleanDoc && cleanDoc.length >= 6) {
+      const match = validDocs.some(d => d === cleanDoc || (d.length >= 11 && cleanDoc.length >= 11 && d.slice(-9) === cleanDoc.slice(-9)));
+      if (match) return true;
+    }
+
+    // Check Phone Match (must match at least the last 8 digits of telephone with or without DDD)
+    if (cleanPhone && cleanPhone.length >= 8) {
+      const match = validPhones.some(p => p.endsWith(cleanPhone) || cleanPhone.endsWith(p));
+      if (match) return true;
+    }
+
+    return false;
   }
 
   resetPasswordByEmail(email: string, newPassword: string): boolean {
