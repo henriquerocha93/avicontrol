@@ -1154,9 +1154,7 @@ function CheckoutContent() {
                   <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-800">
                     <QrCode className="w-4 h-4 text-emerald-600" />
                     <span>
-                      {activeGateway === 'MERCADOPAGO' 
-                        ? 'QR Code PIX Dinâmico (Mercado Pago — Baixa Automática)' 
-                        : 'QR Code PIX PagBank (Bacen Padrão Nacional)'}
+                      QR Code PIX Dinâmico (Baixa Automática Imediata)
                     </span>
                   </div>
 
@@ -1178,7 +1176,7 @@ function CheckoutContent() {
                   {/* Option 1: PIX Copia e Cola (Dynamic) */}
                   <div className="space-y-1 text-left">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Código PIX Copia e Cola ({activeGateway === 'MERCADOPAGO' ? 'Mercado Pago' : 'PagBank'})
+                      Código PIX Copia e Cola Oficial
                     </label>
                     <div className="flex items-center gap-2">
                       <input
