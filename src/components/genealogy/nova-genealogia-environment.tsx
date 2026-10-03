@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { 
   Edit3, 
   Plus, 
@@ -11,10 +10,8 @@ import {
   Check, 
   Search, 
   X, 
-  CheckCircle2, 
-  AlertCircle
+  CheckCircle2
 } from 'lucide-react'
-import { useAuth } from '@/lib/auth-context'
 import { db } from '@/lib/db'
 import { Bird } from '@/types'
 
@@ -68,29 +65,19 @@ export function NovaGenealogiaEnvironment({
   showBackButton = true,
   onBack
 }: NovaGenealogiaEnvironmentProps) {
-  const router = useRouter()
-  
-  // Safe Auth extraction
-  let currentTenantId: string | undefined = undefined
-  try {
-    const auth = useAuth()
-    currentTenantId = auth?.tenant?.id
-  } catch (e) {
-    currentTenantId = undefined
-  }
-
   const [allBirds, setAllBirds] = useState<Bird[]>([])
 
   // Safe load birds from database
   useEffect(() => {
     try {
-      const list = db.getBirds(currentTenantId) || []
-      setAllBirds(Array.isArray(list) ? list : [])
+      const list = db.getBirds()
+      if (Array.isArray(list)) {
+        setAllBirds(list)
+      }
     } catch (e) {
       console.warn('Erro ao carregar aves para genealogia:', e)
-      setAllBirds([])
     }
-  }, [currentTenantId])
+  }, [])
 
   // Generation level: 2 = Pais (matching screenshot), 3 = Avós
   const [generations, setGenerations] = useState<2 | 3>(2)
@@ -244,14 +231,14 @@ export function NovaGenealogiaEnvironment({
   // Save genealogy relationship safely
   const handleSave = () => {
     try {
-      if (mainBird.id) {
+      if (mainBird && mainBird.id) {
         db.updateBird(mainBird.id, {
-          fatherName: father.name || undefined,
-          motherName: mother.name || undefined,
-          paternalGrandfatherId: patGrandfather.name || undefined,
-          paternalGrandmotherId: patGrandmother.name || undefined,
-          maternalGrandfatherId: matGrandfather.name || undefined,
-          maternalGrandmotherId: matGrandmother.name || undefined,
+          fatherName: father?.name || undefined,
+          motherName: mother?.name || undefined,
+          paternalGrandfatherId: patGrandfather?.name || undefined,
+          paternalGrandmotherId: patGrandmother?.name || undefined,
+          maternalGrandfatherId: matGrandfather?.name || undefined,
+          maternalGrandmotherId: matGrandmother?.name || undefined,
         })
       }
 
@@ -261,7 +248,6 @@ export function NovaGenealogiaEnvironment({
       }, 3500)
     } catch (e) {
       console.error('Erro ao salvar genealogia:', e)
-      alert('Genealogia salva com sucesso!')
     }
   }
 
@@ -287,9 +273,9 @@ export function NovaGenealogiaEnvironment({
     if (!b) return false
     if (!searchTerm) return true
     const term = searchTerm.toLowerCase().trim()
-    const nameStr = (b.name || '').toLowerCase()
-    const ringStr = (b.ringNumber || '').toLowerCase()
-    const speciesStr = (b.species || '').toLowerCase()
+    const nameStr = String(b.name || '').toLowerCase()
+    const ringStr = String(b.ringNumber || '').toLowerCase()
+    const speciesStr = String(b.species || '').toLowerCase()
     return nameStr.includes(term) || ringStr.includes(term) || speciesStr.includes(term)
   }) : []
 
@@ -687,8 +673,8 @@ export function NovaGenealogiaEnvironment({
                       <span className="text-xs font-bold text-slate-900 group-hover:text-[#009fe3] transition-colors block">
                         {b.name || 'Sem Nome'}
                       </span>
-                      <span className="text-[10px] font-mono text-slate-500 block">
-                        Anilha: {b.ringNumber || 'S/A'} • {(b.species ? b.species.split('(')[0].trim() : 'Espécie não informada')}
+                      <span className="text-[10px] font-mono text-slate-500 block truncate">
+                        Anilha: {b.ringNumber || 'S/A'} • {b.species ? String(b.species).split('(')[0].trim() : 'Espécie não informada'}
                       </span>
                     </div>
                   </div>
