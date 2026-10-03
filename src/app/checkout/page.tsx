@@ -109,6 +109,11 @@ function CheckoutContent() {
   const [cardCvv, setCardCvv] = useState('')
   const [cardInstallments, setCardInstallments] = useState('1')
 
+  // Receipt E2E ID Verification States
+  const [showReceiptInput, setShowReceiptInput] = useState(false)
+  const [endToEndInput, setEndToEndInput] = useState('')
+  const [receiptError, setReceiptError] = useState('')
+
   // Calculate Prices
   const basePrice = selectedCycle === 'ANUAL' ? 169.99 : 14.99
   const discountPercent = appliedCoupon?.valid ? appliedCoupon.discountPercent : 0
@@ -378,6 +383,43 @@ function CheckoutContent() {
           message: 'Não foi possível confirmar a liquidação no PagBank neste momento. Por favor, verifique se a transferência foi concluída no seu banco e tente novamente.'
         })
       }
+    } finally {
+      setIsVerifying(false)
+    }
+  }
+
+  // Validate Bank Receipt Transaction ID (End-to-End ID) for Immediate Anti-Fraud Unlock
+  const handleValidateReceipt = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setReceiptError('')
+    const cleanE2E = endToEndInput.trim()
+    if (!cleanE2E || cleanE2E.length < 8) {
+      setReceiptError('Informe o ID da transação ou código de autenticação do seu comprovante bancário (mínimo 8 dígitos).')
+      return
+    }
+
+    setIsVerifying(true)
+    try {
+      const res = await fetch('/api/payments/pagbank/confirm-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          referenceId: currentReferenceId,
+          endToEndId: cleanE2E
+        })
+      })
+      const data = await res.json()
+      if (data && data.paid) {
+        setVerificationAlert({
+          type: 'SUCCESS',
+          message: '🎉 Comprovante autenticado com sucesso! Liberando acesso ao sistema...'
+        })
+        await handleProvisionPaidAccount()
+      } else {
+        setReceiptError(data?.error || 'Não foi possível validar o código do comprovante informado.')
+      }
+    } catch (e: any) {
+      setReceiptError('Erro ao enviar comprovante: ' + e.message)
     } finally {
       setIsVerifying(false)
     }
@@ -1102,6 +1144,60 @@ function CheckoutContent() {
                   <div className="pt-1 flex items-center justify-center gap-1.5 text-[10px] text-slate-500 font-medium">
                     <RefreshCw className="w-3 h-3 animate-spin text-emerald-600" />
                     <span>Monitorando PagBank em tempo real — O acesso é liberado automaticamente após a compensação.</span>
+                  </div>
+
+                  {/* Anti-Fraud Receipt Submission */}
+                  <div className="mt-2 pt-2 border-t border-slate-200">
+                    {!showReceiptInput ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowReceiptInput(true)}
+                        className="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold underline flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>Já transferiu? Informar Código/ID do Comprovante PIX</span>
+                      </button>
+                    ) : (
+                      <form onSubmit={handleValidateReceipt} className="bg-white p-3 rounded-xl border border-emerald-300 space-y-2 text-left animate-in fade-in">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold uppercase text-slate-700 block flex items-center gap-1">
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Código de Autenticação / ID da Transação PIX</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setShowReceiptInput(false)}
+                            className="text-[10px] text-slate-400 hover:text-slate-600 cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-slate-500">
+                          Cole o ID da transação ou código de autenticação do seu banco (ex: E00360305...):
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={endToEndInput}
+                            onChange={(e) => setEndToEndInput(e.target.value)}
+                            placeholder="Ex: E0036030520261002220500..."
+                            className="w-full h-8 px-2.5 text-xs font-mono bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#00c853]"
+                          />
+                          <button
+                            type="submit"
+                            disabled={isVerifying}
+                            className="px-3.5 h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition whitespace-nowrap cursor-pointer shadow-xs disabled:opacity-50"
+                          >
+                            Validar
+                          </button>
+                        </div>
+                        {receiptError && (
+                          <p className="text-[10px] text-rose-600 font-medium">
+                            {receiptError}
+                          </p>
+                        )}
+                      </form>
+                    )}
                   </div>
                 </div>
               )}
