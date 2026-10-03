@@ -1,5 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
-  <rect width="48" height="48" rx="10" fill="#009fe3" />
-  <path d="M12 34V14h9c4 0 7 2 7 6 0 2.5-1.5 4.5-3.8 5.4 3 .8 4.8 3 4.8 6.1 0 4.5-3.5 6.5-8 6.5H12zm4-12h4.5c2 0 3.5-1 3.5-2.8s-1.5-2.8-3.5-2.8H16v5.6zm0 8.8h5c2.3 0 4-1 4-3.2 0-2-1.7-3.2-4-3.2H16v6.4z" fill="#ffffff" />
-  <circle cx="36" cy="18" r="4" fill="#f59e0b" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00e676"/>
+      <stop offset="45%" stop-color="#00c853"/>
+      <stop offset="100%" stop-color="#023d24"/>
+    </linearGradient>
+    <linearGradient id="wingGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#a7f3d0"/>
+      <stop offset="100%" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded Squircle Emblem Background -->
+  <rect width="64" height="64" rx="16" fill="url(#bgGrad)"/>
+  <rect width="62" height="62" x="1" y="1" rx="15" fill="none" stroke="#6ee7b7" stroke-width="1.2" stroke-opacity="0.45"/>
+
+  <!-- Sleek Bird Feather / Wing (matching uploaded emblem) -->
+  <g transform="translate(4, 2)">
+    <path d="M10 32C15 24 25 18 41 13C46 11 50 8 50 8C49 13 46 22 41 27C36 32 28 36 19 37C14 38 12 35 10 32Z" fill="url(#wingGrad)" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.25))"/>
+    <path d="M23 28C30 25 41 19 47 11C43 18 37 29 29 34C22 38 15 39 12 39C15 37 20 32 23 28Z" fill="#a7f3d0" fill-opacity="0.85"/>
+
+    <!-- Golden Ring (Anilha) -->
+    <circle cx="42" cy="42" r="8.5" stroke="#F59E0B" stroke-width="3.5" fill="none"/>
+    <circle cx="42" cy="42" r="3.5" fill="#F59E0B"/>
+  </g>
 </svg>
