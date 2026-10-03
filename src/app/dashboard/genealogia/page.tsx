@@ -19,12 +19,15 @@ import { db } from '@/lib/db'
 import { Bird } from '@/types'
 import { PrintPedigreeModal } from '@/components/modals/print-pedigree-modal'
 import { PrintBadgeModal } from '@/components/modals/print-badge-modal'
+import NovaGenealogiaPage from '@/app/dashboard/configuracoes/nova-genealogia/page'
 
 export default function GenealogiaPage() {
   const tenant = db.getTenant()
   const birds = db.getBirds()
 
   // State
+  const [viewMode, setViewMode] = useState<'TREE' | 'LIST'>('TREE')
+  const [selectedTreeBirdId, setSelectedTreeBirdId] = useState<string | undefined>(undefined)
   const [activeTab, setActiveTab] = useState<'PLANTEL' | 'TODOS'>('PLANTEL')
   const [searchField, setSearchField] = useState('ave')
   const [searchQuery, setSearchQuery] = useState('')
@@ -127,21 +130,43 @@ export default function GenealogiaPage() {
       </div>
 
       {/* Top Header Card */}
-      <div className="bg-white rounded-md border border-slate-200 px-4 py-2.5 flex items-center justify-between shadow-xs">
-        <div className="flex items-center space-x-2 text-slate-700 text-xs font-semibold">
-          <span className="text-sm font-bold">≡</span>
-          <span className="text-xs font-bold text-slate-800">Árvore Genealógica</span>
+      <div className="bg-white rounded-md border border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center space-x-2 text-slate-700 text-xs font-semibold mr-2">
+            <span className="text-sm font-bold">≡</span>
+            <span className="text-xs font-bold text-slate-800">Árvore Genealógica</span>
+          </div>
+
+          {/* View Mode Switcher */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setViewMode('TREE')}
+              className={`px-3 py-1 text-xs font-bold rounded-md flex items-center gap-1.5 transition cursor-pointer ${
+                viewMode === 'TREE'
+                  ? 'bg-[#009fe3] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Nova Genealogia (Árvore)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode('LIST')}
+              className={`px-3 py-1 text-xs font-bold rounded-md flex items-center gap-1.5 transition cursor-pointer ${
+                viewMode === 'LIST'
+                  ? 'bg-[#00c853] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>Lista de Pássaros &amp; Pedigrees</span>
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center space-x-2">
-          <Link
-            href="/dashboard/configuracoes/nova-genealogia"
-            className="px-3 py-1.5 bg-[#009fe3] hover:bg-[#008ac7] text-white text-xs font-semibold rounded flex items-center space-x-1.5 shadow-2xs transition"
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-            <span>Nova Genealogia</span>
-          </Link>
-
           <div className="relative">
             <button
               type="button"
@@ -175,7 +200,15 @@ export default function GenealogiaPage() {
           )}
         </div>
       </div>
+    </div>
 
+      {viewMode === 'TREE' ? (
+        <NovaGenealogiaPage 
+          initialBirdId={selectedTreeBirdId} 
+          showBackButton={false} 
+        />
+      ) : (
+        <>
       {/* Search and Filters Bar */}
       <div className="bg-white rounded-md border border-slate-200 p-2 shadow-xs">
         <form onSubmit={handleSearchSubmit} className="flex items-center space-x-0">
@@ -369,6 +402,8 @@ export default function GenealogiaPage() {
           ))
         )}
       </div>
+      </>
+      )}
 
       {/* Modal de Impressão de Genealogia A4 */}
       {selectedPedigreeBird && (
@@ -478,14 +513,30 @@ export default function GenealogiaPage() {
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end space-x-2">
+              <div className="pt-2 flex justify-between items-center">
                 <button
                   type="button"
-                  onClick={() => setEditingBird(null)}
-                  className="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded transition"
+                  onClick={() => {
+                    if (editingBird) {
+                      setSelectedTreeBirdId(editingBird.id)
+                      setViewMode('TREE')
+                      setEditingBird(null)
+                    }
+                  }}
+                  className="px-3 py-2 bg-[#009fe3] hover:bg-[#008ac7] text-white text-xs font-bold rounded shadow-xs transition flex items-center space-x-1 cursor-pointer"
                 >
-                  Cancelar
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Abrir na Árvore Visual</span>
                 </button>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingBird(null)}
+                    className="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
                 <button
                   type="submit"
                   className="px-5 py-2 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-bold rounded shadow-xs transition flex items-center space-x-1"

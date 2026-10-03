@@ -34,7 +34,8 @@ import {
   Gift,
   Sparkles,
   Briefcase,
-  Target
+  Target,
+  Edit3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
@@ -92,6 +93,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { name: 'Anotação', href: '/dashboard/anotacao', icon: FileText },
     { name: 'Pássaro', href: '/dashboard/aves', icon: Send },
     { name: 'Árvore Genealógica', href: '/dashboard/genealogia', icon: GitFork },
+    { name: 'Nova Genealogia', href: '/dashboard/configuracoes/nova-genealogia', icon: Edit3 },
     { name: 'Simulador de Árvore', href: '/dashboard/simulador-arvore', icon: Binary },
     { name: 'Alertas & Notificações', href: '/dashboard/alertas', icon: Bell },
     { name: 'Reserva de Pássaro', href: '/dashboard/reserva', icon: Bookmark },

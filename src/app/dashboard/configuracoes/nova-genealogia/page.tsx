@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { 
@@ -14,6 +14,7 @@ import {
   CheckCircle2, 
   Info
 } from 'lucide-react'
+import { useAuth } from '@/lib/auth-context'
 import { db } from '@/lib/db'
 import { Bird } from '@/types'
 
@@ -56,9 +57,24 @@ interface NodeData {
   sex: 'MALE' | 'FEMALE' | 'UNKNOWN'
 }
 
-export default function NovaGenealogiaPage() {
+export interface NovaGenealogiaProps {
+  initialBirdId?: string
+  showBackButton?: boolean
+  onBack?: () => void
+}
+
+export default function NovaGenealogiaPage({
+  initialBirdId,
+  showBackButton = true,
+  onBack
+}: NovaGenealogiaProps = {}) {
   const router = useRouter()
-  const allBirds = db.getBirds()
+  const { tenant } = useAuth()
+  const [allBirds, setAllBirds] = useState<Bird[]>([])
+
+  useEffect(() => {
+    setAllBirds(db.getBirds(tenant?.id))
+  }, [tenant?.id])
 
   // Generation level: 2 = Pais (matching screenshot), 3 = Avós
   const [generations, setGenerations] = useState<2 | 3>(2)
@@ -93,7 +109,8 @@ export default function NovaGenealogiaPage() {
   }
 
   // Handle bird selection from database
-  const handleSelectBird = (bird: Bird) => {
+  const handleSelectBird = (bird: Bird, targetOverride?: 'main' | 'father' | 'mother' | 'patGF' | 'patGM' | 'matGF' | 'matGM') => {
+    const target = targetOverride || modalTarget
     const data: NodeData = {
       id: bird.id,
       name: bird.name,
@@ -101,7 +118,7 @@ export default function NovaGenealogiaPage() {
       sex: bird.sex as 'MALE' | 'FEMALE' | 'UNKNOWN'
     }
 
-    if (modalTarget === 'main') {
+    if (target === 'main') {
       setMainBird(data)
       // Auto-populate parents if available in DB
       if (bird.fatherName) {
@@ -146,22 +163,32 @@ export default function NovaGenealogiaPage() {
           sex: 'FEMALE'
         })
       }
-    } else if (modalTarget === 'father') {
+    } else if (target === 'father') {
       setFather(data)
-    } else if (modalTarget === 'mother') {
+    } else if (target === 'mother') {
       setMother(data)
-    } else if (modalTarget === 'patGF') {
+    } else if (target === 'patGF') {
       setPatGrandfather(data)
-    } else if (modalTarget === 'patGM') {
+    } else if (target === 'patGM') {
       setPatGrandmother(data)
-    } else if (modalTarget === 'matGF') {
+    } else if (target === 'matGF') {
       setMatGrandfather(data)
-    } else if (modalTarget === 'matGM') {
+    } else if (target === 'matGM') {
       setMatGrandmother(data)
     }
 
     setModalTarget(null)
   }
+
+  // When initialBirdId is provided, auto-select
+  useEffect(() => {
+    if (initialBirdId && allBirds.length > 0) {
+      const bird = allBirds.find(b => b.id === initialBirdId)
+      if (bird) {
+        handleSelectBird(bird, 'main')
+      }
+    }
+  }, [initialBirdId, allBirds])
 
   // Handle manual bird assignment
   const handleApplyManual = () => {
@@ -534,15 +561,30 @@ export default function NovaGenealogiaPage() {
         <div className="bg-[#f8fafc] border-t border-gray-200 px-4 py-3 flex items-center justify-between select-none">
           
           {/* Voltar Button */}
-          <Link href="/dashboard/genealogia">
-            <button
-              type="button"
-              className="px-4 py-1.5 border border-gray-300 bg-[#e2e8f0] hover:bg-[#cbd5e1] active:bg-[#94a3b8] text-slate-700 font-semibold text-xs rounded shadow-2xs flex items-center gap-1 transition cursor-pointer"
-            >
-              <ChevronLeft className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Voltar</span>
-            </button>
-          </Link>
+          {showBackButton ? (
+            onBack ? (
+              <button
+                type="button"
+                onClick={onBack}
+                className="px-4 py-1.5 border border-gray-300 bg-[#e2e8f0] hover:bg-[#cbd5e1] active:bg-[#94a3b8] text-slate-700 font-semibold text-xs rounded shadow-2xs flex items-center gap-1 transition cursor-pointer"
+              >
+                <ChevronLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Voltar</span>
+              </button>
+            ) : (
+              <Link href="/dashboard/genealogia">
+                <button
+                  type="button"
+                  className="px-4 py-1.5 border border-gray-300 bg-[#e2e8f0] hover:bg-[#cbd5e1] active:bg-[#94a3b8] text-slate-700 font-semibold text-xs rounded shadow-2xs flex items-center gap-1 transition cursor-pointer"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Voltar</span>
+                </button>
+              </Link>
+            )
+          ) : (
+            <div />
+          )}
 
           {/* Salvar Button (Cyan/Cerulean Blue matching screenshot) */}
           <button
