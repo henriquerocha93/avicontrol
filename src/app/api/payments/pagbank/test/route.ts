@@ -14,8 +14,8 @@ export async function POST(req: NextRequest) {
 
     const baseUrl = isSandbox ? 'https://sandbox.api.pagseguro.com' : 'https://api.pagseguro.com';
 
-    // Test API call to PagBank Orders endpoint
-    const res = await fetch(`${baseUrl}/orders?reference_id=TEST_PING`, {
+    // Test API call to PagBank Orders endpoint with accepted charge query parameter
+    const res = await fetch(`${baseUrl}/orders?charge_id=CHAR_TEST`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token.trim()}`
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         status: res.status,
-        message: '✅ Conexão com PagBank estabelecida e autenticada com sucesso!'
+        message: '✅ Conexão com PagBank estabelecida e autenticada com sucesso (Status 200 OK)!'
       });
     }
 
@@ -34,7 +34,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: false,
         status: 401,
-        message: '❌ Token não autorizado pelo PagBank (Erro 401). Verifique se o Token foi gerado na área de Desenvolvedor / Integrações do PagBank/PagSeguro.'
+        message: '❌ Token não autorizado pelo PagBank (Erro 401). Verifique o Token gerado em Vendas > Integrações na sua conta PagBank.'
+      });
+    }
+
+    if (res.status === 403) {
+      return NextResponse.json({
+        success: true,
+        status: 403,
+        message: '⚠️ Token reconhecido pelo PagBank! Aguardando ativação de permissão de produção na conta PagBank.'
       });
     }
 

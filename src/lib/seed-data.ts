@@ -328,7 +328,7 @@ export const INITIAL_GLOBAL_CONFIG: GlobalSystemConfig = {
   gatewayApiKey: '',
   gatewayWebhookSecret: '',
   gatewayLiveMode: true,
-  pagbankToken: '20213321-f0b7-455f-9ff6-c437a0b1ff105b6fd3a74fc3b060014c934662d746b6f421-e06a-4ed4-be40-a4becc0ec004',
+  pagbankToken: 'a3050b81-68f0-4c49-b3bf-8565e29ba699174876b44c749dc97df2b75b4d38fa70e2eb-4624-438a-a571-8b37b36881a6',
   pagbankEmail: 'polpadelivery@hotmail.com',
   pagbankSandbox: false,
   pagbankPixKey: '6f33236f-92cb-4812-b0a8-332e3af35839',
