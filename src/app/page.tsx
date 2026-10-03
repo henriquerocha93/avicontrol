@@ -298,8 +298,8 @@ export default function LandingPage() {
             })}
           </nav>
 
-          {/* Action Buttons */}
-          <div className="hidden sm:flex items-center gap-3">
+          {/* Desktop Action Buttons */}
+          <div className="hidden lg:flex items-center gap-3">
             <Link href="/login">
               <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-emerald-950/40 text-xs font-bold">
                 Entrar
@@ -312,17 +312,27 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Mobile Hamburger Button */}
-          <div className="flex lg:hidden items-center gap-2">
-            <Link href="/checkout?plano=anual" className="sm:hidden">
-              <Button size="sm" className="bg-[#00c853] hover:bg-emerald-600 text-white font-black text-[11px] px-3 py-1.5 shadow-md">
+          {/* Mobile & Tablet Action Buttons (Login + Assinar + Menu) */}
+          <div className="flex lg:hidden items-center gap-1.5 sm:gap-2">
+            <Link href="/login">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-emerald-700/60 bg-[#091710] hover:bg-emerald-950 text-emerald-300 hover:text-white font-bold text-[11px] px-2.5 py-1.5 rounded-xl shadow-xs"
+              >
+                Login
+              </Button>
+            </Link>
+
+            <Link href="/checkout?plano=anual">
+              <Button size="sm" className="bg-[#00c853] hover:bg-emerald-600 text-white font-black text-[11px] px-3 py-1.5 shadow-md rounded-xl">
                 Assinar
               </Button>
             </Link>
 
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-2 text-slate-300 hover:text-white hover:bg-emerald-950/60 rounded-xl transition cursor-pointer border border-emerald-800/40"
+              className="p-1.5 text-slate-300 hover:text-white hover:bg-emerald-950/60 rounded-xl transition cursor-pointer border border-emerald-800/40"
               aria-label="Abrir Menu Principal"
             >
               {isMobileMenuOpen ? <X className="w-5 h-5 text-emerald-400" /> : <Menu className="w-5 h-5 text-emerald-400" />}
