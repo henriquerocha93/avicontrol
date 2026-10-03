@@ -177,6 +177,148 @@ class DataService {
     return (this.state.users || []).find(u => u.email.toLowerCase().trim() === clean);
   }
 
+  findAccountForPasswordReset(identifier: string): { 
+    found: boolean; 
+    email: string; 
+    name: string; 
+    phoneLast4?: string;
+    accountType: 'USER' | 'TENANT' | 'SELLER' | 'ADMIN';
+  } {
+    const clean = identifier.toLowerCase().trim();
+    const cleanDigits = identifier.replace(/\D/g, '');
+
+    // 1. Search in users
+    const user = (this.state.users || []).find(u => 
+      u.email.toLowerCase().trim() === clean || 
+      (cleanDigits.length >= 8 && u.phone?.replace(/\D/g, '').endsWith(cleanDigits))
+    );
+    if (user) {
+      const phoneDigits = user.phone ? user.phone.replace(/\D/g, '') : '';
+      return {
+        found: true,
+        email: user.email,
+        name: user.name,
+        phoneLast4: phoneDigits ? phoneDigits.slice(-4) : undefined,
+        accountType: user.role === 'SUPER_ADMIN' ? 'ADMIN' : 'USER'
+      };
+    }
+
+    // 2. Search in tenants
+    const tenant = (this.state.tenants || []).find(t => 
+      t.email.toLowerCase().trim() === clean || 
+      (cleanDigits.length >= 8 && t.phone?.replace(/\D/g, '').endsWith(cleanDigits))
+    );
+    if (tenant) {
+      const phoneDigits = tenant.phone ? tenant.phone.replace(/\D/g, '') : '';
+      return {
+        found: true,
+        email: tenant.email,
+        name: tenant.name,
+        phoneLast4: phoneDigits ? phoneDigits.slice(-4) : undefined,
+        accountType: 'TENANT'
+      };
+    }
+
+    // 3. Search in sellers
+    const seller = (this.state.sellers || []).find(s => 
+      s.email.toLowerCase().trim() === clean || 
+      (cleanDigits.length >= 8 && s.phone?.replace(/\D/g, '').endsWith(cleanDigits))
+    );
+    if (seller) {
+      const phoneDigits = seller.phone ? seller.phone.replace(/\D/g, '') : '';
+      return {
+        found: true,
+        email: seller.email,
+        name: seller.name,
+        phoneLast4: phoneDigits ? phoneDigits.slice(-4) : undefined,
+        accountType: 'SELLER'
+      };
+    }
+
+    // 4. Default admin check
+    if (clean === 'henrique_rocha@live.com' || clean === 'admin@birdpro.com.br' || clean === 'adm@birdpro.com.br' || clean === 'admin') {
+      return {
+        found: true,
+        email: clean === 'admin' ? 'admin@birdpro.com.br' : clean,
+        name: 'Administrador BirdPro',
+        phoneLast4: '3265',
+        accountType: 'ADMIN'
+      };
+    }
+
+    return { found: false, email: clean, name: '', accountType: 'USER' };
+  }
+
+  resetPasswordByEmail(email: string, newPassword: string): boolean {
+    const clean = email.toLowerCase().trim();
+    let updated = false;
+
+    // 1. Update in users
+    const user = (this.state.users || []).find(u => u.email.toLowerCase().trim() === clean);
+    if (user) {
+      user.password = newPassword.trim();
+      updated = true;
+    }
+
+    // 2. Update in tenants & create owner user if missing
+    const tenant = (this.state.tenants || []).find(t => t.email.toLowerCase().trim() === clean);
+    if (tenant) {
+      if (!user) {
+        const ownerUser = (this.state.users || []).find(u => u.tenantId === tenant.id);
+        if (ownerUser) {
+          ownerUser.password = newPassword.trim();
+          updated = true;
+        } else {
+          const newUser: User = {
+            id: `user-${Date.now()}`,
+            name: tenant.name,
+            email: clean,
+            password: newPassword.trim(),
+            role: 'OWNER',
+            tenantId: tenant.id,
+            active: true,
+            createdAt: new Date().toISOString()
+          };
+          this.state.users.push(newUser);
+          updated = true;
+        }
+      }
+    }
+
+    // 3. Update in sellers
+    const seller = (this.state.sellers || []).find(s => s.email.toLowerCase().trim() === clean);
+    if (seller) {
+      seller.password = newPassword.trim();
+      updated = true;
+    }
+
+    // 4. If master admin
+    if (clean === 'henrique_rocha@live.com' || clean === 'admin@birdpro.com.br' || clean === 'adm@birdpro.com.br') {
+      if (!user) {
+        const adminUser: User = {
+          id: 'user-admin-official',
+          name: 'Super Admin BIRDPRO',
+          email: clean,
+          password: newPassword.trim(),
+          role: 'SUPER_ADMIN',
+          tenantId: 'tenant-demo-01',
+          phone: '(55) 9 9134-3265',
+          active: true,
+          createdAt: new Date().toISOString()
+        };
+        this.state.users.push(adminUser);
+      }
+      updated = true;
+    }
+
+    if (updated) {
+      this.logAction(tenant?.id || 'tenant-demo-01', 'RESET_PASSWORD', 'AUTH', `Senha redefinida com sucesso para ${clean}`);
+      this.saveToStorage();
+    }
+
+    return updated;
+  }
+
   getUsers(tenantId = 'tenant-demo-01'): User[] {
     return this.state.users.filter(u => u.tenantId === tenantId);
   }
