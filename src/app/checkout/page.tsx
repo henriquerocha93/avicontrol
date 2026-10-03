@@ -109,8 +109,8 @@ function CheckoutContent() {
   const [cardCvv, setCardCvv] = useState('')
   const [cardInstallments, setCardInstallments] = useState('1')
 
-  // Receipt E2E ID Verification States
-  const [showReceiptInput, setShowReceiptInput] = useState(false)
+  // Receipt E2E ID Verification States — always visible after WAITING status
+  const [showReceiptInput, setShowReceiptInput] = useState(true)
   const [endToEndInput, setEndToEndInput] = useState('')
   const [receiptError, setReceiptError] = useState('')
 
@@ -393,8 +393,8 @@ function CheckoutContent() {
     e.preventDefault()
     setReceiptError('')
     const cleanE2E = endToEndInput.trim()
-    if (!cleanE2E || cleanE2E.length < 8) {
-      setReceiptError('Informe o ID da transação ou código de autenticação do seu comprovante bancário (mínimo 8 dígitos).')
+    if (!cleanE2E || cleanE2E.length < 25) {
+      setReceiptError('Informe o ID End-to-End da transação PIX do comprovante do seu banco. Deve começar com "E" e ter pelo menos 25 caracteres (ex: E00360305202610...).')
       return
     }
 
@@ -1146,58 +1146,47 @@ function CheckoutContent() {
                     <span>Monitorando PagBank em tempo real — O acesso é liberado automaticamente após a compensação.</span>
                   </div>
 
-                  {/* Anti-Fraud Receipt Submission */}
-                  <div className="mt-2 pt-2 border-t border-slate-200">
-                    {!showReceiptInput ? (
-                      <button
-                        type="button"
-                        onClick={() => setShowReceiptInput(true)}
-                        className="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold underline flex items-center justify-center gap-1 mx-auto cursor-pointer"
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        <span>Já transferiu? Informar Código/ID do Comprovante PIX</span>
-                      </button>
-                    ) : (
-                      <form onSubmit={handleValidateReceipt} className="bg-white p-3 rounded-xl border border-emerald-300 space-y-2 text-left animate-in fade-in">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-bold uppercase text-slate-700 block flex items-center gap-1">
-                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Código de Autenticação / ID da Transação PIX</span>
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => setShowReceiptInput(false)}
-                            className="text-[10px] text-slate-400 hover:text-slate-600 cursor-pointer"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                        <p className="text-[10px] text-slate-500">
-                          Cole o ID da transação ou código de autenticação do seu banco (ex: E00360305...):
+                  {/* Anti-Fraud Receipt Submission — PRIMARY ACTION */}
+                  <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">Confirmar Pagamento com Comprovante PIX</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-relaxed">
+                      Após realizar a transferência PIX, abra o comprovante no seu banco e copie o <strong className="text-slate-700">ID da transação</strong> (também chamado de <em>"Código de autenticação"</em> ou <em>"E2E ID"</em>). Cole abaixo para confirmar e liberar o acesso:
+                    </p>
+                    <form onSubmit={handleValidateReceipt} className="bg-emerald-50 p-3 rounded-xl border border-emerald-200 space-y-2 text-left">
+                      <label className="text-[10px] font-bold uppercase text-slate-700 block flex items-center gap-1">
+                        <Key className="w-3 h-3 text-emerald-600" />
+                        <span>ID da Transação / Código de Autenticação PIX</span>
+                      </label>
+                      <p className="text-[9px] text-slate-500 italic">
+                        💡 Formato esperado: começa com <strong>E</strong> seguido de números e letras (ex: <span className="font-mono">E00360305202610022200...</span>)
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={endToEndInput}
+                          onChange={(e) => setEndToEndInput(e.target.value)}
+                          placeholder="Ex: E0036030520261002220500rBqibjBN"
+                          className="w-full h-8 px-2.5 text-[11px] font-mono bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500"
+                        />
+                        <button
+                          type="submit"
+                          disabled={isVerifying}
+                          className="px-3.5 h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition whitespace-nowrap cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {isVerifying ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
+                          <span>Validar</span>
+                        </button>
+                      </div>
+                      {receiptError && (
+                        <p className="text-[10px] text-rose-600 font-medium flex items-start gap-1">
+                          <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                          <span>{receiptError}</span>
                         </p>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={endToEndInput}
-                            onChange={(e) => setEndToEndInput(e.target.value)}
-                            placeholder="Ex: E0036030520261002220500..."
-                            className="w-full h-8 px-2.5 text-xs font-mono bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#00c853]"
-                          />
-                          <button
-                            type="submit"
-                            disabled={isVerifying}
-                            className="px-3.5 h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition whitespace-nowrap cursor-pointer shadow-xs disabled:opacity-50"
-                          >
-                            Validar
-                          </button>
-                        </div>
-                        {receiptError && (
-                          <p className="text-[10px] text-rose-600 font-medium">
-                            {receiptError}
-                          </p>
-                        )}
-                      </form>
-                    )}
+                      )}
+                    </form>
                   </div>
                 </div>
               )}
