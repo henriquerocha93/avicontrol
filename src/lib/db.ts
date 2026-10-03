@@ -12,7 +12,7 @@ import {
   INITIAL_MEDICATIONS, INITIAL_TREATMENTS, INITIAL_DISEASES, 
   INITIAL_SEXINGS, INITIAL_GENOTYPING, INITIAL_TIMELINE, 
   INITIAL_NOTIFICATIONS, INITIAL_DOCUMENTS, INITIAL_TICKETS,
-  INITIAL_SELLERS, INITIAL_GLOBAL_CONFIG, INITIAL_CALENDAR_EVENTS, INITIAL_NOTES,
+  INITIAL_SELLERS, INITIAL_COMMISSIONS, INITIAL_PAYOUTS, INITIAL_GLOBAL_CONFIG, INITIAL_CALENDAR_EVENTS, INITIAL_NOTES,
   INITIAL_USER_REFERRALS
 } from './seed-data';
 
@@ -81,8 +81,8 @@ class DataService {
       photos: [],
       tickets: [...INITIAL_TICKETS],
       sellers: [...INITIAL_SELLERS],
-      commissions: [],
-      payouts: [],
+      commissions: [...INITIAL_COMMISSIONS],
+      payouts: [...INITIAL_PAYOUTS],
       userReferrals: { ...INITIAL_USER_REFERRALS },
       globalConfig: { ...INITIAL_GLOBAL_CONFIG },
       events: [...INITIAL_CALENDAR_EVENTS],
@@ -99,6 +99,15 @@ class DataService {
       if (stored) {
         const parsed = JSON.parse(stored);
         this.state = { ...this.getInitialState(), ...parsed };
+        if (!this.state.sellers || this.state.sellers.length === 0) {
+          this.state.sellers = [...INITIAL_SELLERS];
+        }
+        if (!this.state.commissions || this.state.commissions.length === 0) {
+          this.state.commissions = [...INITIAL_COMMISSIONS];
+        }
+        if (!this.state.payouts || this.state.payouts.length === 0) {
+          this.state.payouts = [...INITIAL_PAYOUTS];
+        }
       } else {
         this.saveToStorage();
       }
