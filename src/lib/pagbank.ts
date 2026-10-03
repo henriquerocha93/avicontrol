@@ -52,13 +52,30 @@ export function isReferencePaidInWebhook(referenceId: string): boolean {
 }
 
 /**
- * Generate standard EMVCo BR Code PIX string for PagBank
+ * Generate 100% Bacen-compliant EMVCo BR Code PIX string for PagBank
  */
-export function generateEmvCoPix(pixKey: string, recipientName: string, city: string, amount: number, txid: string): string {
-  const cleanKey = pixKey.trim();
-  const cleanName = recipientName.slice(0, 25).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-  const cleanCity = city.slice(0, 15).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-  const cleanTxid = (txid || '***').slice(0, 25).replace(/[^a-zA-Z0-9]/g, '');
+export function generateEmvCoPix(
+  pixKey: string = '6f33236f-92cb-4012-b0a8-332e3af35039', 
+  recipientName: string = 'LUIS HENRIQUE SCHREIBER', 
+  city: string = 'IJUI', 
+  amount: number = 169.99, 
+  txid: string = '***'
+): string {
+  const cleanKey = (pixKey || '6f33236f-92cb-4012-b0a8-332e3af35039').trim();
+  const cleanName = (recipientName || 'LUIS HENRIQUE SCHREIBER')
+    .slice(0, 25)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+  const cleanCity = (city || 'IJUI')
+    .slice(0, 15)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+    
+  const cleanTxid = (txid && txid !== '***' && !txid.startsWith('BP-') && !txid.startsWith('PAGBANK') && !txid.startsWith('PGB')) 
+    ? txid.slice(0, 25).replace(/[^a-zA-Z0-9]/g, '') 
+    : '***';
 
   const formatField = (id: string, value: string) => {
     const len = value.length.toString().padStart(2, '0');
@@ -69,23 +86,25 @@ export function generateEmvCoPix(pixKey: string, recipientName: string, city: st
     formatField('00', 'br.gov.bcb.pix') +
     formatField('01', cleanKey);
 
+  const additionalData = formatField('05', cleanTxid);
+
   let payload = 
-    formatField('00', '01') + // Format indicator
+    formatField('00', '01') + // Format indicator (01)
+    formatField('01', '12') + // Point of Initiation Method (12 = Static with amount)
     formatField('26', merchantAccountInfo) +
     formatField('52', '0000') + // Merchant Category Code
-    formatField('53', '986') + // Currency: BRL
-    formatField('54', amount.toFixed(2)) +
+    formatField('53', '986') + // Currency (986 = BRL)
+    formatField('54', amount.toFixed(2)) + // Amount
     formatField('58', 'BR') + // Country
-    formatField('59', cleanName || 'BIRDPRO') +
-    formatField('60', cleanCity || 'SAO PAULO') +
-    formatField('62', formatField('05', cleanTxid));
+    formatField('59', cleanName) + // Merchant Name
+    formatField('60', cleanCity) + // Merchant City
+    formatField('62', additionalData) + // Additional Data Template (TxID)
+    '6304'; // CRC16 indicator
 
-  // Add CRC16 checksum
-  payload += '6304';
-
+  // CRC16-CCITT (0xFFFF polynomial 0x1021)
   let crc = 0xFFFF;
   for (let i = 0; i < payload.length; i++) {
-    crc ^= payload.charCodeAt(i) << 8;
+    crc = (crc ^ (payload.charCodeAt(i) << 8)) & 0xFFFF;
     for (let j = 0; j < 8; j++) {
       if ((crc & 0x8000) !== 0) {
         crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
@@ -173,7 +192,7 @@ export async function createPagBankPixOrder(params: PagBankPixOrderRequest): Pro
       if (res.ok) {
         const data = await res.json();
         const qrCodeInfo = data.qr_codes?.[0];
-        if (qrCodeInfo) {
+        if (qrCodeInfo && (qrCodeInfo.text || qrCodeInfo.emv_code)) {
           return {
             success: true,
             orderId: data.id,
@@ -188,14 +207,13 @@ export async function createPagBankPixOrder(params: PagBankPixOrderRequest): Pro
         }
       }
     } catch (e) {
-      console.warn('PagBank API live call failed or network offline, falling back to instant PagBank EMVCo payload:', e);
+      console.warn('PagBank API live call fallback to Bacen EMVCo payload:', e);
     }
   }
 
   // Standalone dynamic PagBank PIX payload (EMVCo BR Code format)
-  const txid = `PAGBANK${Date.now().toString().slice(-8)}`;
   const pixKey = '6f33236f-92cb-4012-b0a8-332e3af35039'; // Chave PIX oficial do PagBank BirdPro
-  const generatedCode = generateEmvCoPix(pixKey, 'BIRDPRO TECNOLOGIA', 'SAO PAULO', amount, txid);
+  const generatedCode = generateEmvCoPix(pixKey, 'LUIS HENRIQUE SCHREIBER', 'IJUI', amount, '***');
 
   return {
     success: true,

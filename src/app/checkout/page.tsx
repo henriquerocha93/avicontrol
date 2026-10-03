@@ -22,7 +22,8 @@ import {
   FileText,
   Clock,
   AlertTriangle,
-  Info
+  Info,
+  Key
 } from 'lucide-react'
 import { db } from '@/lib/db'
 import { useAuth } from '@/lib/auth-context'
@@ -36,6 +37,8 @@ const BRAZIL_STATES = [
   'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 
   'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
 ]
+
+const PAGBANK_PIX_KEY = '6f33236f-92cb-4012-b0a8-332e3af35039'
 
 function CheckoutContent() {
   const router = useRouter()
@@ -88,6 +91,7 @@ function CheckoutContent() {
   const [isCreatingOrder, setIsCreatingOrder] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [pixCopied, setPixCopied] = useState(false)
+  const [pixKeyCopied, setPixKeyCopied] = useState(false)
   
   // Real PagBank Order & Verification References
   const [currentReferenceId, setCurrentReferenceId] = useState('')
@@ -219,20 +223,19 @@ function CheckoutContent() {
     setVerificationAlert(null)
     setIsCreatingOrder(true)
 
-    // Fallback standard EMVCo PIX code
-    const globalConfig = db.getGlobalConfig()
-    const pagbankPixKey = globalConfig.pagbankPixKey || '6f33236f-92cb-4012-b0a8-332e3af35039'
-    const fallbackPix = generateEmvCoPix(
-      pagbankPixKey, 
-      'BIRDPRO TECNOLOGIA', 
-      'SAO PAULO', 
+    // Generate 100% Bacen-compliant EMVCo static BR Code PIX
+    const standardBacenPix = generateEmvCoPix(
+      PAGBANK_PIX_KEY, 
+      'LUIS HENRIQUE SCHREIBER', 
+      'IJUI', 
       finalPrice, 
-      newRefId
+      '***'
     )
-    setCurrentPixCode(fallbackPix)
+    setCurrentPixCode(standardBacenPix)
 
     // Call PagBank Order Creation API
     try {
+      const globalConfig = db.getGlobalConfig()
       const res = await fetch('/api/payments/pagbank', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -270,6 +273,12 @@ function CheckoutContent() {
     navigator.clipboard.writeText(currentPixCode)
     setPixCopied(true)
     setTimeout(() => setPixCopied(false), 2500)
+  }
+
+  const handleCopyPixKey = () => {
+    navigator.clipboard.writeText(PAGBANK_PIX_KEY)
+    setPixKeyCopied(true)
+    setTimeout(() => setPixKeyCopied(false), 2500)
   }
 
   // Real Account Activation & Provisioning (TRIGGERED ONLY WHEN PAID IS CONFIRMED)
@@ -357,7 +366,7 @@ function CheckoutContent() {
         if (isManualClick) {
           setVerificationAlert({
             type: 'ERROR',
-            message: `⚠️ Pagamento ainda NÃO identificado pelo PagBank PagSeguro (Status: ${data?.status || 'AGUARDANDO PAGAMENTO'}). O acesso ao BIRDPRO só é liberado mediante compensação bancária real do valor de ${formatCurrency(finalPrice)}. Se você acabou de efetuar a transferência no app do seu banco, aguarde de 10 a 30 segundos para o processamento bancário e clique novamente em "Verificar Pagamento".`
+            message: `⚠️ Pagamento ainda NÃO identificado pelo PagBank PagSeguro (Status: ${data?.status || 'AGUARDANDO COMPENSAÇÃO'}). O acesso ao BIRDPRO só é liberado mediante compensação bancária real do valor de ${formatCurrency(finalPrice)}. Se você acabou de efetuar a transferência no app do seu banco, aguarde de 10 a 30 segundos para o processamento bancário e clique novamente em "Verificar Pagamento".`
           })
         }
       }
@@ -995,45 +1004,77 @@ function CheckoutContent() {
 
               {/* PIX PagBank View */}
               {paymentMethod === 'PIX' && (
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 text-center">
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3.5 text-center">
                   <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-800">
                     <QrCode className="w-4 h-4 text-emerald-600" />
-                    <span>QR Code PIX PagBank Oficial</span>
+                    <span>QR Code PIX PagBank (Bacen Padrão Nacional)</span>
                   </div>
 
-                  <div className="w-48 h-48 mx-auto bg-white p-2 rounded-2xl border-2 border-emerald-500/40 shadow-xs flex flex-col items-center justify-center">
+                  {/* Scannable QR Code */}
+                  <div className="w-52 h-52 mx-auto bg-white p-2.5 rounded-2xl border-2 border-emerald-500/50 shadow-md flex flex-col items-center justify-center">
                     <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(currentPixCode)}`} 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(currentPixCode)}`} 
                       alt="QR Code PIX PagBank" 
-                      className="w-40 h-40 object-contain rounded-lg"
+                      className="w-44 h-44 object-contain rounded-lg"
                     />
                   </div>
 
-                  <p className="text-[11px] text-slate-500">
-                    Abra o app do seu banco, selecione a opção <strong>PIX Copia e Cola</strong> e cole o código abaixo:
+                  <p className="text-[11px] text-slate-600">
+                    Abra o app do seu banco, selecione a opção <strong>PIX Copia e Cola</strong> ou aponte a câmera para o QR Code acima:
                   </p>
 
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={currentPixCode}
-                      className="w-full h-8.5 px-2.5 text-[10px] font-mono bg-white border border-slate-300 rounded-lg text-slate-600 select-all focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleCopyPix}
-                      className="px-3 h-8.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition shrink-0 flex items-center gap-1 cursor-pointer"
-                    >
-                      {pixCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{pixCopied ? 'Copiado!' : 'Copiar'}</span>
-                    </button>
+                  {/* Option 1: PIX Copia e Cola */}
+                  <div className="space-y-1 text-left">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      Opção 1: Código PIX Copia e Cola
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={currentPixCode}
+                        className="w-full h-8.5 px-2.5 text-[10px] font-mono bg-white border border-slate-300 rounded-lg text-slate-700 select-all focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCopyPix}
+                        className="px-3.5 h-8.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition shrink-0 flex items-center gap-1 cursor-pointer shadow-xs"
+                      >
+                        {pixCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{pixCopied ? 'Copiado!' : 'Copiar'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Option 2: Chave PIX Direta (EVP) */}
+                  <div className="p-2.5 bg-white rounded-xl border border-slate-200 text-left text-xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                        <Key className="w-3 h-3 text-emerald-600" />
+                        Opção 2: Chave PIX Aleatória (EVP)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleCopyPixKey}
+                        className="text-[10px] text-emerald-700 hover:text-emerald-800 font-bold underline flex items-center gap-0.5 cursor-pointer"
+                      >
+                        {pixKeyCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        <span>{pixKeyCopied ? 'Chave Copiada!' : 'Copiar Chave'}</span>
+                      </button>
+                    </div>
+                    <div className="font-mono font-bold text-slate-800 text-[11px] truncate select-all">
+                      {PAGBANK_PIX_KEY}
+                    </div>
+                    <div className="text-[10px] text-slate-500 flex items-center justify-between pt-0.5 border-t border-slate-100">
+                      <span>Favorecido: <strong>Luis Henrique Schreiber</strong></span>
+                      <span>Banco: <strong>PagBank (PagSeguro)</strong></span>
+                    </div>
                   </div>
 
                   {/* Real-time Poller Badge */}
-                  <div className="pt-2 flex items-center justify-center gap-1.5 text-[10px] text-slate-500 font-medium">
+                  <div className="pt-1 flex items-center justify-center gap-1.5 text-[10px] text-slate-500 font-medium">
                     <RefreshCw className="w-3 h-3 animate-spin text-emerald-600" />
-                    <span>Monitorando PagBank em tempo real — O acesso libera automaticamente após o pagamento.</span>
+                    <span>Monitorando PagBank em tempo real — O acesso é liberado automaticamente após a compensação.</span>
                   </div>
                 </div>
               )}
