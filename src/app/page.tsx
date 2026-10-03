@@ -31,8 +31,6 @@ import {
   Clock,
   Laptop,
   Scan,
-  SlidersHorizontal,
-  LayoutGrid,
   Maximize2,
   Calendar,
   Lock,
@@ -112,7 +110,6 @@ const SECTIONS: SectionConfig[] = [
 export default function LandingPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<SectionId>('recursos');
-  const [viewMode, setViewMode] = useState<'sections' | 'all'>('sections');
   const [activeModuleIdx, setActiveModuleIdx] = useState(0);
   const [billingPeriod, setBillingPeriod] = useState<'anual' | 'mensal'>('anual');
   const [activePedigreeTab, setActivePedigreeTab] = useState<'a4' | 'cracha' | 'qr'>('a4');
@@ -471,83 +468,14 @@ export default function LandingPage() {
       </section>
 
       {/* ========================================================================= */}
-      {/* 3. SECTION HUB NAVIGATOR (INTERACTIVE TAB CONTROLLER)                     */}
+      {/* 3. MAIN CONTENT CONTAINER (SECTIONS WITH FLUID TRANSITIONS)               */}
       {/* ========================================================================= */}
-      <section ref={sectionRef} className="sticky top-18 sm:top-20 z-40 bg-[#070e0b]/95 backdrop-blur-xl border-y border-emerald-900/40 py-3 shadow-xl transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-3">
-          
-          {/* Segmented Section Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 scrollbar-none">
-            {SECTIONS.map((sec) => {
-              const Icon = sec.icon;
-              const isActive = activeSection === sec.id;
-              return (
-                <button
-                  key={sec.id}
-                  onClick={() => handleSelectSection(sec.id)}
-                  className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all duration-300 cursor-pointer ${
-                    isActive
-                      ? 'bg-gradient-to-r from-[#00c853] to-emerald-600 text-white shadow-lg shadow-emerald-500/30 scale-105'
-                      : 'bg-[#0f1f17]/60 text-slate-300 hover:text-white hover:bg-emerald-950/70 border border-emerald-900/40'
-                  }`}
-                >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-emerald-400'}`} />
-                  <span>{sec.shortLabel}</span>
-                  {sec.badge && (
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
-                      isActive ? 'bg-black/30 text-white' : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                    }`}>
-                      {sec.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* View Mode Switcher (Sections vs All) */}
-          <div className="hidden sm:flex items-center gap-2 shrink-0">
-            <span className="text-[11px] text-slate-400 font-semibold">Exibição:</span>
-            <div className="flex items-center bg-[#091510] p-1 rounded-xl border border-emerald-900/60">
-              <button
-                onClick={() => setViewMode('sections')}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === 'sections'
-                    ? 'bg-emerald-700/60 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Modo Seções: Visual limpo e focado, uma seção por vez com transição suave"
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Por Seções</span>
-              </button>
-              <button
-                onClick={() => setViewMode('all')}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === 'all'
-                    ? 'bg-emerald-700/60 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Modo Contínuo: Exibe todas as seções uma abaixo da outra"
-              >
-                <LayoutGrid className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Todas</span>
-              </button>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* ========================================================================= */}
-      {/* 4. MAIN CONTENT CONTAINER (SECTIONS WITH FLUID TRANSITIONS)               */}
-      {/* ========================================================================= */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
+      <main ref={sectionRef} id="conteudo" className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
 
         {/* ----------------------------------------------------------------------- */}
         {/* SECTION 1: MÓDULOS & RECURSOS                                           */}
         {/* ----------------------------------------------------------------------- */}
-        {(viewMode === 'all' || activeSection === 'recursos') && (
+        {activeSection === 'recursos' && (
           <section id="recursos" className="space-y-8 animate-in fade-in zoom-in-98 duration-500">
             
             {/* Section Header */}
@@ -787,7 +715,7 @@ export default function LandingPage() {
         {/* ----------------------------------------------------------------------- */}
         {/* SECTION 2: POR QUE O BIRDPRO? (COMPARATIVO TECNOLÓGICO)                 */}
         {/* ----------------------------------------------------------------------- */}
-        {(viewMode === 'all' || activeSection === 'comparativo') && (
+        {activeSection === 'comparativo' && (
           <section id="comparativo" className="space-y-8 animate-in fade-in zoom-in-98 duration-500">
             
             <div className="text-center max-w-3xl mx-auto space-y-2">
@@ -888,7 +816,7 @@ export default function LandingPage() {
         {/* ----------------------------------------------------------------------- */}
         {/* SECTION 3: PEDIGREE OFICIAL & QR CODE                                    */}
         {/* ----------------------------------------------------------------------- */}
-        {(viewMode === 'all' || activeSection === 'pedigree') && (
+        {activeSection === 'pedigree' && (
           <section id="pedigree" className="space-y-8 animate-in fade-in zoom-in-98 duration-500">
             
             <div className="text-center max-w-2xl mx-auto space-y-2">
@@ -1043,7 +971,7 @@ export default function LandingPage() {
         {/* ----------------------------------------------------------------------- */}
         {/* SECTION 4: CRIATÓRIOS & PROVAS REAIS                                     */}
         {/* ----------------------------------------------------------------------- */}
-        {(viewMode === 'all' || activeSection === 'criatorios') && (
+        {activeSection === 'criatorios' && (
           <section id="criatorios" className="space-y-8 animate-in fade-in zoom-in-98 duration-500">
             <DailyProofsSection />
           </section>
@@ -1052,7 +980,7 @@ export default function LandingPage() {
         {/* ----------------------------------------------------------------------- */}
         {/* SECTION 5: MANEJO AO VIVO & AMBIENTE                                     */}
         {/* ----------------------------------------------------------------------- */}
-        {(viewMode === 'all' || activeSection === 'ambiente') && (
+        {activeSection === 'ambiente' && (
           <section id="ambiente" className="space-y-8 animate-in fade-in zoom-in-98 duration-500">
             <LiveBreedingStatus />
           </section>
@@ -1061,7 +989,7 @@ export default function LandingPage() {
         {/* ----------------------------------------------------------------------- */}
         {/* SECTION 6: PLANOS & ASSINATURA                                           */}
         {/* ----------------------------------------------------------------------- */}
-        {(viewMode === 'all' || activeSection === 'planos') && (
+        {activeSection === 'planos' && (
           <section id="planos" className="space-y-8 animate-in fade-in zoom-in-98 duration-500">
             
             <div className="text-center max-w-2xl mx-auto space-y-3">
@@ -1220,10 +1148,9 @@ export default function LandingPage() {
         )}
 
         {/* ----------------------------------------------------------------------- */}
-        {/* SECTION TRANSITION CONTROLLER (AT THE BOTTOM OF SECTION MODE)          */}
+        {/* SECTION TRANSITION CONTROLLER (AT THE BOTTOM OF SECTIONS)               */}
         {/* ----------------------------------------------------------------------- */}
-        {viewMode === 'sections' && (
-          <div className="mt-12 pt-6 border-t border-emerald-900/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="mt-12 pt-6 border-t border-emerald-900/40 flex flex-col sm:flex-row items-center justify-between gap-4">
             
             {/* Previous Section Button */}
             {prevSection ? (
@@ -1270,7 +1197,6 @@ export default function LandingPage() {
             )}
 
           </div>
-        )}
 
       </main>
 
