@@ -5,14 +5,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { 
   Printer, 
   Scissors, 
-  Sparkles, 
-  Award, 
   CheckCircle2, 
-  Maximize2, 
-  FileText, 
-  QrCode,
   ShieldCheck,
-  Check,
   X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -61,8 +55,252 @@ export function PrintableBadgePreview() {
     window.print();
   };
 
+  // Reusable Tree Card Component (Verso)
+  const TreeBadgeCard = () => (
+    <div className="w-full max-w-[530px] h-[330px] bg-white text-slate-900 rounded-xl border-2 border-slate-700 shadow-2xl relative p-3 flex flex-col justify-between overflow-hidden select-none">
+      {/* Cut marks in corners */}
+      <span className="absolute top-1 left-1 text-[8px] font-mono text-slate-400 select-none">+</span>
+      <span className="absolute top-1 right-1 text-[8px] font-mono text-slate-400 select-none">+</span>
+      <span className="absolute bottom-1 left-1 text-[8px] font-mono text-slate-400 select-none">+</span>
+      <span className="absolute bottom-1 right-1 text-[8px] font-mono text-slate-400 select-none">+</span>
+
+      {/* Header: Criatório, BIRDPRO Logo & Anilha */}
+      <div className="border-b border-slate-300 pb-1.5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-[#00c853] text-white flex items-center justify-center font-black text-[10px] shadow-sm">
+            BP
+          </div>
+          <div className="leading-tight">
+            <span className="font-black text-[10px] text-slate-900 block tracking-tight uppercase">
+              {birdData.criatorio}
+            </span>
+            <span className="text-[8px] text-slate-600 block">
+              {birdData.registry}
+            </span>
+          </div>
+        </div>
+
+        <div className="text-right">
+          <span className="text-[8px] font-black uppercase text-emerald-700 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded">
+            ÁRVORE GENEALÓGICA OFICIAL
+          </span>
+          <span className="text-[7.5px] text-slate-600 block mt-0.5 font-bold">
+            Consanguinidade Wright: <strong className="text-emerald-800">{birdData.coi}</strong>
+          </span>
+        </div>
+      </div>
+
+      {/* Ave Principal Banner */}
+      <div className="bg-slate-100 border border-slate-300 rounded px-2 py-1 flex items-center justify-between text-xs">
+        <div className="truncate mr-2">
+          <span className="text-[8px] font-bold text-slate-500 uppercase block">Ave Cadastrada</span>
+          <span className="font-black text-[11px] text-slate-950 uppercase tracking-wide truncate">
+            {birdData.name}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="bg-emerald-600 text-white font-mono font-bold text-[9px] px-2 py-0.5 rounded">
+            {birdData.ringNumber}
+          </span>
+          <span className="text-[9px] font-black text-slate-700">
+            {birdData.sex}
+          </span>
+        </div>
+      </div>
+
+      {/* Tree Body: 4 Columns with Connectors */}
+      <div className="flex-1 flex items-center justify-between py-1.5 relative">
+        {/* COL 1: PAIS (2 Caixas) */}
+        <div className="w-[120px] h-full flex flex-col justify-around shrink-0 z-10">
+          {/* Pai */}
+          <div className="py-1 px-1.5 text-center text-[8px] font-black uppercase rounded border border-sky-400 bg-sky-50 text-sky-950 shadow-2xs truncate">
+            <span className="text-[7px] text-sky-700 block font-bold">PAI ♂</span>
+            <span className="truncate block font-extrabold">{birdData.father}</span>
+            <span className="text-[6.5px] font-mono text-sky-800 block">{birdData.fatherRing}</span>
+          </div>
+          {/* Mãe */}
+          <div className="py-1 px-1.5 text-center text-[8px] font-black uppercase rounded border border-rose-400 bg-rose-50 text-rose-950 shadow-2xs truncate">
+            <span className="text-[7px] text-rose-700 block font-bold">MÃE ♀</span>
+            <span className="truncate block font-extrabold">{birdData.mother}</span>
+            <span className="text-[6.5px] font-mono text-rose-800 block">{birdData.motherRing}</span>
+          </div>
+        </div>
+
+        {/* CONECTOR 1 -> 2 (SVG) */}
+        <div className="w-[12px] h-full relative shrink-0">
+          <svg className="w-full h-full" viewBox="0 0 12 180" fill="none">
+            <path d="M 0,45 H 6 V 22 H 12 M 6,45 V 68 H 12" stroke="#475569" strokeWidth="1.2" />
+            <path d="M 0,135 H 6 V 112 H 12 M 6,135 V 158 H 12" stroke="#475569" strokeWidth="1.2" />
+          </svg>
+        </div>
+
+        {/* COL 2: AVÓS (4 Caixas) */}
+        <div className="w-[105px] h-full flex flex-col justify-around shrink-0 z-10">
+          {birdData.grandparents.map((av, idx) => (
+            <div 
+              key={idx}
+              className={`py-0.5 px-1 text-center text-[7.5px] font-black uppercase rounded border shadow-2xs truncate ${
+                av.male 
+                  ? 'border-sky-300 bg-sky-50/90 text-sky-950' 
+                  : 'border-rose-300 bg-rose-50/90 text-rose-950'
+              }`}
+            >
+              <span className="truncate block">{av.name} {av.male ? '♂' : '♀'}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* CONECTOR 2 -> 3 (SVG) */}
+        <div className="w-[12px] h-full relative shrink-0">
+          <svg className="w-full h-full" viewBox="0 0 12 180" fill="none">
+            <path d="M 0,22 H 6 V 11 H 12 M 6,22 V 33 H 12" stroke="#64748b" strokeWidth="1" />
+            <path d="M 0,68 H 6 V 57 H 12 M 6,68 V 79 H 12" stroke="#64748b" strokeWidth="1" />
+            <path d="M 0,112 H 6 V 101 H 12 M 6,112 V 123 H 12" stroke="#64748b" strokeWidth="1" />
+            <path d="M 0,158 H 6 V 147 H 12 M 6,158 V 169 H 12" stroke="#64748b" strokeWidth="1" />
+          </svg>
+        </div>
+
+        {/* COL 3: BISAVÓS (8 Caixas Compactas) */}
+        <div className="w-[95px] h-full flex flex-col justify-around shrink-0 z-10">
+          {birdData.greatGrandparents.map((bis, idx) => (
+            <div 
+              key={idx}
+              className={`py-0.2 px-1 text-center text-[6.5px] font-bold uppercase rounded border truncate ${
+                bis.male 
+                  ? 'border-sky-200 bg-sky-50/80 text-sky-900' 
+                  : 'border-rose-200 bg-rose-50/80 text-rose-900'
+              }`}
+            >
+              {bis.name}
+            </div>
+          ))}
+        </div>
+
+        {/* Scannable Real QR Code on the side */}
+        <div className="w-[55px] flex flex-col items-center justify-center pl-1 border-l border-slate-200 shrink-0">
+          <div className="p-1 bg-white border border-slate-400 rounded shadow-xs">
+            <QRCodeSVG value={publicUrl} size={38} level="M" />
+          </div>
+          <span className="text-[6px] font-black text-slate-700 text-center leading-tight mt-1 block">
+            Validar
+          </span>
+        </div>
+      </div>
+
+      {/* Footer: Authentic Security & System Signature */}
+      <div className="border-t border-slate-300 pt-1 flex items-center justify-between text-[7.5px] text-slate-600">
+        <div className="flex items-center gap-1 text-emerald-800 font-bold">
+          <ShieldCheck className="w-3 h-3 text-[#00c853]" />
+          <span>Autenticidade Criptografada • BIRDPRO 2026</span>
+        </div>
+        <span className="font-mono text-slate-500 font-bold">
+          birdpro.com.br/ave/soberano-real
+        </span>
+      </div>
+    </div>
+  );
+
+  // Reusable Front Card Component (Frente)
+  const FrontBadgeCard = () => (
+    <div className="w-full max-w-[530px] h-[330px] bg-white text-slate-900 rounded-xl border-2 border-slate-700 shadow-2xl relative p-3 flex flex-col justify-between overflow-hidden select-none">
+      {/* Cut marks */}
+      <span className="absolute top-1 left-1 text-[8px] font-mono text-slate-400 select-none">+</span>
+      <span className="absolute top-1 right-1 text-[8px] font-mono text-slate-400 select-none">+</span>
+      <span className="absolute bottom-1 left-1 text-[8px] font-mono text-slate-400 select-none">+</span>
+      <span className="absolute bottom-1 right-1 text-[8px] font-mono text-slate-400 select-none">+</span>
+
+      {/* Top Row: Brasão + Nome da Ave + Pais */}
+      <div className="flex gap-3">
+        {/* Brasão do Criatório */}
+        <div className="w-24 shrink-0 flex flex-col items-center justify-center text-center p-1 bg-amber-50/60 rounded-lg border border-amber-300">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-white font-black text-xs shadow-md border-2 border-white">
+            👑
+          </div>
+          <span className="text-[8px] font-black text-amber-900 mt-1 uppercase block leading-tight">
+            CRIATÓRIO ELITE
+          </span>
+          <span className="text-[6.5px] text-amber-700 block font-bold">
+            BRASIL
+          </span>
+        </div>
+
+        {/* Identificação Principal */}
+        <div className="flex-1 space-y-1">
+          <div>
+            <span className="text-[7.5px] font-bold uppercase text-slate-500 block">Nome da Ave</span>
+            <div className="bg-slate-100 border border-slate-400 px-2 py-1 text-center font-black text-sm uppercase text-slate-950 truncate tracking-wide rounded">
+              {birdData.name}
+            </div>
+          </div>
+
+          {/* Pais */}
+          <div className="grid grid-cols-2 gap-1.5">
+            <div>
+              <span className="text-[7px] font-bold uppercase text-slate-500 block">Pai</span>
+              <div className="border border-sky-400 bg-sky-50 text-sky-950 px-1.5 py-0.5 text-center font-extrabold text-[9px] uppercase truncate rounded">
+                {birdData.father}
+              </div>
+            </div>
+            <div>
+              <span className="text-[7px] font-bold uppercase text-slate-500 block">Mãe</span>
+              <div className="border border-rose-400 bg-rose-50 text-rose-950 px-1.5 py-0.5 text-center font-extrabold text-[9px] uppercase truncate rounded">
+                {birdData.mother}
+              </div>
+            </div>
+          </div>
+
+          {/* Nascimento + Sexo */}
+          <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+            <div className="border border-slate-300 bg-slate-50 px-1 py-0.5 text-center text-[8px] rounded">
+              <strong className="text-slate-500">NASC:</strong> {birdData.birthDate}
+            </div>
+            <div className="border border-slate-300 bg-slate-50 px-1 py-0.5 text-center text-[8px] rounded">
+              <strong className="text-slate-500">SEXO:</strong> {birdData.sex}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Middle Row: Anilha Oficial & Registro */}
+      <div className="grid grid-cols-12 gap-2 pt-1">
+        <div className="col-span-8 bg-slate-100 border-2 border-emerald-600 rounded p-1.5 text-center">
+          <span className="text-[7px] font-bold uppercase text-emerald-800 block">Anilha Oficial (FOB / SISPASS)</span>
+          <span className="font-mono font-black text-xs text-emerald-950 tracking-wider">
+            {birdData.ringNumber}
+          </span>
+        </div>
+        <div className="col-span-4 bg-slate-100 border border-slate-400 rounded p-1.5 text-center">
+          <span className="text-[7px] font-bold uppercase text-slate-600 block">Nº SISPASS</span>
+          <span className="font-mono font-bold text-xs text-slate-900">
+            4719754
+          </span>
+        </div>
+      </div>
+
+      {/* Bottom Row: Proprietário + QR Code Gaiola */}
+      <div className="border-t border-slate-300 pt-1.5 flex items-center justify-between">
+        <div>
+          <span className="text-[7px] font-bold uppercase text-slate-500 block">Proprietário Responsável</span>
+          <div className="text-[9px] font-black text-slate-900">
+            {birdData.criador} • {birdData.phone}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="p-0.5 bg-white border border-slate-400 rounded">
+            <QRCodeSVG value={publicUrl} size={30} level="M" />
+          </div>
+          <div className="leading-tight text-right">
+            <span className="font-black text-[9px] text-[#00c853] block">BIRDPRO</span>
+            <span className="text-[6.5px] text-slate-500">www.birdpro.com.br</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-3 font-sans">
+    <div className="space-y-3 font-sans w-full max-w-full overflow-hidden">
       
       {/* Top Controls: View Selector & Print Simulator Button */}
       <div className="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-emerald-900/50">
@@ -96,7 +334,7 @@ export function PrintableBadgePreview() {
           <button
             type="button"
             onClick={() => setActiveTab('ambos')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer hidden sm:flex items-center gap-1 ${
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer flex items-center gap-1 ${
               activeTab === 'ambos'
                 ? 'bg-gradient-to-r from-[#00c853] to-emerald-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-white'
@@ -120,271 +358,36 @@ export function PrintableBadgePreview() {
       </div>
 
       {/* ========================================================================= */}
-      {/* BADGE CANVAS CONTAINER (REAL PHYSICAL BADGE PREVIEW)                      */}
+      {/* BADGE CANVAS CONTAINER (100% WIDTH, NO HORIZONTAL SCROLLBAR)              */}
       {/* ========================================================================= */}
-      <div className="p-3 sm:p-4 rounded-2xl bg-[#051009] border border-emerald-700/40 shadow-inner overflow-x-auto flex justify-center">
+      <div className="p-3 sm:p-4 rounded-2xl bg-[#051009] border border-emerald-700/40 shadow-inner overflow-hidden flex flex-col items-center justify-center w-full">
         
-        {/* ----------------------------------------------------------------------- */}
-        {/* OPTION A: VERSO COM ÁRVORE GENEALÓGICA COMPLETA                         */}
-        {/* ----------------------------------------------------------------------- */}
-        {(activeTab === 'arvore' || activeTab === 'ambos') && (
-          <div className="w-[520px] min-w-[500px] h-[330px] bg-white text-slate-900 rounded-xl border-2 border-slate-700 shadow-2xl relative p-3 flex flex-col justify-between overflow-hidden select-none">
-            
-            {/* Cut marks in corners */}
-            <span className="absolute top-1 left-1 text-[8px] font-mono text-slate-400 select-none">+</span>
-            <span className="absolute top-1 right-1 text-[8px] font-mono text-slate-400 select-none">+</span>
-            <span className="absolute bottom-1 left-1 text-[8px] font-mono text-slate-400 select-none">+</span>
-            <span className="absolute bottom-1 right-1 text-[8px] font-mono text-slate-400 select-none">+</span>
-
-            {/* Header: Criatório, BIRDPRO Logo & Anilha */}
-            <div className="border-b border-slate-300 pb-1.5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-md bg-[#00c853] text-white flex items-center justify-center font-black text-[10px] shadow-sm">
-                  BP
-                </div>
-                <div className="leading-tight">
-                  <span className="font-black text-[10px] text-slate-900 block tracking-tight uppercase">
-                    {birdData.criatorio}
-                  </span>
-                  <span className="text-[8px] text-slate-600 block">
-                    {birdData.registry}
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span className="text-[8px] font-black uppercase text-emerald-700 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded">
-                  ÁRVORE GENEALÓGICA OFICIAL
-                </span>
-                <span className="text-[7.5px] text-slate-600 block mt-0.5 font-bold">
-                  Consanguinidade Wright: <strong className="text-emerald-800">{birdData.coi}</strong>
-                </span>
-              </div>
-            </div>
-
-            {/* Ave Principal Banner */}
-            <div className="bg-slate-100 border border-slate-300 rounded px-2 py-1 flex items-center justify-between text-xs">
-              <div className="truncate mr-2">
-                <span className="text-[8px] font-bold text-slate-500 uppercase block">Ave Cadastrada</span>
-                <span className="font-black text-[11px] text-slate-950 uppercase tracking-wide truncate">
-                  {birdData.name}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="bg-emerald-600 text-white font-mono font-bold text-[9px] px-2 py-0.5 rounded">
-                  {birdData.ringNumber}
-                </span>
-                <span className="text-[9px] font-black text-slate-700">
-                  {birdData.sex}
-                </span>
-              </div>
-            </div>
-
-            {/* Tree Body: 4 Columns with Connectors */}
-            <div className="flex-1 flex items-center justify-between py-1.5 relative">
-              
-              {/* COL 1: PAIS (2 Caixas) */}
-              <div className="w-[125px] h-full flex flex-col justify-around shrink-0 z-10">
-                {/* Pai */}
-                <div className="py-1 px-1.5 text-center text-[8px] font-black uppercase rounded border border-sky-400 bg-sky-50 text-sky-950 shadow-2xs truncate">
-                  <span className="text-[7px] text-sky-700 block font-bold">PAI ♂</span>
-                  <span className="truncate block font-extrabold">{birdData.father}</span>
-                  <span className="text-[6.5px] font-mono text-sky-800 block">{birdData.fatherRing}</span>
-                </div>
-                {/* Mãe */}
-                <div className="py-1 px-1.5 text-center text-[8px] font-black uppercase rounded border border-rose-400 bg-rose-50 text-rose-950 shadow-2xs truncate">
-                  <span className="text-[7px] text-rose-700 block font-bold">MÃE ♀</span>
-                  <span className="truncate block font-extrabold">{birdData.mother}</span>
-                  <span className="text-[6.5px] font-mono text-rose-800 block">{birdData.motherRing}</span>
-                </div>
-              </div>
-
-              {/* CONECTOR 1 -> 2 (SVG) */}
-              <div className="w-[14px] h-full relative shrink-0">
-                <svg className="w-full h-full" viewBox="0 0 14 180" fill="none">
-                  <path d="M 0,45 H 7 V 22 H 14 M 7,45 V 68 H 14" stroke="#475569" strokeWidth="1.2" />
-                  <path d="M 0,135 H 7 V 112 H 14 M 7,135 V 158 H 14" stroke="#475569" strokeWidth="1.2" />
-                </svg>
-              </div>
-
-              {/* COL 2: AVÓS (4 Caixas) */}
-              <div className="w-[115px] h-full flex flex-col justify-around shrink-0 z-10">
-                {birdData.grandparents.map((av, idx) => (
-                  <div 
-                    key={idx}
-                    className={`py-0.5 px-1 text-center text-[7.5px] font-black uppercase rounded border shadow-2xs truncate ${
-                      av.male 
-                        ? 'border-sky-300 bg-sky-50/90 text-sky-950' 
-                        : 'border-rose-300 bg-rose-50/90 text-rose-950'
-                    }`}
-                  >
-                    <span className="truncate block">{av.name} {av.male ? '♂' : '♀'}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* CONECTOR 2 -> 3 (SVG) */}
-              <div className="w-[14px] h-full relative shrink-0">
-                <svg className="w-full h-full" viewBox="0 0 14 180" fill="none">
-                  <path d="M 0,22 H 7 V 11 H 14 M 7,22 V 33 H 14" stroke="#64748b" strokeWidth="1" />
-                  <path d="M 0,68 H 7 V 57 H 14 M 7,68 V 79 H 14" stroke="#64748b" strokeWidth="1" />
-                  <path d="M 0,112 H 7 V 101 H 14 M 7,112 V 123 H 14" stroke="#64748b" strokeWidth="1" />
-                  <path d="M 0,158 H 7 V 147 H 14 M 7,158 V 169 H 14" stroke="#64748b" strokeWidth="1" />
-                </svg>
-              </div>
-
-              {/* COL 3: BISAVÓS (8 Caixas Compactas) */}
-              <div className="w-[100px] h-full flex flex-col justify-around shrink-0 z-10">
-                {birdData.greatGrandparents.map((bis, idx) => (
-                  <div 
-                    key={idx}
-                    className={`py-0.2 px-1 text-center text-[6.5px] font-bold uppercase rounded border truncate ${
-                      bis.male 
-                        ? 'border-sky-200 bg-sky-50/80 text-sky-900' 
-                        : 'border-rose-200 bg-rose-50/80 text-rose-900'
-                    }`}
-                  >
-                    {bis.name}
-                  </div>
-                ))}
-              </div>
-
-              {/* Scannable Real QR Code on the side */}
-              <div className="w-[60px] flex flex-col items-center justify-center pl-1 border-l border-slate-200 shrink-0">
-                <div className="p-1 bg-white border border-slate-400 rounded shadow-xs">
-                  <QRCodeSVG value={publicUrl} size={42} level="M" />
-                </div>
-                <span className="text-[6.5px] font-black text-slate-700 text-center leading-tight mt-1 block">
-                  Validar com Celular
-                </span>
-              </div>
-
-            </div>
-
-            {/* Footer: Authentic Security & System Signature */}
-            <div className="border-t border-slate-300 pt-1 flex items-center justify-between text-[7.5px] text-slate-600">
-              <div className="flex items-center gap-1 text-emerald-800 font-bold">
-                <ShieldCheck className="w-3 h-3 text-[#00c853]" />
-                <span>Autenticidade Criptografada • BIRDPRO 2026</span>
-              </div>
-              <span className="font-mono text-slate-500 font-bold">
-                birdpro.com.br/ave/soberano-real
-              </span>
-            </div>
-
-          </div>
+        {/* Tab 1: Árvore Genealógica */}
+        {activeTab === 'arvore' && (
+          <TreeBadgeCard />
         )}
 
-        {/* ----------------------------------------------------------------------- */}
-        {/* SEPARATOR (WHEN AMBOS IS SELECTED)                                      */}
-        {/* ----------------------------------------------------------------------- */}
+        {/* Tab 2: Frente da Etiqueta */}
+        {activeTab === 'frente' && (
+          <FrontBadgeCard />
+        )}
+
+        {/* Tab 3: Frente & Verso (Empilhado verticalmente com linha de dobra — Zero Scrollbar) */}
         {activeTab === 'ambos' && (
-          <div className="px-3 flex flex-col items-center justify-center border-l-2 border-dashed border-emerald-500/50 mx-2 text-emerald-400 text-[10px] font-bold text-center">
-            <Scissors className="w-4 h-4 mb-1" />
-            <span>DOBRA</span>
-          </div>
-        )}
-
-        {/* ----------------------------------------------------------------------- */}
-        {/* OPTION B: FRENTE DA ETIQUETA DE GAIOLA                                  */}
-        {/* ----------------------------------------------------------------------- */}
-        {(activeTab === 'frente' || activeTab === 'ambos') && (
-          <div className="w-[520px] min-w-[500px] h-[330px] bg-white text-slate-900 rounded-xl border-2 border-slate-700 shadow-2xl relative p-3 flex flex-col justify-between overflow-hidden select-none">
+          <div className="w-full flex flex-col items-center gap-3">
+            <FrontBadgeCard />
             
-            {/* Cut marks */}
-            <span className="absolute top-1 left-1 text-[8px] font-mono text-slate-400 select-none">+</span>
-            <span className="absolute top-1 right-1 text-[8px] font-mono text-slate-400 select-none">+</span>
-            <span className="absolute bottom-1 left-1 text-[8px] font-mono text-slate-400 select-none">+</span>
-            <span className="absolute bottom-1 right-1 text-[8px] font-mono text-slate-400 select-none">+</span>
-
-            {/* Top Row: Brasão + Nome da Ave + Pais */}
-            <div className="flex gap-3">
-              {/* Brasão do Criatório */}
-              <div className="w-24 shrink-0 flex flex-col items-center justify-center text-center p-1 bg-amber-50/60 rounded-lg border border-amber-300">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-white font-black text-xs shadow-md border-2 border-white">
-                  👑
-                </div>
-                <span className="text-[8px] font-black text-amber-900 mt-1 uppercase block leading-tight">
-                  CRIATÓRIO ELITE
-                </span>
-                <span className="text-[6.5px] text-amber-700 block font-bold">
-                  BRASIL
-                </span>
-              </div>
-
-              {/* Identificação Principal */}
-              <div className="flex-1 space-y-1">
-                <div>
-                  <span className="text-[7.5px] font-bold uppercase text-slate-500 block">Nome da Ave</span>
-                  <div className="bg-slate-100 border border-slate-400 px-2 py-1 text-center font-black text-sm uppercase text-slate-950 truncate tracking-wide rounded">
-                    {birdData.name}
-                  </div>
-                </div>
-
-                {/* Pais */}
-                <div className="grid grid-cols-2 gap-1.5">
-                  <div>
-                    <span className="text-[7px] font-bold uppercase text-slate-500 block">Pai</span>
-                    <div className="border border-sky-400 bg-sky-50 text-sky-950 px-1.5 py-0.5 text-center font-extrabold text-[9px] uppercase truncate rounded">
-                      {birdData.father}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-[7px] font-bold uppercase text-slate-500 block">Mãe</span>
-                    <div className="border border-rose-400 bg-rose-50 text-rose-950 px-1.5 py-0.5 text-center font-extrabold text-[9px] uppercase truncate rounded">
-                      {birdData.mother}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Nascimento + Sexo */}
-                <div className="grid grid-cols-2 gap-1.5 pt-0.5">
-                  <div className="border border-slate-300 bg-slate-50 px-1 py-0.5 text-center text-[8px] rounded">
-                    <strong className="text-slate-500">NASC:</strong> {birdData.birthDate}
-                  </div>
-                  <div className="border border-slate-300 bg-slate-50 px-1 py-0.5 text-center text-[8px] rounded">
-                    <strong className="text-slate-500">SEXO:</strong> {birdData.sex}
-                  </div>
-                </div>
-              </div>
+            {/* Linha de Corte e Dobra para Plastificação */}
+            <div className="w-full max-w-[530px] flex items-center justify-center gap-2 py-1 text-emerald-400 text-xs font-bold">
+              <div className="flex-1 border-t-2 border-dashed border-emerald-500/50" />
+              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/90 border border-emerald-500/40 text-[10px] text-emerald-300">
+                <Scissors className="w-3.5 h-3.5 text-emerald-400" />
+                Linha de dobra para plastificação (Frente &amp; Verso)
+              </span>
+              <div className="flex-1 border-t-2 border-dashed border-emerald-500/50" />
             </div>
 
-            {/* Middle Row: Anilha Oficial & Registro */}
-            <div className="grid grid-cols-12 gap-2 pt-1">
-              <div className="col-span-8 bg-slate-100 border-2 border-emerald-600 rounded p-1.5 text-center">
-                <span className="text-[7px] font-bold uppercase text-emerald-800 block">Anilha Oficial (FOB / SISPASS)</span>
-                <span className="font-mono font-black text-xs text-emerald-950 tracking-wider">
-                  {birdData.ringNumber}
-                </span>
-              </div>
-              <div className="col-span-4 bg-slate-100 border border-slate-400 rounded p-1.5 text-center">
-                <span className="text-[7px] font-bold uppercase text-slate-600 block">Nº SISPASS</span>
-                <span className="font-mono font-bold text-xs text-slate-900">
-                  4719754
-                </span>
-              </div>
-            </div>
-
-            {/* Bottom Row: Proprietário + QR Code Gaiola */}
-            <div className="border-t border-slate-300 pt-1.5 flex items-center justify-between">
-              <div>
-                <span className="text-[7px] font-bold uppercase text-slate-500 block">Proprietário Responsável</span>
-                <div className="text-[9px] font-black text-slate-900">
-                  {birdData.criador} • {birdData.phone}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="p-0.5 bg-white border border-slate-400 rounded">
-                  <QRCodeSVG value={publicUrl} size={30} level="M" />
-                </div>
-                <div className="leading-tight text-right">
-                  <span className="font-black text-[9px] text-[#00c853] block">BIRDPRO</span>
-                  <span className="text-[6.5px] text-slate-500">www.birdpro.com.br</span>
-                </div>
-              </div>
-            </div>
-
+            <TreeBadgeCard />
           </div>
         )}
 
