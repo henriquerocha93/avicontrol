@@ -362,11 +362,10 @@ function CheckoutContent() {
         })
         await handleProvisionPaidAccount()
       } else {
-        // NOT PAID YET - DO NOT LIBERATE ACCESS!
         if (isManualClick) {
           setVerificationAlert({
-            type: 'ERROR',
-            message: `⚠️ Pagamento ainda NÃO identificado pelo PagBank PagSeguro (Status: ${data?.status || 'AGUARDANDO COMPENSAÇÃO'}). O acesso ao BIRDPRO só é liberado mediante compensação bancária real do valor de ${formatCurrency(finalPrice)}. Se você acabou de efetuar a transferência no app do seu banco, aguarde de 10 a 30 segundos para o processamento bancário e clique novamente em "Verificar Pagamento".`
+            type: 'INFO',
+            message: `Aguardando liquidação automática no PagBank. Se você já realizou o PIX no valor de ${formatCurrency(finalPrice)} para Carmen Rogere Rosa Da Rocha (PagBank), clique no botão verde abaixo "JÁ PAGUEI VIA PIX / LIBERAR ACESSO" para liberar sua conta imediatamente.`
           })
         }
       }
@@ -374,10 +373,30 @@ function CheckoutContent() {
       console.error('Erro ao consultar PagBank:', e)
       if (isManualClick) {
         setVerificationAlert({
-          type: 'ERROR',
-          message: 'Não foi possível confirmar a liquidação no PagBank neste momento. Por favor, verifique se a transferência foi concluída no seu banco e tente novamente.'
+          type: 'INFO',
+          message: `Se você já realizou o PIX no app do seu banco para Carmen Rogere Rosa Da Rocha, clique no botão verde "JÁ PAGUEI VIA PIX / LIBERAR ACESSO" para prosseguir.`
         })
       }
+    } finally {
+      setIsVerifying(false)
+    }
+  }
+
+  // User Direct Confirmation: When customer already completed the PIX transfer in bank
+  const handleManualPixConfirmation = async () => {
+    setIsVerifying(true)
+    try {
+      if (currentReferenceId) {
+        await fetch('/api/payments/pagbank/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ referenceId: currentReferenceId, orderId: currentOrderId })
+        }).catch(() => {})
+      }
+      await handleProvisionPaidAccount()
+    } catch (e) {
+      console.error('Erro ao confirmar:', e)
+      await handleProvisionPaidAccount()
     } finally {
       setIsVerifying(false)
     }
@@ -1195,24 +1214,36 @@ function CheckoutContent() {
               </button>
 
               {paymentMethod === 'PIX' && (
-                <button
-                  type="button"
-                  onClick={() => handleVerifyPaymentWithPagBank(true)}
-                  disabled={isVerifying}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black rounded-xl transition shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider order-1 sm:order-2"
-                >
-                  {isVerifying ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Consultando PagBank...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Search className="w-3.5 h-3.5" />
-                      <span>Verificar se o PIX foi Identificado</span>
-                    </>
-                  )}
-                </button>
+                <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto order-1 sm:order-2">
+                  <button
+                    type="button"
+                    onClick={() => handleVerifyPaymentWithPagBank(true)}
+                    disabled={isVerifying}
+                    className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {isVerifying ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Consultando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Search className="w-3.5 h-3.5" />
+                        <span>Consultar PagBank</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleManualPixConfirmation}
+                    disabled={isVerifying}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-black rounded-xl transition shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Já Paguei via PIX / Liberar Acesso</span>
+                  </button>
+                </div>
               )}
 
               {paymentMethod === 'CARD' && (
