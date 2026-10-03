@@ -11,7 +11,12 @@ import {
   Percent, 
   ShieldCheck, 
   AlertTriangle,
-  Check
+  Check,
+  CheckCircle2,
+  RefreshCw,
+  X,
+  Sparkles,
+  AlertCircle
 } from 'lucide-react'
 import { db } from '@/lib/db'
 import { GlobalSystemConfig } from '@/types'
@@ -19,20 +24,87 @@ import { GlobalSystemConfig } from '@/types'
 export default function AdminConfiguracoesPage() {
   const [config, setConfig] = useState<GlobalSystemConfig>(db.getGlobalConfig())
   const [savedSuccess, setSavedSuccess] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     setConfig(db.getGlobalConfig())
   }, [])
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    db.updateGlobalConfig(config)
-    setSavedSuccess(true)
-    setTimeout(() => setSavedSuccess(false), 3000)
+    setIsSaving(true)
+    setErrorMessage('')
+
+    try {
+      // Persist to database/localStorage
+      db.updateGlobalConfig(config)
+      
+      // Update local state to ensure synchronization
+      const updated = db.getGlobalConfig()
+      setConfig({ ...updated })
+
+      setIsSaving(false)
+      setSavedSuccess(true)
+
+      // Auto-hide success toast after 4 seconds
+      setTimeout(() => {
+        setSavedSuccess(false)
+      }, 4000)
+    } catch (err: any) {
+      console.error('Erro ao salvar configurações:', err)
+      setIsSaving(false)
+      setErrorMessage(err.message || 'Ocorreu um erro ao salvar as configurações.')
+    }
   }
 
   return (
-    <div className="space-y-6 pb-12 w-full font-sans">
+    <div className="space-y-6 pb-16 w-full font-sans relative">
+      
+      {/* ==================================================================== */}
+      {/* FLOATING SUCCESS NOTIFICATION TOAST (ALWAYS VISIBLE ON SCREEN)        */}
+      {/* ==================================================================== */}
+      {savedSuccess && (
+        <div className="fixed top-5 right-5 z-50 bg-[#00c853] text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center space-x-3 border border-emerald-400 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <div className="font-black text-xs">Configurações Salvas com Sucesso!</div>
+            <div className="text-[11px] text-emerald-100">
+              Todas as credenciais do PagBank, SMTP e regras foram atualizadas.
+            </div>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setSavedSuccess(false)}
+            className="text-white/80 hover:text-white ml-2 cursor-pointer p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Floating Error Toast */}
+      {errorMessage && (
+        <div className="fixed top-5 right-5 z-50 bg-rose-600 text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center space-x-3 border border-rose-400 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+            <AlertCircle className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <div className="font-black text-xs">Erro ao Salvar!</div>
+            <div className="text-[11px] text-rose-100">{errorMessage}</div>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setErrorMessage('')}
+            className="text-white/80 hover:text-white ml-2 cursor-pointer p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Breadcrumb */}
       <div className="flex items-center space-x-1.5 text-xs text-slate-500 px-1">
         <Link href="/dashboard" className="text-[#00c853] hover:underline font-medium">Home</Link>
@@ -43,7 +115,7 @@ export default function AdminConfiguracoesPage() {
       </div>
 
       {/* Header */}
-      <div className="bg-white p-5 rounded border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-3.5">
           <div className="w-11 h-11 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shadow-xs">
             <Settings className="w-6 h-6" />
@@ -59,8 +131,8 @@ export default function AdminConfiguracoesPage() {
         </div>
 
         {savedSuccess && (
-          <div className="px-3 py-1.5 bg-emerald-100 text-emerald-800 text-xs font-bold rounded flex items-center space-x-1">
-            <Check className="w-4 h-4" />
+          <div className="px-3.5 py-2 bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-lg flex items-center space-x-1.5 animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>Configurações salvas com sucesso!</span>
           </div>
         )}
@@ -69,7 +141,7 @@ export default function AdminConfiguracoesPage() {
       <form onSubmit={handleSave} className="space-y-6">
         
         {/* Section 1: Marca & Domínios */}
-        <div className="bg-white rounded border border-slate-200 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center space-x-2">
             <Globe className="w-4 h-4 text-[#00c853]" />
             <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
@@ -117,7 +189,7 @@ export default function AdminConfiguracoesPage() {
         </div>
 
         {/* Section 2: Regras de Vendedores & Afiliados */}
-        <div className="bg-white rounded border border-slate-200 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center space-x-2">
             <Percent className="w-4 h-4 text-purple-600" />
             <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
@@ -156,7 +228,7 @@ export default function AdminConfiguracoesPage() {
         </div>
 
         {/* Section 3: Gateway de Pagamento */}
-        <div className="bg-white rounded border border-slate-200 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <CreditCard className="w-4 h-4 text-emerald-600" />
@@ -192,7 +264,7 @@ export default function AdminConfiguracoesPage() {
                       Token de Acesso / API Token (PagBank PagSeguro)
                     </label>
                     <input
-                      type="password"
+                      type="text"
                       value={config.pagbankToken || ''}
                       onChange={(e) => setConfig({ ...config, pagbankToken: e.target.value })}
                       placeholder="Cole o Token de Acesso gerado no Painel do PagBank/PagSeguro"
@@ -266,7 +338,7 @@ export default function AdminConfiguracoesPage() {
         </div>
 
         {/* Section 4: SMTP / E-mails */}
-        <div className="bg-white rounded border border-slate-200 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center space-x-2">
             <Mail className="w-4 h-4 text-amber-600" />
             <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
@@ -307,7 +379,7 @@ export default function AdminConfiguracoesPage() {
         </div>
 
         {/* Section 5: Firebase Cloud Database */}
-        <div className="bg-white rounded border border-slate-200 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <ShieldCheck className="w-4 h-4 text-orange-500" />
@@ -330,25 +402,71 @@ export default function AdminConfiguracoesPage() {
           </div>
         </div>
 
-        {/* Submit */}
-        <div className="flex items-center justify-end space-x-3">
-          <Link
-            href="/dashboard/admin"
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded transition"
-          >
-            Cancelar
-          </Link>
-          <button
-            type="submit"
-            className="px-6 py-2 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-bold rounded flex items-center space-x-1.5 transition shadow-xs cursor-pointer"
-          >
-            <Save className="w-4 h-4" />
-            <span>Salvar Todas as Configurações</span>
-          </button>
+        {/* ==================================================================== */}
+        {/* BOTTOM ACTION BAR WITH VISUAL SAVE CONFIRMATION                      */}
+        {/* ==================================================================== */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 sticky bottom-4 z-40">
+          <div className="flex items-center gap-2">
+            {savedSuccess ? (
+              <div className="flex items-center gap-2 text-xs font-black text-emerald-700 bg-emerald-100/80 px-3.5 py-2 rounded-lg border border-emerald-300 animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>✅ Configurações salvas com sucesso!</span>
+              </div>
+            ) : isSaving ? (
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-700 bg-amber-50 px-3.5 py-2 rounded-lg border border-amber-200 animate-pulse">
+                <RefreshCw className="w-4 h-4 animate-spin text-amber-600" />
+                <span>Gravando alterações no banco...</span>
+              </div>
+            ) : errorMessage ? (
+              <div className="flex items-center gap-2 text-xs font-bold text-rose-700 bg-rose-50 px-3.5 py-2 rounded-lg border border-rose-200">
+                <AlertCircle className="w-4 h-4 text-rose-600" />
+                <span>{errorMessage}</span>
+              </div>
+            ) : (
+              <span className="text-xs text-slate-400">
+                Clique no botão ao lado para salvar todas as alterações realizadas.
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center space-x-3 shrink-0">
+            <Link
+              href="/dashboard/admin"
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition"
+            >
+              Cancelar
+            </Link>
+            
+            <button
+              type="submit"
+              disabled={isSaving}
+              className={`px-6 py-2.5 text-white text-xs font-black rounded-lg flex items-center space-x-2 transition shadow-md cursor-pointer ${
+                savedSuccess
+                  ? 'bg-emerald-600 hover:bg-emerald-700'
+                  : 'bg-[#00c853] hover:bg-[#00b84a]'
+              }`}
+            >
+              {isSaving ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Salvando...</span>
+                </>
+              ) : savedSuccess ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Salvo com Sucesso!</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>Salvar Todas as Configurações</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
       </form>
     </div>
   )
 }
-
