@@ -427,7 +427,7 @@ export default function GenealogiaPage() {
 
       {/* Modal de Edição de Ave / Genealogia */}
       {editingBird && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-md shadow-xl w-full max-w-lg border border-slate-200 overflow-hidden animate-scale-in">
             <div className="bg-slate-50 px-5 py-3.5 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-800">
@@ -545,7 +545,8 @@ export default function GenealogiaPage() {
                   <span>Salvar Alterações</span>
                 </button>
               </div>
-            </form>
+            </div>
+          </form>
           </div>
         </div>
       )}

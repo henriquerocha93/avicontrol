@@ -337,7 +337,7 @@ export function NovaGenealogiaEnvironment({
             <button
               type="button"
               onClick={handleZoomIn}
-              className="w-7 h-7 sm:w-8 sm:h-8 bg-[#94a3b8] hover:bg-[#64748b] active:bg-[#475569] text-white rounded flex items-center justify-center shadow-2xs transition cursor-pointer"
+              className="w-7 h-7 sm:w-8 sm:h-8 bg-[#94a3b8] hover:bg-[#64748b] active:bg-[#475569] text-white rounded flex items-center justify-center shadow-sm transition cursor-pointer"
               title="Expandir gerações ou aumentar zoom"
               aria-label="Aumentar zoom ou gerações"
             >
@@ -347,7 +347,7 @@ export function NovaGenealogiaEnvironment({
             <button
               type="button"
               onClick={handleZoomOut}
-              className="w-7 h-7 sm:w-8 sm:h-8 bg-[#94a3b8] hover:bg-[#64748b] active:bg-[#475569] text-white rounded flex items-center justify-center shadow-2xs transition cursor-pointer"
+              className="w-7 h-7 sm:w-8 sm:h-8 bg-[#94a3b8] hover:bg-[#64748b] active:bg-[#475569] text-white rounded flex items-center justify-center shadow-sm transition cursor-pointer"
               title="Recolher gerações ou diminuir zoom"
               aria-label="Diminuir zoom ou gerações"
             >
@@ -466,7 +466,7 @@ export function NovaGenealogiaEnvironment({
                       {/* Avô Paterno */}
                       <div
                         onClick={() => handleOpenSelector('patGF')}
-                        className="w-18 bg-white border border-gray-300 rounded p-1.5 text-center shadow-2xs hover:border-sky-500 cursor-pointer relative"
+                        className="w-18 bg-white border border-gray-300 rounded p-1.5 text-center shadow-sm hover:border-sky-500 cursor-pointer relative"
                         title="Avô Paterno ♂"
                       >
                         <span className="absolute top-0.5 right-1 text-[9px] text-sky-600 font-bold">♂</span>
@@ -480,7 +480,7 @@ export function NovaGenealogiaEnvironment({
                       {/* Avó Paterna */}
                       <div
                         onClick={() => handleOpenSelector('patGM')}
-                        className="w-18 bg-white border border-gray-300 rounded p-1.5 text-center shadow-2xs hover:border-rose-500 cursor-pointer relative"
+                        className="w-18 bg-white border border-gray-300 rounded p-1.5 text-center shadow-sm hover:border-rose-500 cursor-pointer relative"
                         title="Avó Paterna ♀"
                       >
                         <span className="absolute top-0.5 right-1 text-[9px] text-rose-500 font-bold">♀</span>
@@ -544,7 +544,7 @@ export function NovaGenealogiaEnvironment({
                       {/* Avô Materno */}
                       <div
                         onClick={() => handleOpenSelector('matGF')}
-                        className="w-18 bg-white border border-gray-300 rounded p-1.5 text-center shadow-2xs hover:border-sky-500 cursor-pointer relative"
+                        className="w-18 bg-white border border-gray-300 rounded p-1.5 text-center shadow-sm hover:border-sky-500 cursor-pointer relative"
                         title="Avô Materno ♂"
                       >
                         <span className="absolute top-0.5 right-1 text-[9px] text-sky-600 font-bold">♂</span>
@@ -558,7 +558,7 @@ export function NovaGenealogiaEnvironment({
                       {/* Avó Materna */}
                       <div
                         onClick={() => handleOpenSelector('matGM')}
-                        className="w-18 bg-white border border-gray-300 rounded p-1.5 text-center shadow-2xs hover:border-rose-500 cursor-pointer relative"
+                        className="w-18 bg-white border border-gray-300 rounded p-1.5 text-center shadow-sm hover:border-rose-500 cursor-pointer relative"
                         title="Avó Materna ♀"
                       >
                         <span className="absolute top-0.5 right-1 text-[9px] text-rose-500 font-bold">♀</span>
@@ -590,7 +590,7 @@ export function NovaGenealogiaEnvironment({
               <button
                 type="button"
                 onClick={onBack}
-                className="px-4 py-1.5 border border-gray-300 bg-[#e2e8f0] hover:bg-[#cbd5e1] active:bg-[#94a3b8] text-slate-700 font-semibold text-xs rounded shadow-2xs flex items-center gap-1 transition cursor-pointer"
+                className="px-4 py-1.5 border border-gray-300 bg-[#e2e8f0] hover:bg-[#cbd5e1] active:bg-[#94a3b8] text-slate-700 font-semibold text-xs rounded shadow-sm flex items-center gap-1 transition cursor-pointer"
               >
                 <ChevronLeft className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>Voltar</span>
@@ -599,7 +599,7 @@ export function NovaGenealogiaEnvironment({
               <Link href="/dashboard/genealogia">
                 <button
                   type="button"
-                  className="px-4 py-1.5 border border-gray-300 bg-[#e2e8f0] hover:bg-[#cbd5e1] active:bg-[#94a3b8] text-slate-700 font-semibold text-xs rounded shadow-2xs flex items-center gap-1 transition cursor-pointer"
+                  className="px-4 py-1.5 border border-gray-300 bg-[#e2e8f0] hover:bg-[#cbd5e1] active:bg-[#94a3b8] text-slate-700 font-semibold text-xs rounded shadow-sm flex items-center gap-1 transition cursor-pointer"
                 >
                   <ChevronLeft className="w-3.5 h-3.5 stroke-[2.5]" />
                   <span>Voltar</span>
@@ -628,7 +628,7 @@ export function NovaGenealogiaEnvironment({
       {/* SELECTION MODAL (POPUP WHEN CLICKING ON ANY NODE)                         */}
       {/* ========================================================================= */}
       {modalTarget && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-lg w-full p-5 space-y-4 max-h-[90vh] overflow-y-auto">
             
             {/* Modal Header */}
