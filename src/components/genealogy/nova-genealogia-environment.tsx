@@ -65,10 +65,12 @@ export function NovaGenealogiaEnvironment({
   showBackButton = true,
   onBack
 }: NovaGenealogiaEnvironmentProps) {
+  const [mounted, setMounted] = useState(false)
   const [allBirds, setAllBirds] = useState<Bird[]>([])
 
   // Safe load birds from database
   useEffect(() => {
+    setMounted(true)
     try {
       const list = db.getBirds()
       if (Array.isArray(list)) {
@@ -278,6 +280,19 @@ export function NovaGenealogiaEnvironment({
     const speciesStr = String(b.species || '').toLowerCase()
     return nameStr.includes(term) || ringStr.includes(term) || speciesStr.includes(term)
   }) : []
+
+  if (!mounted) {
+    return (
+      <div className="w-full max-w-7xl mx-auto py-2 sm:py-4 px-2 sm:px-4 font-sans space-y-4">
+        <div className="bg-white border border-gray-300 rounded-lg shadow-xs p-12 min-h-[460px] flex items-center justify-center">
+          <div className="flex items-center space-x-2 text-slate-500 text-xs font-semibold">
+            <div className="w-4 h-4 border-2 border-[#009fe3] border-t-transparent rounded-full animate-spin" />
+            <span>Carregando Genealogia...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="w-full max-w-7xl mx-auto py-2 sm:py-4 px-2 sm:px-4 font-sans space-y-4">

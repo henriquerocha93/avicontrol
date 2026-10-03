@@ -61,15 +61,15 @@ export default function GenealogiaPage() {
 
     const query = appliedSearch.toLowerCase()
     if (searchField === 'ave') {
-      return b.name.toLowerCase().includes(query)
+      return String(b.name || '').toLowerCase().includes(query)
     } else if (searchField === 'anilha') {
-      return (b.ringNumber || '').toLowerCase().includes(query)
+      return String(b.ringNumber || '').toLowerCase().includes(query)
     } else if (searchField === 'pai') {
-      return (b.fatherName || '').toLowerCase().includes(query)
+      return String(b.fatherName || '').toLowerCase().includes(query)
     } else if (searchField === 'mae') {
-      return (b.motherName || '').toLowerCase().includes(query)
+      return String(b.motherName || '').toLowerCase().includes(query)
     } else if (searchField === 'especie') {
-      return (b.species || '').toLowerCase().includes(query)
+      return String(b.species || '').toLowerCase().includes(query)
     }
     return true
   })
