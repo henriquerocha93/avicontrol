@@ -19,7 +19,7 @@ import { db } from '@/lib/db'
 import { Bird } from '@/types'
 import { PrintPedigreeModal } from '@/components/modals/print-pedigree-modal'
 import { PrintBadgeModal } from '@/components/modals/print-badge-modal'
-import NovaGenealogiaPage from '@/app/dashboard/configuracoes/nova-genealogia/page'
+import { NovaGenealogiaEnvironment } from '@/components/genealogy/nova-genealogia-environment'
 
 export default function GenealogiaPage() {
   const tenant = db.getTenant()
@@ -203,7 +203,7 @@ export default function GenealogiaPage() {
     </div>
 
       {viewMode === 'TREE' ? (
-        <NovaGenealogiaPage 
+        <NovaGenealogiaEnvironment 
           initialBirdId={selectedTreeBirdId} 
           showBackButton={false} 
         />
