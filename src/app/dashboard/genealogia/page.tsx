@@ -133,16 +133,25 @@ export default function GenealogiaPage() {
           <span className="text-xs font-bold text-slate-800">Árvore Genealógica</span>
         </div>
 
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setIsTrainingOpen(!isTrainingOpen)}
-            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded border border-slate-300 flex items-center space-x-1.5 transition"
+        <div className="flex items-center space-x-2">
+          <Link
+            href="/dashboard/configuracoes/nova-genealogia"
+            className="px-3 py-1.5 bg-[#009fe3] hover:bg-[#008ac7] text-white text-xs font-semibold rounded flex items-center space-x-1.5 shadow-2xs transition"
           >
-            <Video className="w-3.5 h-3.5 text-slate-600" />
-            <span>Treinamento</span>
-            <ChevronDown className="w-3 h-3 text-slate-500" />
-          </button>
+            <Edit3 className="w-3.5 h-3.5" />
+            <span>Nova Genealogia</span>
+          </Link>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsTrainingOpen(!isTrainingOpen)}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded border border-slate-300 flex items-center space-x-1.5 transition"
+            >
+              <Video className="w-3.5 h-3.5 text-slate-600" />
+              <span>Treinamento</span>
+              <ChevronDown className="w-3 h-3 text-slate-500" />
+            </button>
 
           {isTrainingOpen && (
             <div className="absolute right-0 mt-1 w-56 bg-white rounded shadow-lg border border-slate-200 py-1 z-20 text-xs">
