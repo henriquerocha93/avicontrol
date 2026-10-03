@@ -45,6 +45,7 @@ import { Button } from '@/components/ui/button';
 import { DynamicDaytimeAmbience } from '@/components/landing/dynamic-daytime-ambience';
 import { LiveBreedingStatus } from '@/components/landing/live-breeding-status';
 import { DailyProofsSection } from '@/components/landing/daily-proofs-section';
+import { PrintableBadgePreview } from '@/components/landing/printable-badge-preview';
 
 type SectionId = 'recursos' | 'comparativo' | 'pedigree' | 'criatorios' | 'ambiente' | 'planos';
 
@@ -637,32 +638,9 @@ export default function LandingPage() {
                       <Scan className="w-3.5 h-3.5" /> Demonstração Visual do Recurso:
                     </div>
 
-                    {/* Genealogy Preview */}
+                    {/* Genealogy Preview: Crachá da Árvore Genealógica Oficial Pronto para Impressão */}
                     {activeModule.previewType === 'genealogy' && (
-                      <div className="p-4 rounded-2xl bg-[#08150f] border border-emerald-700/50 space-y-3 font-mono text-xs">
-                        <div className="flex justify-between items-center pb-2 border-b border-emerald-900/60">
-                          <span className="text-emerald-300 font-bold">AVE: Soberano Real (FOB-2024-BR-0891)</span>
-                          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-700/60 text-[10px]">
-                            COI: 3.12% (Excelente)
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-[11px]">
-                          <div className="p-2.5 rounded-xl bg-emerald-950/50 border border-emerald-800/40">
-                            <span className="text-slate-400 block text-[9px] uppercase">Pai (Gen. I)</span>
-                            <span className="text-white font-bold">Trovão Negro ♂</span>
-                            <span className="text-[10px] text-emerald-400 block">FOB-2022-BR-4401</span>
-                          </div>
-                          <div className="p-2.5 rounded-xl bg-rose-950/30 border border-rose-800/30">
-                            <span className="text-slate-400 block text-[9px] uppercase">Mãe (Gen. I)</span>
-                            <span className="text-white font-bold">Rainha do Ouro ♀</span>
-                            <span className="text-[10px] text-rose-300 block">FOB-2023-BR-1182</span>
-                          </div>
-                        </div>
-                        <div className="flex justify-between items-center text-[10px] text-slate-400 pt-1">
-                          <span>✓ Cálculo automatizado de 5 gerações</span>
-                          <span className="text-emerald-400">PDF A4 Pronto para Impressão →</span>
-                        </div>
-                      </div>
+                      <PrintableBadgePreview />
                     )}
 
                     {/* Breeding Preview */}
