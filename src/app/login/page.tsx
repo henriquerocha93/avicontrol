@@ -31,6 +31,10 @@ export default function LoginPage() {
   const [captchaInput, setCaptchaInput] = useState('');
   const [captchaCode, setCaptchaCode] = useState('3505');
   
+  // Remember credentials & Session persistence
+  const [rememberPassword, setRememberPassword] = useState(false);
+  const [keepLoggedIn, setKeepLoggedIn] = useState(true);
+  
   // Validation error states
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
@@ -48,6 +52,25 @@ export default function LoginPage() {
 
   useEffect(() => {
     generateCaptcha();
+
+    // Load saved credentials from localStorage if user previously chose "Salvar senha"
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('birdpro_saved_credentials');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.email) setEmail(parsed.email);
+          if (parsed.password) setPassword(parsed.password);
+          setRememberPassword(true);
+        }
+        const savedKeep = localStorage.getItem('birdpro_keep_logged_in');
+        if (savedKeep !== null) {
+          setKeepLoggedIn(savedKeep === 'true');
+        }
+      }
+    } catch (e) {
+      // Ignore storage errors
+    }
   }, []);
 
   const validateForm = (): boolean => {
@@ -110,6 +133,20 @@ export default function LoginPage() {
         setAuthError('E-mail ou senha incorretos. Verifique suas credenciais e tente novamente.');
         generateCaptcha();
         return;
+      }
+
+      // Handle "Salvar senha" and "Manter conectado"
+      try {
+        if (typeof window !== 'undefined') {
+          if (rememberPassword) {
+            localStorage.setItem('birdpro_saved_credentials', JSON.stringify({ email: email.trim(), password }));
+          } else {
+            localStorage.removeItem('birdpro_saved_credentials');
+          }
+          localStorage.setItem('birdpro_keep_logged_in', keepLoggedIn ? 'true' : 'false');
+        }
+      } catch (e) {
+        // Ignore storage errors
       }
 
       const clean = email.toLowerCase().trim();
@@ -181,13 +218,15 @@ export default function LoginPage() {
                 </div>
                 <input
                   type="email"
+                  name="email"
+                  id="email"
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
                     if (emailError) setEmailError('');
                   }}
                   placeholder="seu.email@exemplo.com"
-                  autoComplete="email"
+                  autoComplete="username email"
                   className="w-full px-3.5 py-3 bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:outline-none font-medium"
                 />
               </div>
@@ -206,6 +245,8 @@ export default function LoginPage() {
                 </div>
                 <input
                   type="password"
+                  name="password"
+                  id="password"
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
@@ -276,6 +317,33 @@ export default function LoginPage() {
               >
                 <RotateCw className="w-5 h-5" />
               </button>
+            </div>
+
+            {/* Remember Password & Keep Logged In Checkboxes */}
+            <div className="flex items-center justify-between pt-1 pb-1 px-0.5 select-none">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={rememberPassword}
+                  onChange={(e) => setRememberPassword(e.target.checked)}
+                  className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer accent-[#00c853]"
+                />
+                <span className="text-xs font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">
+                  Salvar senha
+                </span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={keepLoggedIn}
+                  onChange={(e) => setKeepLoggedIn(e.target.checked)}
+                  className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer accent-[#00c853]"
+                />
+                <span className="text-xs font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">
+                  Manter conectado
+                </span>
+              </label>
             </div>
 
             {/* Action Bar: Submit & Forgot Password */}
