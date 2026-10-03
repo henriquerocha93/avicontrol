@@ -506,20 +506,29 @@ export default function AssinaturaPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 block">Parcelas PagBank</label>
+                    <label className="text-[11px] font-bold text-slate-700 block">Parcelamento no Cartão de Crédito</label>
                     <select
                       value={cardInstallments}
                       onChange={(e) => setCardInstallments(e.target.value)}
                       className="w-full h-8.5 px-2.5 text-xs bg-white border border-slate-300 rounded-lg font-medium focus:outline-none focus:border-[#00c853]"
                     >
-                      <option value="1">1x de {formatCurrency(finalPrice)} (Sem juros)</option>
-                      {billingCycle === 'ANNUAL' && (
+                      <option value="1">1x de {formatCurrency(finalPrice)} (À vista)</option>
+                      {billingCycle === 'ANNUAL' ? (
                         <>
                           <option value="2">2x de {formatCurrency(finalPrice / 2)} (Sem juros)</option>
                           <option value="3">3x de {formatCurrency(finalPrice / 3)} (Sem juros)</option>
+                          <option value="4">4x de {formatCurrency(finalPrice / 4)} (Sem juros)</option>
+                          <option value="5">5x de {formatCurrency(finalPrice / 5)} (Sem juros)</option>
                           <option value="6">6x de {formatCurrency(finalPrice / 6)} (Sem juros)</option>
-                          <option value="12">12x de {formatCurrency((finalPrice * 1.08) / 12)} (PagBank)</option>
+                          <option value="7">7x de {formatCurrency((finalPrice * 1.04) / 7)}</option>
+                          <option value="8">8x de {formatCurrency((finalPrice * 1.05) / 8)}</option>
+                          <option value="9">9x de {formatCurrency((finalPrice * 1.06) / 9)}</option>
+                          <option value="10">10x de {formatCurrency((finalPrice * 1.07) / 10)}</option>
+                          <option value="11">11x de {formatCurrency((finalPrice * 1.08) / 11)}</option>
+                          <option value="12">12x de {formatCurrency((finalPrice * 1.09) / 12)}</option>
                         </>
+                      ) : (
+                        <option value="1">1x de {formatCurrency(finalPrice)} (Mensalidade)</option>
                       )}
                     </select>
                   </div>
