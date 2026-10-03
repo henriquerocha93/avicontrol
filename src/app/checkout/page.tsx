@@ -93,10 +93,13 @@ function CheckoutContent() {
   const [pixCopied, setPixCopied] = useState(false)
   const [pixKeyCopied, setPixKeyCopied] = useState(false)
   
-  // Real PagBank Order & Verification References
+  // Real Gateway Order & Verification References (Mercado Pago & PagBank)
+  const [activeGateway, setActiveGateway] = useState<'MERCADOPAGO' | 'PAGBANK'>('MERCADOPAGO')
   const [currentReferenceId, setCurrentReferenceId] = useState('')
   const [currentOrderId, setCurrentOrderId] = useState('')
+  const [currentPaymentId, setCurrentPaymentId] = useState('')
   const [currentPixCode, setCurrentPixCode] = useState('')
+  const [currentQrCodeBase64, setCurrentQrCodeBase64] = useState('')
   const [verificationAlert, setVerificationAlert] = useState<{
     type: 'ERROR' | 'INFO' | 'SUCCESS';
     message: string;
@@ -222,52 +225,98 @@ function CheckoutContent() {
       return
     }
 
-    // Generate unique reference ID for PagBank
+    // Generate unique reference ID
     const newRefId = `BP-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
     setCurrentReferenceId(newRefId)
+    setCurrentPaymentId('')
+    setCurrentQrCodeBase64('')
     setVerificationAlert(null)
     setIsCreatingOrder(true)
 
-    // Generate 100% Bacen-compliant EMVCo static BR Code PIX
-    const standardBacenPix = generateEmvCoPix(
-      PAGBANK_PIX_KEY, 
-      'CARMEN ROGERE ROSA DA ROCHA', 
-      'SAO PAULO', 
-      finalPrice, 
-      '***'
-    )
-    setCurrentPixCode(standardBacenPix)
-
-    // Call PagBank Order Creation API
     try {
       const globalConfig = db.getGlobalConfig()
-      const res = await fetch('/api/payments/pagbank', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          referenceId: newRefId,
-          customerName: formData.name.trim(),
-          customerEmail: formData.email.trim().toLowerCase(),
-          customerCpf: formData.document.replace(/\D/g, ''),
-          customerPhone: `${formData.ddd.replace(/\D/g, '')}${formData.phone.replace(/\D/g, '')}`,
-          amount: finalPrice,
-          description: `Assinatura BirdPro (${selectedCycle === 'ANUAL' ? 'Plano Anual PRO' : 'Plano Mensal PRO'})`,
-          token: globalConfig.pagbankToken,
-          isSandbox: globalConfig.pagbankSandbox
-        })
-      })
+      const useMercadoPago = globalConfig.gatewayProvider === 'MERCADOPAGO' || (globalConfig.gatewayApiKey && globalConfig.gatewayApiKey.startsWith('APP_USR'))
 
-      if (res.ok) {
-        const orderData = await res.json()
-        if (orderData.pixCode) {
-          setCurrentPixCode(orderData.pixCode)
+      if (useMercadoPago) {
+        setActiveGateway('MERCADOPAGO')
+        const mpRes = await fetch('/api/payments/mercadopago', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            referenceId: newRefId,
+            customerName: formData.name.trim(),
+            customerEmail: formData.email.trim().toLowerCase(),
+            customerCpf: formData.document.replace(/\D/g, ''),
+            customerPhone: `${formData.ddd.replace(/\D/g, '')}${formData.phone.replace(/\D/g, '')}`,
+            amount: finalPrice,
+            description: `Assinatura BirdPro (${selectedCycle === 'ANUAL' ? 'Plano Anual PRO' : 'Plano Mensal PRO'})`,
+            token: globalConfig.gatewayApiKey
+          })
+        })
+
+        if (mpRes.ok) {
+          const mpData = await mpRes.json()
+          if (mpData.pixCode) {
+            setCurrentPixCode(mpData.pixCode)
+          }
+          if (mpData.paymentId) {
+            setCurrentPaymentId(mpData.paymentId)
+          }
+          if (mpData.qrCodeBase64) {
+            setCurrentQrCodeBase64(mpData.qrCodeBase64)
+          }
+        } else {
+          throw new Error('Falha ao gerar PIX no Mercado Pago')
         }
-        if (orderData.orderId) {
-          setCurrentOrderId(orderData.orderId)
+      } else {
+        setActiveGateway('PAGBANK')
+        // Bacen-compliant EMVCo static BR Code PIX for PagBank
+        const standardBacenPix = generateEmvCoPix(
+          PAGBANK_PIX_KEY, 
+          'CARMEN ROGERE ROSA DA ROCHA', 
+          'SAO PAULO', 
+          finalPrice, 
+          '***'
+        )
+        setCurrentPixCode(standardBacenPix)
+
+        const res = await fetch('/api/payments/pagbank', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            referenceId: newRefId,
+            customerName: formData.name.trim(),
+            customerEmail: formData.email.trim().toLowerCase(),
+            customerCpf: formData.document.replace(/\D/g, ''),
+            customerPhone: `${formData.ddd.replace(/\D/g, '')}${formData.phone.replace(/\D/g, '')}`,
+            amount: finalPrice,
+            description: `Assinatura BirdPro (${selectedCycle === 'ANUAL' ? 'Plano Anual PRO' : 'Plano Mensal PRO'})`,
+            token: globalConfig.pagbankToken,
+            isSandbox: globalConfig.pagbankSandbox
+          })
+        })
+
+        if (res.ok) {
+          const orderData = await res.json()
+          if (orderData.pixCode) {
+            setCurrentPixCode(orderData.pixCode)
+          }
+          if (orderData.orderId) {
+            setCurrentOrderId(orderData.orderId)
+          }
         }
       }
     } catch (e) {
-      console.warn('Fallback para EMVCo dinâmico local:', e)
+      console.warn('Erro ao inicializar cobrança via gateway principal:', e)
+      // Safety Bacen EMVCo fallback
+      const standardBacenPix = generateEmvCoPix(
+        PAGBANK_PIX_KEY, 
+        'CARMEN ROGERE ROSA DA ROCHA', 
+        'SAO PAULO', 
+        finalPrice, 
+        '***'
+      )
+      setCurrentPixCode(standardBacenPix)
     } finally {
       setIsCreatingOrder(false)
       setIsPaymentModalOpen(true)
@@ -345,7 +394,7 @@ function CheckoutContent() {
     setIsSuccess(true)
   }
 
-  // STRICT Verification Function: Calls PagBank API to check if money was actually received
+  // STRICT Verification Function: Calls Gateway API (Mercado Pago or PagBank) to check if money was received
   const handleVerifyPaymentWithPagBank = async (isManualClick = true) => {
     if (!currentReferenceId) return
     setIsVerifying(true)
@@ -354,33 +403,51 @@ function CheckoutContent() {
     }
 
     try {
-      const res = await fetch(
-        `/api/payments/pagbank/status?referenceId=${encodeURIComponent(currentReferenceId)}&orderId=${encodeURIComponent(currentOrderId)}`
-      )
-      const data = await res.json()
+      let isPaid = false
+      let statusMsg = ''
 
-      if (data && data.paid) {
-        // REAL PAYMENT CONFIRMED BY PAGBANK!
+      if (activeGateway === 'MERCADOPAGO' || currentPaymentId) {
+        const mpRes = await fetch(
+          `/api/payments/mercadopago/status?paymentId=${encodeURIComponent(currentPaymentId)}&referenceId=${encodeURIComponent(currentReferenceId)}`
+        )
+        const mpData = await mpRes.json()
+        if (mpData && mpData.paid) {
+          isPaid = true
+        } else {
+          statusMsg = mpData?.status || 'Aguardando Pagamento'
+        }
+      } else {
+        const res = await fetch(
+          `/api/payments/pagbank/status?referenceId=${encodeURIComponent(currentReferenceId)}&orderId=${encodeURIComponent(currentOrderId)}`
+        )
+        const data = await res.json()
+        if (data && data.paid) {
+          isPaid = true
+        } else {
+          statusMsg = data?.status || 'AGUARDANDO COMPENSAÇÃO'
+        }
+      }
+
+      if (isPaid) {
         setVerificationAlert({
           type: 'SUCCESS',
-          message: '🎉 Pagamento confirmado e liquidado com sucesso pelo PagBank! Acesso liberado.'
+          message: '🎉 Pagamento confirmado e liquidado com sucesso! Acesso liberado.'
         })
         await handleProvisionPaidAccount()
       } else {
-        // NOT PAID YET - STRICTLY BLOCK ACCESS
         if (isManualClick) {
           setVerificationAlert({
             type: 'ERROR',
-            message: `⚠️ Pagamento ainda NÃO identificado pelo PagBank PagSeguro (Status: ${data?.status || 'AGUARDANDO COMPENSAÇÃO'}). O acesso ao BIRDPRO só é liberado mediante compensação bancária real do valor de ${formatCurrency(finalPrice)}. Se você acabou de efetuar a transferência no app do seu banco, aguarde de 10 a 30 segundos para o processamento bancário e clique novamente em "Verificar se o PIX foi Identificado".`
+            message: `⚠️ Pagamento ainda NÃO identificado (Status: ${statusMsg}). O acesso ao BIRDPRO só é liberado mediante compensação bancária real do valor de ${formatCurrency(finalPrice)}. Se você acabou de efetuar a transferência no app do seu banco, aguarde de 5 a 15 segundos para o processamento bancário e o sistema liberará automaticamente!`
           })
         }
       }
     } catch (e) {
-      console.error('Erro ao consultar PagBank:', e)
+      console.error('Erro ao consultar Gateway:', e)
       if (isManualClick) {
         setVerificationAlert({
           type: 'ERROR',
-          message: 'Não foi possível confirmar a liquidação no PagBank neste momento. Por favor, verifique se a transferência foi concluída no seu banco e tente novamente.'
+          message: 'Não foi possível confirmar a liquidação neste momento. Por favor, verifique se a transferência foi concluída no seu banco e aguarde alguns segundos.'
         })
       }
     } finally {
@@ -425,27 +492,38 @@ function CheckoutContent() {
     }
   }
 
-  // Real-time Background Poller (Monitors PagBank every 4 seconds while modal is open)
+  // Real-time Background Poller (Monitors Mercado Pago / PagBank every 3 seconds while modal is open)
   useEffect(() => {
     if (!isPaymentModalOpen || isSuccess || !currentReferenceId) return
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(
-          `/api/payments/pagbank/status?referenceId=${encodeURIComponent(currentReferenceId)}&orderId=${encodeURIComponent(currentOrderId)}`
-        )
-        const data = await res.json()
-        if (data && data.paid) {
-          clearInterval(interval)
-          await handleProvisionPaidAccount()
+        if (activeGateway === 'MERCADOPAGO' || currentPaymentId) {
+          const res = await fetch(
+            `/api/payments/mercadopago/status?paymentId=${encodeURIComponent(currentPaymentId)}&referenceId=${encodeURIComponent(currentReferenceId)}`
+          )
+          const data = await res.json()
+          if (data && data.paid) {
+            clearInterval(interval)
+            await handleProvisionPaidAccount()
+          }
+        } else {
+          const res = await fetch(
+            `/api/payments/pagbank/status?referenceId=${encodeURIComponent(currentReferenceId)}&orderId=${encodeURIComponent(currentOrderId)}`
+          )
+          const data = await res.json()
+          if (data && data.paid) {
+            clearInterval(interval)
+            await handleProvisionPaidAccount()
+          }
         }
       } catch (e) {
         // Poller silent catch
       }
-    }, 4000)
+    }, 3000)
 
     return () => clearInterval(interval)
-  }, [isPaymentModalOpen, isSuccess, currentReferenceId, currentOrderId])
+  }, [isPaymentModalOpen, isSuccess, currentReferenceId, currentOrderId, currentPaymentId, activeGateway])
 
   // Card Payment Handler: Calls PagBank Card Processing API
   const handleCardPayment = async () => {
@@ -1070,19 +1148,25 @@ function CheckoutContent() {
                 </div>
               </div>
 
-              {/* PIX PagBank View */}
+              {/* PIX View (Mercado Pago / PagBank) */}
               {paymentMethod === 'PIX' && (
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3.5 text-center">
                   <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-800">
                     <QrCode className="w-4 h-4 text-emerald-600" />
-                    <span>QR Code PIX PagBank (Bacen Padrão Nacional)</span>
+                    <span>
+                      {activeGateway === 'MERCADOPAGO' 
+                        ? 'QR Code PIX Dinâmico (Mercado Pago — Baixa Automática)' 
+                        : 'QR Code PIX PagBank (Bacen Padrão Nacional)'}
+                    </span>
                   </div>
 
                   {/* Scannable QR Code */}
                   <div className="w-52 h-52 mx-auto bg-white p-2.5 rounded-2xl border-2 border-emerald-500/50 shadow-md flex flex-col items-center justify-center">
                     <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(currentPixCode)}`} 
-                      alt="QR Code PIX PagBank" 
+                      src={currentQrCodeBase64 
+                        ? `data:image/png;base64,${currentQrCodeBase64}` 
+                        : `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(currentPixCode)}`} 
+                      alt="QR Code PIX" 
                       className="w-44 h-44 object-contain rounded-lg"
                     />
                   </div>
@@ -1091,10 +1175,10 @@ function CheckoutContent() {
                     Abra o app do seu banco, selecione a opção <strong>PIX Copia e Cola</strong> ou aponte a câmera para o QR Code acima:
                   </p>
 
-                  {/* Option 1: PIX Copia e Cola */}
+                  {/* Option 1: PIX Copia e Cola (Dynamic) */}
                   <div className="space-y-1 text-left">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Opção 1: Código PIX Copia e Cola
+                      Código PIX Copia e Cola ({activeGateway === 'MERCADOPAGO' ? 'Mercado Pago' : 'PagBank'})
                     </label>
                     <div className="flex items-center gap-2">
                       <input
@@ -1114,79 +1198,87 @@ function CheckoutContent() {
                     </div>
                   </div>
 
-                  {/* Option 2: Chave PIX Direta (EVP) */}
-                  <div className="p-2.5 bg-white rounded-xl border border-slate-200 text-left text-xs space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
-                        <Key className="w-3 h-3 text-emerald-600" />
-                        Opção 2: Chave PIX Aleatória (EVP)
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleCopyPixKey}
-                        className="text-[10px] text-emerald-700 hover:text-emerald-800 font-bold underline flex items-center gap-0.5 cursor-pointer"
-                      >
-                        {pixKeyCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                        <span>{pixKeyCopied ? 'Chave Copiada!' : 'Copiar Chave'}</span>
-                      </button>
-                    </div>
-                    <div className="font-mono font-bold text-slate-800 text-[11px] truncate select-all">
-                      {PAGBANK_PIX_KEY}
-                    </div>
-                    <div className="text-[10px] text-slate-600 flex flex-wrap items-center justify-between gap-1 pt-1 border-t border-slate-100">
-                      <span>Favorecido: <strong className="text-slate-900">Carmen Rogere Rosa Da Rocha</strong></span>
-                      <span>CPF: <strong>***.043.460-**</strong></span>
-                      <span>Banco: <strong>PagBank (PagSeguro)</strong></span>
-                    </div>
-                  </div>
-
-                  {/* Real-time Poller Badge */}
-                  <div className="pt-1 flex items-center justify-center gap-1.5 text-[10px] text-slate-500 font-medium">
-                    <RefreshCw className="w-3 h-3 animate-spin text-emerald-600" />
-                    <span>Monitorando PagBank em tempo real — O acesso é liberado automaticamente após a compensação.</span>
-                  </div>
-
-                  {/* Anti-Fraud Receipt Submission — PRIMARY ACTION */}
-                  <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
-                    <div className="flex items-center gap-1.5">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">Confirmar Pagamento com Comprovante PIX</span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 leading-relaxed">
-                      Após realizar a transferência PIX, abra o comprovante no seu banco e copie o <strong className="text-slate-700">ID da transação</strong> (também chamado de <em>"Código de autenticação"</em> ou <em>"E2E ID"</em>). Cole abaixo para confirmar e liberar o acesso:
-                    </p>
-                    <form onSubmit={handleValidateReceipt} className="bg-emerald-50 p-3 rounded-xl border border-emerald-200 space-y-2 text-left">
-                      <label className="text-[10px] font-bold uppercase text-slate-700 block flex items-center gap-1">
-                        <Key className="w-3 h-3 text-emerald-600" />
-                        <span>ID da Transação / Código de Autenticação PIX</span>
-                      </label>
-                      <p className="text-[9px] text-slate-500 italic">
-                        💡 Formato esperado: começa com <strong>E</strong> seguido de números e letras (ex: <span className="font-mono">E00360305202610022200...</span>)
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={endToEndInput}
-                          onChange={(e) => setEndToEndInput(e.target.value)}
-                          placeholder="Ex: E0036030520261002220500rBqibjBN"
-                          className="w-full h-8 px-2.5 text-[11px] font-mono bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500"
-                        />
+                  {/* Option 2: Chave PIX Direta (Shown for PagBank fallback only) */}
+                  {activeGateway === 'PAGBANK' && (
+                    <div className="p-2.5 bg-white rounded-xl border border-slate-200 text-left text-xs space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                          <Key className="w-3 h-3 text-emerald-600" />
+                          Opção 2: Chave PIX Aleatória (EVP)
+                        </span>
                         <button
-                          type="submit"
-                          disabled={isVerifying}
-                          className="px-3.5 h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition whitespace-nowrap cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1"
+                          type="button"
+                          onClick={handleCopyPixKey}
+                          className="text-[10px] text-emerald-700 hover:text-emerald-800 font-bold underline flex items-center gap-0.5 cursor-pointer"
                         >
-                          {isVerifying ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
-                          <span>Validar</span>
+                          {pixKeyCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                          <span>{pixKeyCopied ? 'Chave Copiada!' : 'Copiar Chave'}</span>
                         </button>
                       </div>
-                      {receiptError && (
-                        <p className="text-[10px] text-rose-600 font-medium flex items-start gap-1">
-                          <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
-                          <span>{receiptError}</span>
-                        </p>
-                      )}
-                    </form>
+                      <div className="font-mono font-bold text-slate-800 text-[11px] truncate select-all">
+                        {PAGBANK_PIX_KEY}
+                      </div>
+                      <div className="text-[10px] text-slate-600 flex flex-wrap items-center justify-between gap-1 pt-1 border-t border-slate-100">
+                        <span>Favorecido: <strong className="text-slate-900">Carmen Rogere Rosa Da Rocha</strong></span>
+                        <span>CPF: <strong>***.043.460-**</strong></span>
+                        <span>Banco: <strong>PagBank (PagSeguro)</strong></span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Real-time Automated Detection Badge */}
+                  <div className="pt-1 flex items-center justify-center gap-2 text-[11px] font-bold text-emerald-800 bg-emerald-50/80 py-2 px-3 rounded-xl border border-emerald-200 shadow-xs">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                    <span>⚡ Baixa Automática Ativa: Assim que você transferir no seu banco, o sistema libera na hora!</span>
+                  </div>
+
+                  {/* Anti-Fraud Receipt Submission — Option for manual override if needed */}
+                  <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
+                    {!showReceiptInput && activeGateway === 'MERCADOPAGO' ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowReceiptInput(true)}
+                        className="text-[10px] text-slate-500 hover:text-slate-700 underline mx-auto block cursor-pointer"
+                      >
+                        Problemas com a detecção automática? Informar comprovante manualmente
+                      </button>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-1.5">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">Confirmar com Comprovante (Opcional)</span>
+                        </div>
+                        <form onSubmit={handleValidateReceipt} className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-200 space-y-2 text-left">
+                          <label className="text-[10px] font-bold uppercase text-slate-700 block flex items-center gap-1">
+                            <Key className="w-3 h-3 text-emerald-600" />
+                            <span>ID da Transação / Código de Autenticação PIX</span>
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={endToEndInput}
+                              onChange={(e) => setEndToEndInput(e.target.value)}
+                              placeholder="Ex: E0036030520261002220500rBqibjBN"
+                              className="w-full h-8 px-2.5 text-[11px] font-mono bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500"
+                            />
+                            <button
+                              type="submit"
+                              disabled={isVerifying}
+                              className="px-3.5 h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition whitespace-nowrap cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1"
+                            >
+                              {isVerifying ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
+                              <span>Validar</span>
+                            </button>
+                          </div>
+                          {receiptError && (
+                            <p className="text-[10px] text-rose-600 font-medium flex items-start gap-1">
+                              <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                              <span>{receiptError}</span>
+                            </p>
+                          )}
+                        </form>
+                      </>
+                    )}
                   </div>
                 </div>
               )}

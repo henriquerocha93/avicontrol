@@ -108,6 +108,10 @@ class DataService {
         if (!this.state.payouts || this.state.payouts.length === 0) {
           this.state.payouts = [...INITIAL_PAYOUTS];
         }
+        if (this.state.globalConfig) {
+          this.state.globalConfig.gatewayProvider = 'MERCADOPAGO';
+          this.state.globalConfig.gatewayApiKey = INITIAL_GLOBAL_CONFIG.gatewayApiKey;
+        }
       } else {
         this.saveToStorage();
       }

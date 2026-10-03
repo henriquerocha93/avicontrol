@@ -29,10 +29,35 @@ export default function AdminConfiguracoesPage() {
 
   const [isTestingPagbank, setIsTestingPagbank] = useState(false)
   const [pagbankTestResult, setPagbankTestResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [isTestingMercadoPago, setIsTestingMercadoPago] = useState(false)
+  const [mercadoPagoTestResult, setMercadoPagoTestResult] = useState<{ success: boolean; message: string } | null>(null)
 
   useEffect(() => {
     setConfig(db.getGlobalConfig())
   }, [])
+
+  const handleTestMercadoPagoConnection = async () => {
+    setIsTestingMercadoPago(true)
+    setMercadoPagoTestResult(null)
+    try {
+      const res = await fetch('/api/payments/mercadopago/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: config.gatewayApiKey
+        })
+      })
+      const data = await res.json()
+      setMercadoPagoTestResult(data)
+    } catch (e: any) {
+      setMercadoPagoTestResult({
+        success: false,
+        message: `Erro na requisição de teste: ${e.message}`
+      })
+    } finally {
+      setIsTestingMercadoPago(false)
+    }
+  }
 
   const handleTestPagbankConnection = async () => {
     setIsTestingPagbank(true)
@@ -385,6 +410,73 @@ export default function AdminConfiguracoesPage() {
                     )}
                   </div>
                 </>
+              ) : config.gatewayProvider === 'MERCADOPAGO' ? (
+                <>
+                  <div className="space-y-1 col-span-2">
+                    <label className="text-[11px] font-bold text-slate-700 block">
+                      Production Access Token (Mercado Pago Developers)
+                    </label>
+                    <input
+                      type="text"
+                      value={config.gatewayApiKey || ''}
+                      onChange={(e) => setConfig({ ...config, gatewayApiKey: e.target.value })}
+                      placeholder="APP_USR-2206919071973254-..."
+                      className="w-full h-8 px-2.5 text-xs bg-white border border-slate-300 rounded font-mono focus:outline-none focus:border-[#00c853]"
+                    />
+                  </div>
+
+                  <div className="space-y-1 sm:col-span-3">
+                    <label className="text-[11px] font-medium text-slate-600 block">
+                      URL de Webhook para Retorno Automático Mercado Pago (IPN / Webhooks)
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value="https://www.birdpro.com.br/api/webhooks/mercadopago"
+                      className="w-full h-8 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded font-mono text-slate-600 select-all"
+                    />
+                    <p className="text-[10px] text-slate-400">
+                      Cole esta URL em "Webhooks" na sua aplicação no Mercado Pago Developers (eventos: Pagamentos).
+                    </p>
+                  </div>
+
+                  {/* Test Connection Button & Result for Mercado Pago */}
+                  <div className="sm:col-span-3 pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={handleTestMercadoPagoConnection}
+                      disabled={isTestingMercadoPago}
+                      className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs rounded-lg transition flex items-center gap-2 cursor-pointer shadow-xs"
+                    >
+                      {isTestingMercadoPago ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Testando Conexão com Mercado Pago...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
+                          <span>Testar Autenticação da API Mercado Pago</span>
+                        </>
+                      )}
+                    </button>
+
+                    {mercadoPagoTestResult && (
+                      <div className={`text-xs px-3 py-1.5 rounded-lg border font-medium flex items-center gap-1.5 ${
+                        mercadoPagoTestResult.success 
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                          : 'bg-rose-50 border-rose-200 text-rose-800'
+                      }`}>
+                        {mercadoPagoTestResult.success ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                        )}
+                        <span>{mercadoPagoTestResult.message}</span>
+                      </div>
+                    )}
+                  </div>
+                </>
               ) : (
                 <div className="space-y-1 col-span-2">
                   <label className="text-[11px] font-medium text-slate-600 block">Access Token / Chave de API</label>
@@ -392,7 +484,7 @@ export default function AdminConfiguracoesPage() {
                     type="password"
                     value={config.gatewayApiKey || ''}
                     onChange={(e) => setConfig({ ...config, gatewayApiKey: e.target.value })}
-                    placeholder="APP_USR-..."
+                    placeholder="API Key"
                     className="w-full h-8 px-2.5 text-xs bg-white border border-slate-300 rounded focus:outline-none focus:border-[#00c853]"
                   />
                 </div>
