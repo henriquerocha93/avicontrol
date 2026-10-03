@@ -57,7 +57,7 @@ export default function AssinaturaPage() {
 
   // PagBank PIX Code generation
   const globalConfig = db.getGlobalConfig();
-  const pagbankPixKey = globalConfig.pagbankPixKey || '5555991343265';
+  const pagbankPixKey = globalConfig.pagbankPixKey || '6f33236f-92cb-4012-b0a8-332e3af35039';
   const txid = `PGB${Date.now().toString().slice(-8)}`;
   const currentPixCode = generateEmvCoPix(
     pagbankPixKey, 

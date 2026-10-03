@@ -170,7 +170,7 @@ export async function createPagBankPixOrder(params: PagBankPixOrderRequest): Pro
 
   // Standalone dynamic PagBank PIX payload (EMVCo BR Code format)
   const txid = `PAGBANK${Date.now().toString().slice(-8)}`;
-  const pixKey = '5555991343265'; // Chave PIX cadastrada do PagBank BirdPro
+  const pixKey = '6f33236f-92cb-4012-b0a8-332e3af35039'; // Chave PIX cadastrada do PagBank BirdPro
   const generatedCode = generateEmvCoPix(pixKey, 'BIRDPRO TECNOLOGIA', 'SAO PAULO', amount, txid);
 
   return {
