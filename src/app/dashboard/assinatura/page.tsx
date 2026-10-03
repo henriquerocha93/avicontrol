@@ -57,14 +57,13 @@ export default function AssinaturaPage() {
 
   // PagBank PIX Code generation
   const globalConfig = db.getGlobalConfig();
-  const pagbankPixKey = globalConfig.pagbankPixKey || '6f33236f-92cb-4012-b0a8-332e3af35039';
-  const txid = `PGB${Date.now().toString().slice(-8)}`;
+  const pagbankPixKey = globalConfig.pagbankPixKey || '6f33236f-92cb-4812-b0a8-332e3af35839';
   const currentPixCode = generateEmvCoPix(
     pagbankPixKey, 
-    'BIRDPRO TECNOLOGIA', 
+    'CARMEN ROGERE ROSA DA ROCHA', 
     'SAO PAULO', 
     finalPrice, 
-    txid
+    '***'
   );
 
   const handleApplyCoupon = (e: React.FormEvent) => {
@@ -453,6 +452,19 @@ export default function AssinaturaPage() {
                       {pixCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                       <span>{pixCopied ? 'Copiado!' : 'Copiar'}</span>
                     </button>
+                  </div>
+
+                  {/* Chave Direta PagBank */}
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 text-left space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">Chave PIX (Aleatória / EVP):</span>
+                    <div className="font-mono font-bold text-slate-800 text-[11px] truncate select-all">
+                      {pagbankPixKey}
+                    </div>
+                    <div className="text-[10px] text-slate-600 flex flex-wrap items-center justify-between gap-1 pt-1 border-t border-slate-100">
+                      <span>Favorecido: <strong className="text-slate-900">Carmen Rogere Rosa Da Rocha</strong></span>
+                      <span>CPF: <strong>***.043.460-**</strong></span>
+                      <span>Banco: <strong>PagBank (PagSeguro)</strong></span>
+                    </div>
                   </div>
                 </div>
               )}

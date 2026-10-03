@@ -38,7 +38,7 @@ const BRAZIL_STATES = [
   'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
 ]
 
-const PAGBANK_PIX_KEY = '6f33236f-92cb-4012-b0a8-332e3af35039'
+const PAGBANK_PIX_KEY = '6f33236f-92cb-4812-b0a8-332e3af35839'
 
 function CheckoutContent() {
   const router = useRouter()
@@ -226,8 +226,8 @@ function CheckoutContent() {
     // Generate 100% Bacen-compliant EMVCo static BR Code PIX
     const standardBacenPix = generateEmvCoPix(
       PAGBANK_PIX_KEY, 
-      'LUIS HENRIQUE SCHREIBER', 
-      'IJUI', 
+      'CARMEN ROGERE ROSA DA ROCHA', 
+      'SAO PAULO', 
       finalPrice, 
       '***'
     )
@@ -1065,8 +1065,9 @@ function CheckoutContent() {
                     <div className="font-mono font-bold text-slate-800 text-[11px] truncate select-all">
                       {PAGBANK_PIX_KEY}
                     </div>
-                    <div className="text-[10px] text-slate-500 flex items-center justify-between pt-0.5 border-t border-slate-100">
-                      <span>Favorecido: <strong>Luis Henrique Schreiber</strong></span>
+                    <div className="text-[10px] text-slate-600 flex flex-wrap items-center justify-between gap-1 pt-1 border-t border-slate-100">
+                      <span>Favorecido: <strong className="text-slate-900">Carmen Rogere Rosa Da Rocha</strong></span>
+                      <span>CPF: <strong>***.043.460-**</strong></span>
                       <span>Banco: <strong>PagBank (PagSeguro)</strong></span>
                     </div>
                   </div>

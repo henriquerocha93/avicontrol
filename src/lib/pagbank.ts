@@ -55,19 +55,19 @@ export function isReferencePaidInWebhook(referenceId: string): boolean {
  * Generate 100% Bacen-compliant EMVCo BR Code PIX string for PagBank
  */
 export function generateEmvCoPix(
-  pixKey: string = '6f33236f-92cb-4012-b0a8-332e3af35039', 
-  recipientName: string = 'LUIS HENRIQUE SCHREIBER', 
-  city: string = 'IJUI', 
+  pixKey: string = '6f33236f-92cb-4812-b0a8-332e3af35839', 
+  recipientName: string = 'CARMEN ROGERE ROSA DA ROCHA', 
+  city: string = 'SAO PAULO', 
   amount: number = 169.99, 
   txid: string = '***'
 ): string {
-  const cleanKey = (pixKey || '6f33236f-92cb-4012-b0a8-332e3af35039').trim();
-  const cleanName = (recipientName || 'LUIS HENRIQUE SCHREIBER')
+  const cleanKey = (pixKey || '6f33236f-92cb-4812-b0a8-332e3af35839').trim();
+  const cleanName = (recipientName || 'CARMEN ROGERE ROSA DA ROCHA')
     .slice(0, 25)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase();
-  const cleanCity = (city || 'IJUI')
+  const cleanCity = (city || 'SAO PAULO')
     .slice(0, 15)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -212,8 +212,8 @@ export async function createPagBankPixOrder(params: PagBankPixOrderRequest): Pro
   }
 
   // Standalone dynamic PagBank PIX payload (EMVCo BR Code format)
-  const pixKey = '6f33236f-92cb-4012-b0a8-332e3af35039'; // Chave PIX oficial do PagBank BirdPro
-  const generatedCode = generateEmvCoPix(pixKey, 'LUIS HENRIQUE SCHREIBER', 'IJUI', amount, '***');
+  const pixKey = '6f33236f-92cb-4812-b0a8-332e3af35839'; // Chave PIX oficial do PagBank BirdPro
+  const generatedCode = generateEmvCoPix(pixKey, 'CARMEN ROGERE ROSA DA ROCHA', 'SAO PAULO', amount, '***');
 
   return {
     success: true,
