@@ -340,7 +340,7 @@ function CheckoutContent() {
     setIsSuccess(true)
   }
 
-  // REAL Verification Function: Calls PagBank API to check if money was actually received
+  // STRICT Verification Function: Calls PagBank API to check if money was actually received
   const handleVerifyPaymentWithPagBank = async (isManualClick = true) => {
     if (!currentReferenceId) return
     setIsVerifying(true)
@@ -358,14 +358,15 @@ function CheckoutContent() {
         // REAL PAYMENT CONFIRMED BY PAGBANK!
         setVerificationAlert({
           type: 'SUCCESS',
-          message: '🎉 Pagamento confirmado e liquidado com sucesso pelo PagBank!'
+          message: '🎉 Pagamento confirmado e liquidado com sucesso pelo PagBank! Acesso liberado.'
         })
         await handleProvisionPaidAccount()
       } else {
+        // NOT PAID YET - STRICTLY BLOCK ACCESS
         if (isManualClick) {
           setVerificationAlert({
-            type: 'INFO',
-            message: `Aguardando liquidação automática no PagBank. Se você já realizou o PIX no valor de ${formatCurrency(finalPrice)} para Carmen Rogere Rosa Da Rocha (PagBank), clique no botão verde abaixo "JÁ PAGUEI VIA PIX / LIBERAR ACESSO" para liberar sua conta imediatamente.`
+            type: 'ERROR',
+            message: `⚠️ Pagamento ainda NÃO identificado pelo PagBank PagSeguro (Status: ${data?.status || 'AGUARDANDO COMPENSAÇÃO'}). O acesso ao BIRDPRO só é liberado mediante compensação bancária real do valor de ${formatCurrency(finalPrice)}. Se você acabou de efetuar a transferência no app do seu banco, aguarde de 10 a 30 segundos para o processamento bancário e clique novamente em "Verificar se o PIX foi Identificado".`
           })
         }
       }
@@ -373,30 +374,10 @@ function CheckoutContent() {
       console.error('Erro ao consultar PagBank:', e)
       if (isManualClick) {
         setVerificationAlert({
-          type: 'INFO',
-          message: `Se você já realizou o PIX no app do seu banco para Carmen Rogere Rosa Da Rocha, clique no botão verde "JÁ PAGUEI VIA PIX / LIBERAR ACESSO" para prosseguir.`
+          type: 'ERROR',
+          message: 'Não foi possível confirmar a liquidação no PagBank neste momento. Por favor, verifique se a transferência foi concluída no seu banco e tente novamente.'
         })
       }
-    } finally {
-      setIsVerifying(false)
-    }
-  }
-
-  // User Direct Confirmation: When customer already completed the PIX transfer in bank
-  const handleManualPixConfirmation = async () => {
-    setIsVerifying(true)
-    try {
-      if (currentReferenceId) {
-        await fetch('/api/payments/pagbank/status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ referenceId: currentReferenceId, orderId: currentOrderId })
-        }).catch(() => {})
-      }
-      await handleProvisionPaidAccount()
-    } catch (e) {
-      console.error('Erro ao confirmar:', e)
-      await handleProvisionPaidAccount()
     } finally {
       setIsVerifying(false)
     }
@@ -424,10 +405,11 @@ function CheckoutContent() {
     return () => clearInterval(interval)
   }, [isPaymentModalOpen, isSuccess, currentReferenceId, currentOrderId])
 
-  // Card Payment Handler
+  // Card Payment Handler: Calls PagBank Card Processing API
   const handleCardPayment = async () => {
     setVerificationAlert(null)
-    if (!cardNumber.replace(/\D/g, '') || cardNumber.replace(/\D/g, '').length < 13) {
+    const cleanCardNum = cardNumber.replace(/\D/g, '')
+    if (!cleanCardNum || cleanCardNum.length < 13) {
       setVerificationAlert({ type: 'ERROR', message: 'Número de cartão de crédito inválido.' })
       return
     }
@@ -442,22 +424,47 @@ function CheckoutContent() {
 
     setIsVerifying(true)
     try {
-      const res = await fetch(
-        `/api/payments/pagbank/status?referenceId=${encodeURIComponent(currentReferenceId)}&orderId=${encodeURIComponent(currentOrderId)}`
-      )
+      const globalConfig = db.getGlobalConfig()
+      const res = await fetch('/api/payments/pagbank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentMethod: 'CARD',
+          referenceId: currentReferenceId,
+          customerName: formData.name.trim(),
+          customerEmail: formData.email.trim().toLowerCase(),
+          customerCpf: formData.document.replace(/\D/g, ''),
+          customerPhone: `${formData.ddd.replace(/\D/g, '')}${formData.phone.replace(/\D/g, '')}`,
+          amount: finalPrice,
+          description: `Assinatura BirdPro (${selectedCycle === 'ANUAL' ? 'Plano Anual PRO' : 'Plano Mensal PRO'})`,
+          cardNumber: cleanCardNum,
+          cardHolder: cardHolder.trim(),
+          cardExpiry: cardExpiry.trim(),
+          cardCvv: cardCvv.trim(),
+          installments: parseInt(cardInstallments) || 1,
+          token: globalConfig.pagbankToken,
+          isSandbox: globalConfig.pagbankSandbox
+        })
+      })
+
       const data = await res.json()
-      if (data && data.paid) {
+      if (data && (data.paid || data.status === 'PAID' || data.status === 'AUTHORIZED')) {
+        setVerificationAlert({
+          type: 'SUCCESS',
+          message: '🎉 Pagamento com cartão aprovado com sucesso pelo PagBank! Acesso liberado.'
+        })
         await handleProvisionPaidAccount()
         return
       }
+
       setVerificationAlert({
         type: 'ERROR',
-        message: '⚠️ Pagamento com cartão não autorizado ou não processado pelo PagBank. Verifique o limite e os dados digitados ou utilize o pagamento via PIX com ativação instantânea.'
+        message: `⚠️ Pagamento com cartão recusado pelo PagBank: ${data?.error || data?.status || 'Não autorizado pela operadora'}. Verifique os dados ou utilize o pagamento via PIX.`
       })
-    } catch (e) {
+    } catch (e: any) {
       setVerificationAlert({
         type: 'ERROR',
-        message: 'Erro ao processar transação de cartão no PagBank.'
+        message: `Erro ao processar cobrança de cartão no PagBank: ${e.message || 'Falha de comunicação'}`
       })
     } finally {
       setIsVerifying(false)
@@ -1214,36 +1221,24 @@ function CheckoutContent() {
               </button>
 
               {paymentMethod === 'PIX' && (
-                <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto order-1 sm:order-2">
-                  <button
-                    type="button"
-                    onClick={() => handleVerifyPaymentWithPagBank(true)}
-                    disabled={isVerifying}
-                    className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    {isVerifying ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Consultando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Search className="w-3.5 h-3.5" />
-                        <span>Consultar PagBank</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleManualPixConfirmation}
-                    disabled={isVerifying}
-                    className="w-full sm:w-auto px-5 py-2.5 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-black rounded-xl transition shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Já Paguei via PIX / Liberar Acesso</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => handleVerifyPaymentWithPagBank(true)}
+                  disabled={isVerifying}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black rounded-xl transition shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider order-1 sm:order-2"
+                >
+                  {isVerifying ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Consultando PagBank...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-3.5 h-3.5" />
+                      <span>Verificar se o PIX foi Identificado</span>
+                    </>
+                  )}
+                </button>
               )}
 
               {paymentMethod === 'CARD' && (

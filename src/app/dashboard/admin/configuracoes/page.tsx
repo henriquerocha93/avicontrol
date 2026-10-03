@@ -27,9 +27,36 @@ export default function AdminConfiguracoesPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
+  const [isTestingPagbank, setIsTestingPagbank] = useState(false)
+  const [pagbankTestResult, setPagbankTestResult] = useState<{ success: boolean; message: string } | null>(null)
+
   useEffect(() => {
     setConfig(db.getGlobalConfig())
   }, [])
+
+  const handleTestPagbankConnection = async () => {
+    setIsTestingPagbank(true)
+    setPagbankTestResult(null)
+    try {
+      const res = await fetch('/api/payments/pagbank/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: config.pagbankToken,
+          isSandbox: config.pagbankSandbox
+        })
+      })
+      const data = await res.json()
+      setPagbankTestResult(data)
+    } catch (e: any) {
+      setPagbankTestResult({
+        success: false,
+        message: `Erro na requisição de teste: ${e.message}`
+      })
+    } finally {
+      setIsTestingPagbank(false)
+    }
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -319,6 +346,43 @@ export default function AdminConfiguracoesPage() {
                     <p className="text-[10px] text-slate-400">
                       Cadastre esta URL nas configurações de Notificações / Webhooks da sua conta PagBank para baixa automática de PIX e Cartão.
                     </p>
+                  </div>
+
+                  {/* Test Connection Button & Result */}
+                  <div className="sm:col-span-3 pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={handleTestPagbankConnection}
+                      disabled={isTestingPagbank}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white font-bold text-xs rounded-lg transition flex items-center gap-2 cursor-pointer shadow-xs"
+                    >
+                      {isTestingPagbank ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Testando Conexão com Servidor PagBank...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Testar Autenticação da API PagBank</span>
+                        </>
+                      )}
+                    </button>
+
+                    {pagbankTestResult && (
+                      <div className={`text-xs px-3 py-1.5 rounded-lg border font-medium flex items-center gap-1.5 ${
+                        pagbankTestResult.success 
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                          : 'bg-rose-50 border-rose-200 text-rose-800'
+                      }`}>
+                        {pagbankTestResult.success ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                        )}
+                        <span>{pagbankTestResult.message}</span>
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (

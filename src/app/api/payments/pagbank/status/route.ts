@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkPagBankOrderStatus, isReferencePaidInWebhook, registerPaidReference } from '@/lib/pagbank';
+import { checkPagBankOrderStatus, isReferencePaidInWebhook } from '@/lib/pagbank';
 import { INITIAL_GLOBAL_CONFIG } from '@/lib/seed-data';
 
 export async function GET(req: NextRequest) {
@@ -7,32 +7,27 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const referenceId = searchParams.get('referenceId') || searchParams.get('ref') || '';
     const orderId = searchParams.get('orderId') || '';
-    const confirm = searchParams.get('confirm') === 'true';
 
     if (!referenceId && !orderId) {
-      return NextResponse.json({ success: false, paid: false, error: 'Identificador do pedido obrigatório.' }, { status: 400 });
+      return NextResponse.json({ 
+        success: false, 
+        paid: false, 
+        status: 'INVALID_REQUEST',
+        error: 'Identificador do pedido (referenceId ou orderId) obrigatório.' 
+      }, { status: 400 });
     }
 
-    if (confirm && referenceId) {
-      registerPaidReference(referenceId);
-      return NextResponse.json({
-        success: true,
-        paid: true,
-        status: 'PAID',
-        message: 'Pagamento confirmado e registrado com sucesso.'
-      });
-    }
-
-    // Check webhook / in-memory cache first
+    // 1. Check if payment was confirmed via PagBank Webhook
     if (referenceId && isReferencePaidInWebhook(referenceId)) {
       return NextResponse.json({
         success: true,
         paid: true,
         status: 'PAID',
-        message: 'Pagamento confirmado com sucesso pelo PagBank.'
+        message: 'Pagamento confirmado com sucesso via Notificação Oficial do PagBank.'
       });
     }
 
+    // 2. Real query to PagBank API servers
     const token = INITIAL_GLOBAL_CONFIG.pagbankToken || '';
     const isSandbox = INITIAL_GLOBAL_CONFIG.pagbankSandbox || false;
 
@@ -49,29 +44,15 @@ export async function GET(req: NextRequest) {
       status: result.status,
       message: result.paid 
         ? 'Pagamento identificado e aprovado pelo PagBank.' 
-        : 'Pagamento ainda não identificado automaticamente pelo PagBank.'
+        : 'Pagamento ainda não confirmado no PagBank. Aguardando compensação bancária.'
     });
   } catch (err: any) {
     console.error('[API PagBank Status] Erro:', err);
-    return NextResponse.json({ success: false, paid: false, error: err.message }, { status: 500 });
-  }
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { referenceId, orderId } = body;
-    if (referenceId) {
-      registerPaidReference(referenceId);
-    }
-    return NextResponse.json({
-      success: true,
-      paid: true,
-      status: 'PAID',
-      message: 'Pagamento marcado como confirmado.'
-    });
-  } catch (err: any) {
-    console.error('[API PagBank Status POST] Erro:', err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      paid: false, 
+      status: 'ERROR',
+      error: err.message || 'Erro ao consultar status no PagBank.' 
+    }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 /**
  * PagBank (PagSeguro) Integration Service for BIRDPRO
- * Handles PIX Orders, Credit Card charges and Webhook processing.
+ * Handles PIX Orders, Credit Card charges, Boleto and Webhook processing.
+ * Strictly enforces real bank authorization and status verification.
  */
 
 export interface PagBankPixOrderRequest {
@@ -25,6 +26,43 @@ export interface PagBankPixOrderResponse {
   amount: number;
   status: 'WAITING' | 'PAID' | 'DECLINED' | 'CANCELED';
   raw?: any;
+}
+
+export interface PagBankCardChargeRequest {
+  referenceId: string;
+  customerName: string;
+  customerEmail: string;
+  customerCpf?: string;
+  customerPhone?: string;
+  amount: number;
+  description: string;
+  cardNumber: string;
+  cardHolder: string;
+  cardExpiry: string; // MM/YY or MM/YYYY
+  cardCvv: string;
+  installments?: number;
+  token?: string;
+  isSandbox?: boolean;
+}
+
+export interface PagBankBoletoRequest {
+  referenceId: string;
+  customerName: string;
+  customerEmail: string;
+  customerCpf?: string;
+  customerPhone?: string;
+  amount: number;
+  description: string;
+  address?: {
+    street: string;
+    number: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
+  token?: string;
+  isSandbox?: boolean;
 }
 
 // In-memory set of webhook-confirmed paid transactions for fast lookups
@@ -118,7 +156,7 @@ export function generateEmvCoPix(
 }
 
 /**
- * Creates a PagBank Order with PIX QR Code
+ * Creates a PagBank Order with PIX QR Code via official PagBank API
  */
 export async function createPagBankPixOrder(params: PagBankPixOrderRequest): Promise<PagBankPixOrderResponse> {
   const {
@@ -136,8 +174,8 @@ export async function createPagBankPixOrder(params: PagBankPixOrderRequest): Pro
   const baseUrl = isSandbox ? 'https://sandbox.api.pagseguro.com' : 'https://api.pagseguro.com';
   const unitAmountInCents = Math.round(amount * 100);
 
-  // If live token is present, attempt direct API call
-  if (token && token.length > 20 && !token.includes('DEMO')) {
+  // If live token is present, attempt direct PagBank API call
+  if (token && token.length > 20) {
     try {
       const expDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       const cleanPhone = (customerPhone || '11999998888').replace(/\D/g, '');
@@ -207,12 +245,12 @@ export async function createPagBankPixOrder(params: PagBankPixOrderRequest): Pro
         }
       }
     } catch (e) {
-      console.warn('PagBank API live call fallback to Bacen EMVCo payload:', e);
+      console.warn('PagBank API call failed, generating Bacen EMVCo code:', e);
     }
   }
 
-  // Standalone dynamic PagBank PIX payload (EMVCo BR Code format)
-  const pixKey = '6f33236f-92cb-4812-b0a8-332e3af35839'; // Chave PIX oficial do PagBank BirdPro
+  // Bacen EMVCo payload with exact credentials
+  const pixKey = '6f33236f-92cb-4812-b0a8-332e3af35839';
   const generatedCode = generateEmvCoPix(pixKey, 'CARMEN ROGERE ROSA DA ROCHA', 'SAO PAULO', amount, '***');
 
   return {
@@ -223,6 +261,299 @@ export async function createPagBankPixOrder(params: PagBankPixOrderRequest): Pro
     expirationDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     amount,
     status: 'WAITING'
+  };
+}
+
+/**
+ * Creates a Credit Card Charge on PagBank API
+ */
+export async function createPagBankCardCharge(params: PagBankCardChargeRequest): Promise<{
+  success: boolean;
+  paid: boolean;
+  orderId?: string;
+  referenceId?: string;
+  status: string;
+  error?: string;
+  raw?: any;
+}> {
+  const {
+    referenceId,
+    customerName,
+    customerEmail,
+    customerCpf,
+    customerPhone,
+    amount,
+    description,
+    cardNumber,
+    cardHolder,
+    cardExpiry,
+    cardCvv,
+    installments = 1,
+    token,
+    isSandbox
+  } = params;
+
+  const baseUrl = isSandbox ? 'https://sandbox.api.pagseguro.com' : 'https://api.pagseguro.com';
+  const unitAmountInCents = Math.round(amount * 100);
+
+  if (!token || token.length < 20) {
+    return {
+      success: false,
+      paid: false,
+      status: 'CONFIG_ERROR',
+      error: 'Token da API do PagBank não configurado nas Configurações Gerais.'
+    };
+  }
+
+  try {
+    const cleanPhone = (customerPhone || '11999998888').replace(/\D/g, '');
+    const cleanCpf = (customerCpf || '00000000000').replace(/\D/g, '');
+    const cleanCard = cardNumber.replace(/\D/g, '');
+    const expiryParts = cardExpiry.split('/');
+    const expMonth = expiryParts[0]?.trim().padStart(2, '0') || '12';
+    let expYear = expiryParts[1]?.trim() || '2028';
+    if (expYear.length === 2) expYear = `20${expYear}`;
+
+    const payload = {
+      reference_id: referenceId,
+      customer: {
+        name: customerName,
+        email: customerEmail,
+        tax_id: cleanCpf.length === 11 ? cleanCpf : undefined,
+        phones: [
+          {
+            country: '55',
+            area: cleanPhone.slice(0, 2) || '11',
+            number: cleanPhone.slice(2) || '999998888',
+            type: 'MOBILE'
+          }
+        ]
+      },
+      items: [
+        {
+          name: description,
+          quantity: 1,
+          unit_amount: unitAmountInCents
+        }
+      ],
+      charges: [
+        {
+          reference_id: referenceId,
+          description: description,
+          amount: {
+            value: unitAmountInCents,
+            currency: 'BRL'
+          },
+          payment_method: {
+            type: 'CREDIT_CARD',
+            installments: installments || 1,
+            capture: true,
+            card: {
+              number: cleanCard,
+              exp_month: expMonth,
+              exp_year: expYear,
+              security_code: cardCvv.trim(),
+              holder: {
+                name: cardHolder.trim().toUpperCase()
+              }
+            }
+          }
+        }
+      ],
+      notification_urls: [
+        'https://www.birdpro.com.br/api/webhooks/pagbank'
+      ]
+    };
+
+    const res = await fetch(`${baseUrl}/orders`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      const charge = data.charges?.[0];
+      const chargeStatus = charge?.status || data.status;
+      const isPaid = chargeStatus === 'PAID' || chargeStatus === 'AUTHORIZED';
+
+      if (isPaid) {
+        registerPaidReference(referenceId);
+      }
+
+      return {
+        success: true,
+        paid: isPaid,
+        orderId: data.id,
+        referenceId: data.reference_id || referenceId,
+        status: chargeStatus || 'WAITING',
+        raw: data
+      };
+    } else {
+      const errorMsg = data.error_messages?.[0]?.description || 'Pagamento recusado pela operadora do cartão no PagBank.';
+      return {
+        success: false,
+        paid: false,
+        status: 'DECLINED',
+        error: errorMsg,
+        raw: data
+      };
+    }
+  } catch (err: any) {
+    console.error('Erro na cobrança de cartão PagBank:', err);
+    return {
+      success: false,
+      paid: false,
+      status: 'ERROR',
+      error: err.message || 'Erro de comunicação com o PagBank.'
+    };
+  }
+}
+
+/**
+ * Creates a Boleto on PagBank API
+ */
+export async function createPagBankBoletoOrder(params: PagBankBoletoRequest): Promise<{
+  success: boolean;
+  orderId?: string;
+  referenceId: string;
+  barcode?: string;
+  formattedBarcode?: string;
+  pdfUrl?: string;
+  pngUrl?: string;
+  dueDate?: string;
+  status: string;
+  error?: string;
+}> {
+  const {
+    referenceId,
+    customerName,
+    customerEmail,
+    customerCpf,
+    customerPhone,
+    amount,
+    description,
+    address,
+    token,
+    isSandbox
+  } = params;
+
+  const baseUrl = isSandbox ? 'https://sandbox.api.pagseguro.com' : 'https://api.pagseguro.com';
+  const unitAmountInCents = Math.round(amount * 100);
+
+  if (!token || token.length < 20) {
+    return {
+      success: false,
+      referenceId,
+      status: 'CONFIG_ERROR',
+      error: 'Token do PagBank não configurado.'
+    };
+  }
+
+  try {
+    const cleanPhone = (customerPhone || '11999998888').replace(/\D/g, '');
+    const cleanCpf = (customerCpf || '00000000000').replace(/\D/g, '');
+    const dueDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const payload = {
+      reference_id: referenceId,
+      customer: {
+        name: customerName,
+        email: customerEmail,
+        tax_id: cleanCpf.length === 11 ? cleanCpf : undefined,
+        phones: [
+          {
+            country: '55',
+            area: cleanPhone.slice(0, 2) || '11',
+            number: cleanPhone.slice(2) || '999998888',
+            type: 'MOBILE'
+          }
+        ]
+      },
+      items: [
+        {
+          name: description,
+          quantity: 1,
+          unit_amount: unitAmountInCents
+        }
+      ],
+      charges: [
+        {
+          reference_id: referenceId,
+          description: description,
+          amount: {
+            value: unitAmountInCents,
+            currency: 'BRL'
+          },
+          payment_method: {
+            type: 'BOLETO',
+            boleto: {
+              due_date: dueDate,
+              instruction_lines: {
+                line_1: 'Pagamento da assinatura do Sistema BIRDPRO',
+                line_2: 'Não receber após o vencimento'
+              },
+              holder: {
+                name: customerName,
+                tax_id: cleanCpf,
+                email: customerEmail,
+                address: {
+                  country: 'BRA',
+                  region: address?.state || 'SP',
+                  region_code: address?.state || 'SP',
+                  city: address?.city || 'Sao Paulo',
+                  postal_code: (address?.zipCode || '01001000').replace(/\D/g, ''),
+                  street: address?.street || 'Rua Principal',
+                  number: address?.number || '1',
+                  locality: address?.neighborhood || 'Centro'
+                }
+              }
+            }
+          }
+        }
+      ],
+      notification_urls: [
+        'https://www.birdpro.com.br/api/webhooks/pagbank'
+      ]
+    };
+
+    const res = await fetch(`${baseUrl}/orders`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const charge = data.charges?.[0];
+      const boletoInfo = charge?.payment_method?.boleto;
+      return {
+        success: true,
+        orderId: data.id,
+        referenceId: data.reference_id || referenceId,
+        barcode: boletoInfo?.barcode,
+        formattedBarcode: boletoInfo?.formatted_barcode,
+        pdfUrl: charge?.links?.find((l: any) => l.rel === 'PAYMENT_RECEIPT' || l.rel === 'PDF')?.href,
+        pngUrl: charge?.links?.find((l: any) => l.rel === 'PNG')?.href,
+        dueDate,
+        status: charge?.status || 'WAITING'
+      };
+    }
+  } catch (err: any) {
+    console.error('Erro na emissão de boleto PagBank:', err);
+  }
+
+  return {
+    success: false,
+    referenceId,
+    status: 'ERROR',
+    error: 'Não foi possível gerar o boleto no PagBank.'
   };
 }
 
