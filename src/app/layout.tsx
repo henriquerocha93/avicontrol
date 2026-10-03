@@ -16,6 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://www.birdpro.com.br'),
   title: "BIRDPRO • Gestão Profissional de Criatórios de Aves",
   description: "Plataforma profissional para gestão completa de criatórios: aves, anilhas, genealogia, reprodução, gaiolas, saúde, pedigree A4 e QR Codes.",
   keywords: ["criatório de aves", "gestão de plantel", "genealogia aves", "pedigree canário", "curió", "trinca ferro", "fob", "sispass", "anilhas"],
@@ -26,7 +27,35 @@ export const metadata: Metadata = {
     ],
     shortcut: '/favicon.png',
     apple: '/apple-icon.png',
-  }
+  },
+  openGraph: {
+    title: "BIRDPRO • Gestão Profissional de Criatórios de Aves",
+    description: "Plataforma profissional para gestão completa de criatórios: aves, anilhas, genealogia de até 5 gerações com cálculo de consanguinidade, reprodução e pedigree A4 com QR Code.",
+    url: "https://www.birdpro.com.br",
+    siteName: "BIRDPRO",
+    locale: "pt_BR",
+    type: "website",
+    images: [
+      {
+        url: "/og-square.png",
+        width: 512,
+        height: 512,
+        alt: "BIRDPRO Logo Oficial",
+      },
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "BIRDPRO • Gestão Zootécnica & Genética Aviária",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "BIRDPRO • Gestão Profissional de Criatórios de Aves",
+    description: "Plataforma profissional para gestão completa de criatórios de aves, anilhas e pedigree oficial.",
+    images: ["/og-image.png"],
+  },
 };
 
 export default function RootLayout({
