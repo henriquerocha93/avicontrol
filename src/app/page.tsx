@@ -60,6 +60,14 @@ interface SectionConfig {
 
 const SECTIONS: SectionConfig[] = [
   { 
+    id: 'planos', 
+    label: 'Planos & Valores', 
+    shortLabel: 'Planos',
+    icon: Sprout,
+    badge: 'R$ 14,99/mês',
+    tagline: 'Sem taxas ocultas, 100% dos recursos liberados'
+  },
+  { 
     id: 'recursos', 
     label: 'Módulos & Recursos', 
     shortLabel: 'Módulos',
@@ -100,14 +108,6 @@ const SECTIONS: SectionConfig[] = [
     tagline: 'Relógio biológico, temperatura e fases sazonais de reprodução'
   },
   { 
-    id: 'planos', 
-    label: 'Planos & Assinatura', 
-    shortLabel: 'Planos',
-    icon: Sprout,
-    badge: 'R$ 14,99/mês',
-    tagline: 'Sem taxas ocultas, 100% dos recursos liberados'
-  },
-  { 
     id: 'faq', 
     label: 'Dúvidas Frequentes', 
     shortLabel: 'Dúvidas / FAQ',
@@ -119,7 +119,7 @@ const SECTIONS: SectionConfig[] = [
 
 export default function LandingPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<SectionId>('recursos');
+  const [activeSection, setActiveSection] = useState<SectionId>('planos');
   const [activeModuleIdx, setActiveModuleIdx] = useState(0);
   const [billingPeriod, setBillingPeriod] = useState<'anual' | 'mensal'>('anual');
   const [activePedigreeTab, setActivePedigreeTab] = useState<'a4' | 'cracha' | 'qr'>('a4');
@@ -130,6 +130,14 @@ export default function LandingPage() {
   // Switch section with smooth scroll and transition effect
   const handleSelectSection = (id: SectionId) => {
     setActiveSection(id);
+    if (id === 'planos') {
+      const planosElem = document.getElementById('planos');
+      if (planosElem) {
+        const topOffset = planosElem.getBoundingClientRect().top + window.scrollY - 85;
+        window.scrollTo({ top: topOffset, behavior: 'smooth' });
+        return;
+      }
+    }
     if (id === 'faq') {
       const faqElem = document.getElementById('faq');
       if (faqElem) {
@@ -446,13 +454,14 @@ export default function LandingPage() {
 
           {/* Hero CTAs */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-2">
-            <Link href="/checkout?plano=anual" className="w-full sm:w-auto">
-              <Button size="lg" className="w-full sm:w-auto bg-[#00c853] hover:bg-emerald-600 font-black text-sm text-white shadow-xl shadow-emerald-600/30 px-7 py-3 transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer">
-                <Leaf className="w-4 h-4 mr-2" />
-                Assinar Agora (R$ 14,99/mês)
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </Link>
+            <button
+              onClick={() => handleSelectSection('planos')}
+              className="w-full sm:w-auto bg-[#00c853] hover:bg-emerald-600 font-black text-sm text-white shadow-xl shadow-emerald-600/30 px-7 py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Sprout className="w-4 h-4 text-white" />
+              <span>Ver Planos &amp; Assinar (R$ 14,99/mês)</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
 
             <button
               onClick={() => handleSelectSection('recursos')}
@@ -490,6 +499,188 @@ export default function LandingPage() {
                 <span className="text-[11px] text-emerald-400 font-bold block">Satisfação &amp; Retenção</span>
               </div>
             </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* 2.1 SEÇÃO DE PLANOS & VALORES (LOGO DE INÍCIO - ALTA VISIBILIDADE)        */}
+      {/* ========================================================================= */}
+      <section id="planos" className="relative py-14 sm:py-20 border-y border-emerald-900/40 bg-gradient-to-b from-[#091510] via-[#060e0a] to-[#08150f] overflow-hidden">
+        {/* Glow Effects */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-[#00c853]/5 blur-[120px] pointer-events-none rounded-full" />
+
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8 relative z-10">
+          
+          <div className="text-center max-w-3xl mx-auto space-y-3">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-[11px] sm:text-xs font-black uppercase tracking-wider">
+              <Sprout className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Planos Transparentes • Liberação Imediata via PIX</span>
+            </div>
+            
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
+              Planos &amp; Valores para o seu Criatório
+            </h2>
+            
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-normal max-w-2xl mx-auto">
+              Acesso total e irrestrito a <strong>100% dos recursos da plataforma</strong>: genealogia de até 5 gerações com cálculo de consanguinidade Wright, emissão de pedigree A4 com QR Code, importador SISPASS em 5 segundos, reprodução, ninhos e aves ilimitadas. <strong>Sem taxas ocultas nem cobranças extras!</strong>
+            </p>
+
+            {/* Billing Toggle Switcher */}
+            <div className="pt-4 flex items-center justify-center">
+              <div className="inline-flex items-center bg-[#0e1b14] p-1.5 rounded-2xl border border-emerald-800/60 shadow-xl">
+                <button
+                  onClick={() => setBillingPeriod('mensal')}
+                  className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                    billingPeriod === 'mensal'
+                      ? 'bg-emerald-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  📅 Plano Mensal (R$ 14,99)
+                </button>
+                <button
+                  onClick={() => setBillingPeriod('anual')}
+                  className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center gap-2 ${
+                    billingPeriod === 'anual'
+                      ? 'bg-[#00c853] text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <span>🗓️ Plano Anual (R$ 169,99)</span>
+                  <span className="px-2 py-0.5 rounded-md bg-yellow-400 text-black text-[10px] font-black tracking-wide">
+                    20% OFF
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Pricing Cards Grid */}
+          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-stretch pt-2">
+            
+            {/* Plano Mensal Card */}
+            <div className={`p-6 sm:p-8 rounded-3xl border transition-all duration-300 flex flex-col justify-between ${
+              billingPeriod === 'mensal'
+                ? 'bg-gradient-to-br from-[#0c2418] to-[#07130d] border-2 border-[#00c853] shadow-2xl scale-[1.02]'
+                : 'bg-[#0c1813] border-emerald-900/50 hover:border-emerald-700/60'
+            }`}>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-emerald-400 uppercase tracking-wider block">Assinatura Mensal</span>
+                  <span className="px-2.5 py-0.5 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px] font-bold">
+                    Sem Fidelidade
+                  </span>
+                </div>
+                
+                <div>
+                  <h3 className="text-2xl font-black text-white">Plano Mensal</h3>
+                  <p className="text-xs text-slate-400 mt-1">Acesso completo com liberdade de renovação mês a mês.</p>
+                </div>
+
+                <div className="pt-2">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-4xl sm:text-5xl font-black text-white">R$ 14,99</span>
+                    <span className="text-sm font-semibold text-slate-400">/mês</span>
+                  </div>
+                  <p className="text-xs text-emerald-400 font-semibold mt-1">Cobrança mensal simples e transparente</p>
+                </div>
+
+                <div className="space-y-2.5 text-xs text-slate-300 pt-4 border-t border-emerald-900/60">
+                  <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> <strong>Aves, anilhas e matrizes ilimitadas</strong></p>
+                  <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Genealogia até 5 gerações &amp; Consanguinidade Wright</p>
+                  <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Emissão de Pedigree Oficial A4 com QR Code</p>
+                  <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Importador SISPASS / IBAMA em 5 segundos</p>
+                  <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Gestão de postura, ovoscopia e alertas de anilhamento</p>
+                  <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Prontuário de saúde, medicamentos e sexagem DNA</p>
+                  <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Acesso em Celular, Tablet e Computador</p>
+                </div>
+              </div>
+
+              <div className="pt-6">
+                <Link href="/checkout?plano=mensal" className="block">
+                  <Button 
+                    className={`w-full py-3.5 text-xs sm:text-sm font-black rounded-xl cursor-pointer transition shadow-md ${
+                      billingPeriod === 'mensal'
+                        ? 'bg-[#00c853] hover:bg-emerald-600 text-white shadow-emerald-950/80 scale-[1.01]'
+                        : 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/60'
+                    }`}
+                  >
+                    Assinar Plano Mensal (R$ 14,99/mês) →
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            {/* Plano Anual Card */}
+            <div className={`p-6 sm:p-8 rounded-3xl border transition-all duration-300 flex flex-col justify-between relative ${
+              billingPeriod === 'anual'
+                ? 'bg-gradient-to-br from-[#0d2a1c] to-[#07170e] border-2 border-[#00c853] shadow-2xl shadow-emerald-950 scale-[1.02]'
+                : 'bg-[#0c1813] border-emerald-900/50 hover:border-emerald-700/60'
+            }`}>
+              <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-emerald-500 to-[#00c853] text-slate-950 text-[10px] font-black uppercase tracking-wider rounded-full shadow-lg">
+                ★ MAIS POPULAR • ECONOMIZE 20%
+              </span>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-emerald-300 uppercase tracking-wider block">Assinatura Anual</span>
+                  <span className="px-2.5 py-0.5 rounded-md bg-yellow-400 text-slate-950 text-[10px] font-black">
+                    2 Meses Grátis
+                  </span>
+                </div>
+                
+                <div>
+                  <h3 className="text-2xl font-black text-white">Plano Anual</h3>
+                  <p className="text-xs text-emerald-200/80 mt-1">12 meses de tranquilidade com máxima economia para o plantel.</p>
+                </div>
+
+                <div className="pt-2">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-4xl sm:text-5xl font-black text-white">R$ 169,99</span>
+                    <span className="text-sm font-semibold text-slate-400">/ano</span>
+                  </div>
+                  <p className="text-xs text-emerald-400 font-semibold mt-1">Equivalente a apenas R$ 14,16/mês (desconto anual de 20%)</p>
+                </div>
+
+                <div className="space-y-2.5 text-xs text-slate-200 pt-4 border-t border-emerald-900/80">
+                  <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> <strong>TUDO do Plano Mensal incluso</strong></p>
+                  <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> <strong>Aves, anilhas e matrizes ilimitadas</strong></p>
+                  <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Genealogia até 5 gerações &amp; Pedigree A4 Oficial</p>
+                  <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Importador do SISPASS / IBAMA em 5 segundos</p>
+                  <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> <strong>Economia real de 20%</strong> no valor total</p>
+                  <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> <strong>Suporte VIP prioritário via WhatsApp</strong></p>
+                  <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Backup contínuo redundante em nuvem segura</p>
+                </div>
+              </div>
+
+              <div className="pt-6">
+                <Link href="/checkout?plano=anual" className="block">
+                  <Button 
+                    className={`w-full py-3.5 text-xs sm:text-sm font-black rounded-xl cursor-pointer transition shadow-xl ${
+                      billingPeriod === 'anual'
+                        ? 'bg-[#00c853] hover:bg-emerald-600 text-white shadow-emerald-600/40 scale-[1.01]'
+                        : 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/60'
+                    }`}
+                  >
+                    Garantir Plano Anual com 20% OFF →
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Money-Back & Security Guarantee */}
+          <div className="max-w-2xl mx-auto p-4 rounded-2xl bg-emerald-950/50 border border-emerald-700/40 text-center space-y-1.5">
+            <div className="flex items-center justify-center gap-2 text-xs font-bold text-emerald-300">
+              <ShieldCheck className="w-4 h-4 text-[#00c853]" />
+              <span>Liberação Instantânea via PIX Automatizado • Acesso Seguro</span>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Pague via PIX e acesse sua conta imediatamente pelo celular ou computador, sem esperar por aprovação manual de suporte.
+            </p>
           </div>
 
         </div>
@@ -1015,164 +1206,34 @@ export default function LandingPage() {
         )}
 
         {/* ----------------------------------------------------------------------- */}
-        {/* SECTION 6: PLANOS & ASSINATURA                                           */}
+        {/* SECTION: REDIRECIONADOR DE PLANOS CASO SELECIONADO                      */}
         {/* ----------------------------------------------------------------------- */}
         {activeSection === 'planos' && (
-          <section id="planos" className="space-y-8 animate-in fade-in zoom-in-98 duration-500">
-            
-            <div className="text-center max-w-2xl mx-auto space-y-3">
-              <span className="text-xs font-black text-emerald-400 uppercase tracking-widest flex items-center justify-center gap-1.5">
-                <Sprout className="w-3.5 h-3.5" /> Planos Transparentes &amp; Sem Pegadinhas
-              </span>
-              <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-                Invista no crescimento do seu plantel
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-normal">
-                Acesso total e irrestrito a <strong>100% dos recursos da plataforma</strong> em qualquer um dos planos. Sem cobranças para upgrades!
-              </p>
-
-              {/* Billing Toggle Switcher */}
-              <div className="pt-3 flex items-center justify-center">
-                <div className="inline-flex items-center bg-[#0e1b14] p-1.5 rounded-2xl border border-emerald-800/60 shadow-lg">
-                  <button
-                    onClick={() => setBillingPeriod('mensal')}
-                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                      billingPeriod === 'mensal'
-                        ? 'bg-emerald-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    Mensal (R$ 14,99)
-                  </button>
-                  <button
-                    onClick={() => setBillingPeriod('anual')}
-                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
-                      billingPeriod === 'anual'
-                        ? 'bg-[#00c853] text-white shadow-md'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <span>Anual (R$ 169,99)</span>
-                    <span className="px-1.5 py-0.2 rounded-md bg-yellow-400 text-black text-[10px] font-black">
-                      20% OFF
-                    </span>
-                  </button>
-                </div>
-              </div>
+          <div className="p-8 sm:p-10 rounded-3xl bg-gradient-to-br from-[#0c2418] to-[#07130d] border border-emerald-600/50 text-center space-y-4 shadow-xl">
+            <span className="text-xs font-black text-emerald-400 uppercase tracking-widest flex items-center justify-center gap-1.5">
+              <Sprout className="w-4 h-4 text-emerald-400" /> Planos em Destaque no Topo
+            </span>
+            <h3 className="text-2xl sm:text-3xl font-black text-white">
+              Todos os planos e valores estão exibidos logo no início do site!
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
+              Você pode assinar o <strong>Plano Mensal (R$ 14,99/mês)</strong> ou o <strong>Plano Anual (R$ 169,99/ano com 20% OFF)</strong> com liberação imediata via PIX.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <button
+                onClick={() => handleSelectSection('planos')}
+                className="px-6 py-3 bg-[#00c853] hover:bg-emerald-600 text-white font-black text-xs sm:text-sm rounded-xl transition shadow-lg shadow-emerald-950 cursor-pointer flex items-center gap-2"
+              >
+                <span>↑ Subir para os Planos &amp; Valores</span>
+              </button>
+              <button
+                onClick={() => handleSelectSection('recursos')}
+                className="px-6 py-3 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/60 font-bold text-xs sm:text-sm rounded-xl transition cursor-pointer"
+              >
+                Explorar Módulos e Recursos →
+              </button>
             </div>
-
-            {/* Pricing Cards Grid */}
-            <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-              
-              {/* Plano Mensal Card */}
-              <div className={`p-6 sm:p-8 rounded-3xl border transition-all duration-300 flex flex-col justify-between ${
-                billingPeriod === 'mensal'
-                  ? 'bg-gradient-to-br from-[#0c2418] to-[#07130d] border-2 border-[#00c853] shadow-2xl scale-[1.02]'
-                  : 'bg-[#0e1b14] border-emerald-900/40 opacity-90'
-              }`}>
-                <div className="space-y-4">
-                  <div>
-                    <span className="text-xs font-black text-emerald-400 uppercase tracking-wider block">Assinatura Mensal</span>
-                    <h3 className="text-2xl font-black text-white mt-1">Plano Mensal</h3>
-                    <p className="text-xs text-slate-400 mt-1">Acesso total sem fidelidade, cancele quando quiser.</p>
-                  </div>
-
-                  <div className="pt-2">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-4xl font-black text-white">R$ 14,99</span>
-                      <span className="text-sm font-semibold text-slate-400">/mês</span>
-                    </div>
-                    <p className="text-xs text-emerald-400 font-semibold mt-1">Cobrança mensal simples e transparente</p>
-                  </div>
-
-                  <div className="space-y-2 text-xs text-slate-300 pt-3 border-t border-emerald-950/80">
-                    <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> <strong>Aves, gaiolas e anilhas ilimitadas</strong></p>
-                    <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Genealogia de até 5 gerações &amp; Pedigree A4</p>
-                    <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Gestão de reprodução, ovos e ninhos</p>
-                    <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Prontuário de saúde e sexagem DNA</p>
-                    <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Importação rápida do SISPASS / IBAMA</p>
-                  </div>
-                </div>
-
-                <div className="pt-6">
-                  <Link href="/checkout?plano=mensal" className="block">
-                    <Button 
-                      variant={billingPeriod === 'mensal' ? 'primary' : 'outline'}
-                      className={`w-full py-3 text-xs sm:text-sm font-black rounded-xl cursor-pointer ${
-                        billingPeriod === 'mensal'
-                          ? 'bg-[#00c853] hover:bg-emerald-600 text-white shadow-lg'
-                          : 'border-emerald-700 text-white hover:bg-emerald-950/80'
-                      }`}
-                    >
-                      Assinar Plano Mensal →
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-
-              {/* Plano Anual Card */}
-              <div className={`p-6 sm:p-8 rounded-3xl border transition-all duration-300 flex flex-col justify-between relative ${
-                billingPeriod === 'anual'
-                  ? 'bg-gradient-to-br from-[#0c281b] to-[#07170e] border-2 border-[#00c853] shadow-2xl shadow-emerald-950 scale-[1.02]'
-                  : 'bg-[#0e1b14] border-emerald-900/40 opacity-90'
-              }`}>
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-[#00c853] text-white text-[10px] font-black uppercase tracking-wider rounded-full shadow-lg">
-                  ★ Mais Vantajoso • Economize 20%
-                </span>
-
-                <div className="space-y-4">
-                  <div>
-                    <span className="text-xs font-black text-emerald-300 uppercase tracking-wider block">Assinatura Anual</span>
-                    <h3 className="text-2xl font-black text-white mt-1">Plano Anual</h3>
-                    <p className="text-xs text-emerald-200/80 mt-1">12 meses de tranquilidade com máxima economia.</p>
-                  </div>
-
-                  <div className="pt-2">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-4xl font-black text-white">R$ 169,99</span>
-                      <span className="text-sm font-semibold text-slate-400">/ano</span>
-                    </div>
-                    <p className="text-xs text-emerald-400 font-semibold mt-1">Equivalente a apenas R$ 14,16/mês (desconto anual)</p>
-                  </div>
-
-                  <div className="space-y-2 text-xs text-slate-200 pt-3 border-t border-emerald-900/80">
-                    <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> <strong>Aves, gaiolas e anilhas ilimitadas</strong></p>
-                    <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Genealogia de até 5 gerações &amp; Pedigree A4</p>
-                    <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Gestão de reprodução, ovos e ninhos</p>
-                    <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Prontuário de saúde e sexagem DNA</p>
-                    <p className="flex items-center gap-2"><Check className="w-4 h-4 text-[#00c853] shrink-0" /> Backup automático prioritário em nuvem</p>
-                  </div>
-                </div>
-
-                <div className="pt-6">
-                  <Link href="/checkout?plano=anual" className="block">
-                    <Button 
-                      className={`w-full py-3 text-xs sm:text-sm font-black rounded-xl cursor-pointer ${
-                        billingPeriod === 'anual'
-                          ? 'bg-[#00c853] hover:bg-emerald-600 text-white shadow-xl shadow-emerald-700/40'
-                          : 'border-emerald-700 text-white hover:bg-emerald-950/80'
-                      }`}
-                    >
-                      Assinar Plano Anual →
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Money-Back & Security Guarantee */}
-            <div className="max-w-2xl mx-auto p-4 rounded-2xl bg-emerald-950/50 border border-emerald-700/40 text-center space-y-1.5">
-              <div className="flex items-center justify-center gap-2 text-xs font-bold text-emerald-300">
-                <ShieldCheck className="w-4 h-4 text-[#00c853]" />
-                <span>Liberação Instantânea via PIX Automatizado</span>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Pague via PIX e acesse sua conta imediatamente sem esperar por aprovação manual de suporte.
-              </p>
-            </div>
-
-          </section>
+          </div>
         )}
 
         {/* ----------------------------------------------------------------------- */}
