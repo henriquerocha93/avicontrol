@@ -98,6 +98,18 @@ export const INITIAL_USERS: User[] = [
     createdAt: '2026-01-01T00:00:00Z',
   },
   {
+    id: 'user-master-admin-02',
+    name: 'Henrique Rocha',
+    email: 'henriquerocha93@hotmail.com',
+    password: 'admin',
+    role: 'SUPER_ADMIN',
+    tenantId: 'tenant-demo-01',
+    phone: '',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    active: true,
+    createdAt: '2026-01-01T00:00:00Z',
+  },
+  {
     id: 'user-admin-official',
     name: 'Super Admin BIRDPRO',
     email: 'admin@birdpro.com.br',

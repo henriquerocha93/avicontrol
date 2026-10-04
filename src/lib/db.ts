@@ -108,6 +108,15 @@ class DataService {
         if (!this.state.payouts || this.state.payouts.length === 0) {
           this.state.payouts = [...INITIAL_PAYOUTS];
         }
+        if (!this.state.users || this.state.users.length === 0) {
+          this.state.users = [...INITIAL_USERS];
+        } else {
+          INITIAL_USERS.forEach(iu => {
+            if (!this.state.users.some(u => u.email.toLowerCase().trim() === iu.email.toLowerCase().trim())) {
+              this.state.users.push({ ...iu });
+            }
+          });
+        }
         if (this.state.globalConfig) {
           this.state.globalConfig.gatewayProvider = 'MERCADOPAGO';
           this.state.globalConfig.gatewayApiKey = INITIAL_GLOBAL_CONFIG.gatewayApiKey;

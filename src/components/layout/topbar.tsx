@@ -1,3 +1,7 @@
+'use client'
+
+import React, { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { 
   Menu, 
@@ -35,10 +39,10 @@ export function Topbar({ onOpenSidebar }: TopbarProps) {
   const [ringQuery, setRingQuery] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
 
-  const notifications = db.getNotifications(tenant?.id)
+  const notifications = db.getNotifications(tenant?.id) || []
   const unreadCount = notifications.filter(n => !n.read).length
 
-  const birds = db.getBirds(tenant?.id)
+  const birds = db.getBirds(tenant?.id) || []
   const ringSuggestions = ringQuery.trim()
     ? birds.filter(b => {
         if (!b.ringNumber) return false

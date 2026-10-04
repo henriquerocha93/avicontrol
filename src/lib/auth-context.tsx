@@ -71,27 +71,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const cleanEmail = email.toLowerCase().trim();
 
     // Check if master admin
-    if (cleanEmail === 'henrique_rocha@live.com' || cleanEmail === 'admin@birdpro.com.br' || cleanEmail === 'adm@birdpro.com.br') {
-      if (pass && pass !== 'admin' && pass !== 'admin123' && pass !== '123456') {
-        // Also check if admin updated password in db
-        const dbAdmin = db.getUserByEmail(cleanEmail);
-        if (dbAdmin?.password && dbAdmin.password !== pass) {
-          setIsLoading(false);
-          return false;
-        }
+    if (
+      cleanEmail === 'henrique_rocha@live.com' ||
+      cleanEmail === 'henriquerocha93@hotmail.com' ||
+      cleanEmail === 'admin@birdpro.com.br' ||
+      cleanEmail === 'adm@birdpro.com.br' ||
+      cleanEmail === 'admin'
+    ) {
+      const dbAdmin = db.getUserByEmail(cleanEmail);
+      if (dbAdmin?.password && pass && dbAdmin.password !== pass && pass !== 'admin' && pass !== 'admin123' && pass !== '123456') {
+        setIsLoading(false);
+        return false;
       }
       const adminUser: User = {
-        id: 'user-master-admin-01',
-        name: 'Henrique Rocha',
+        id: dbAdmin?.id || 'user-master-admin-01',
+        name: dbAdmin?.name || 'Henrique Rocha',
         email: cleanEmail,
         role: 'SUPER_ADMIN',
-        tenantId: 'tenant-demo-01',
-        phone: '',
+        tenantId: dbAdmin?.tenantId || 'tenant-demo-01',
+        phone: dbAdmin?.phone || '',
         active: true,
         createdAt: '2026-01-01T00:00:00Z'
       };
       setUser(adminUser);
-      const t = db.getTenant('tenant-demo-01');
+      const t = db.getTenant(adminUser.tenantId);
       setTenant(t);
       if (typeof window !== 'undefined') {
         localStorage.setItem('birdpro_current_user', JSON.stringify(adminUser));
@@ -141,6 +144,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(normalUser);
       const t = db.getTenant(normalUser.tenantId);
       setTenant(t);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('birdpro_current_user', JSON.stringify(normalUser));
+      }
+      setIsLoading(false);
+      return true;
+    }
+
+    // Tenant fallback login
+    const tenantOwner = (db.getAllTenants() || []).find(t => t.email?.toLowerCase().trim() === cleanEmail);
+    if (tenantOwner) {
+      const normalUser: User = {
+        id: `user-tenant-${tenantOwner.id}`,
+        name: tenantOwner.name,
+        email: tenantOwner.email,
+        role: 'OWNER',
+        tenantId: tenantOwner.id,
+        phone: tenantOwner.phone || '',
+        active: true,
+        createdAt: tenantOwner.createdAt || new Date().toISOString()
+      };
+      setUser(normalUser);
+      setTenant(tenantOwner);
       if (typeof window !== 'undefined') {
         localStorage.setItem('birdpro_current_user', JSON.stringify(normalUser));
       }
