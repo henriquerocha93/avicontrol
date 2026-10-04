@@ -42,13 +42,70 @@ export default function ImportacaoPage() {
 
   const existingRings = db.getRings(tenant?.id);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setFileName(file.name);
     setIsProcessing(true);
     setSuccessCount(null);
+
+    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+
+    if (isPdf) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await fetch('/api/sispass/parse-pdf', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+
+        if (data.success && Array.isArray(data.birds) && data.birds.length > 0) {
+          const processed: ImportedRow[] = data.birds.map((item: any) => {
+            const num = item.ringNumber;
+            const yr = parseInt(item.birthDate?.slice(0, 4)) || 2026;
+            const tp = item.ringNumber.includes('2.2') ? 'SISPASS 2.2mm' : item.ringNumber.includes('2.8') ? 'SISPASS 2.8mm' : 'SISPASS Oficial';
+            const orig = item.origin || 'IBAMA SISPASS';
+            const birdNm = item.name;
+            const spec = item.species || item.commonName;
+            const sx = item.sex;
+
+            const isDuplicate = existingRings.some(r => r.number.toLowerCase().trim() === num.toLowerCase().trim());
+            const isValid = !!num && num.length >= 3;
+
+            return {
+              number: num,
+              year: yr,
+              type: tp,
+              origin: orig,
+              birdName: birdNm,
+              species: spec,
+              sex: sx,
+              isDuplicate,
+              isValid,
+              error: !isValid ? 'Número da anilha inválido ou vazio' : isDuplicate ? 'Anilha já cadastrada no sistema' : undefined
+            };
+          });
+
+          setRows(processed);
+          setIsProcessing(false);
+          return;
+        } else {
+          alert('Não foi possível identificar dados de anilhas no PDF enviado. Certifique-se de que é um documento oficial do SISPASS/IBAMA.');
+          setIsProcessing(false);
+          return;
+        }
+      } catch (err) {
+        console.error('Erro ao processar PDF:', err);
+        alert('Erro ao processar arquivo PDF.');
+        setIsProcessing(false);
+        return;
+      }
+    }
 
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -65,7 +122,7 @@ export default function ImportacaoPage() {
           const yr = Number(item['Ano'] || item['ano'] || item['Year'] || 2026);
           const tp = String(item['Tipo'] || item['tipo'] || item['Type'] || 'FOB Oficial').trim();
           const orig = String(item['Origem'] || item['origem'] || item['Origin'] || 'Federação Ornitológica').trim();
-          const birdNm = item['Nome_Ave'] || item['Ave'] || item['ave'] || '';
+          const birdNm = item['Nome_Ave'] || item['Nome'] || item['Ave'] || item['ave'] || '';
           const spec = item['Especie'] || item['especie'] || '';
           const sx = item['Sexo'] || item['sexo'] || 'UNKNOWN';
 
@@ -181,7 +238,7 @@ export default function ImportacaoPage() {
         <div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Importação de Anilhas & Plantel</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Importe centenas de anilhas e aves instantaneamente a partir de planilhas Excel (.xlsx) ou CSV.
+            Importe centenas de anilhas e aves instantaneamente a partir de documentos PDF (SISPASS / IBAMA com múltiplas folhas) ou planilhas Excel (.xlsx) e CSV.
           </p>
         </div>
 
@@ -220,21 +277,28 @@ export default function ImportacaoPage() {
             {fileName ? `Arquivo selecionado: ${fileName}` : 'Arraste ou selecione seu arquivo de anilhas'}
           </h3>
           <p className="text-xs text-slate-500">
-            Formatos suportados: .XLSX, .XLS, .CSV. O sistema detectará automaticamente duplicidades e colunas.
+            Formatos suportados: <strong className="text-emerald-700">.PDF</strong> (Relação de Anilhas SISPASS / IBAMA de até dezenas de páginas), <strong className="text-slate-700">.XLSX, .XLS, .CSV</strong>. O sistema detectará automaticamente todas as páginas, duplicidades e colunas.
           </p>
         </div>
+
+        {isProcessing && (
+          <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl max-w-sm mx-auto flex items-center justify-center gap-3 text-xs text-emerald-900 font-bold animate-pulse">
+            <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+            <span>Processando páginas do documento PDF / Planilha...</span>
+          </div>
+        )}
 
         <div className="pt-2">
           <label className="cursor-pointer">
             <input
               type="file"
-              accept=".xlsx, .xls, .csv"
+              accept=".pdf, .xlsx, .xls, .csv"
               onChange={handleFileUpload}
               className="hidden"
             />
-            <span className="inline-flex items-center justify-center font-bold text-xs h-10 px-5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm cursor-pointer transition-all">
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Selecionar Planilha do Computador
+            <span className="inline-flex items-center justify-center font-bold text-xs h-10 px-6 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm cursor-pointer transition-all hover:scale-102">
+              <UploadCloud className="w-4 h-4 mr-2" />
+              Selecionar Arquivo do Computador (PDF ou Planilha)
             </span>
           </label>
         </div>

@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { 
   Search, 
   Printer, 
@@ -21,14 +22,30 @@ import { PrintPedigreeModal } from '@/components/modals/print-pedigree-modal'
 import { PrintBadgeModal } from '@/components/modals/print-badge-modal'
 import { NovaGenealogiaEnvironment } from '@/components/genealogy/nova-genealogia-environment'
 
-export default function GenealogiaPage() {
+function GenealogiaContent() {
+  const searchParams = useSearchParams()
+  const ringParam = searchParams.get('anilha') || undefined
+  const birdIdParam = searchParams.get('birdId') || undefined
+
   const tenant = db.getTenant()
   const birds = db.getBirds()
 
   // State
   const [viewMode, setViewMode] = useState<'TREE' | 'LIST'>('TREE')
-  const [selectedTreeBirdId, setSelectedTreeBirdId] = useState<string | undefined>(undefined)
+  const [selectedTreeBirdId, setSelectedTreeBirdId] = useState<string | undefined>(birdIdParam)
+  const [selectedRingNumber, setSelectedRingNumber] = useState<string | undefined>(ringParam)
   const [activeTab, setActiveTab] = useState<'PLANTEL' | 'TODOS'>('PLANTEL')
+
+  useEffect(() => {
+    if (ringParam) {
+      setSelectedRingNumber(ringParam)
+      setViewMode('TREE')
+    }
+    if (birdIdParam) {
+      setSelectedTreeBirdId(birdIdParam)
+      setViewMode('TREE')
+    }
+  }, [ringParam, birdIdParam])
   const [searchField, setSearchField] = useState('ave')
   const [searchQuery, setSearchQuery] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
@@ -205,6 +222,7 @@ export default function GenealogiaPage() {
       {viewMode === 'TREE' ? (
         <NovaGenealogiaEnvironment 
           initialBirdId={selectedTreeBirdId} 
+          initialRingNumber={selectedRingNumber}
           showBackButton={false} 
         />
       ) : (
@@ -352,6 +370,20 @@ export default function GenealogiaPage() {
 
                 {/* Action Buttons (10% - Right Aligned) */}
                 <div className="lg:col-span-2 flex items-center justify-end space-x-1.5 pt-2 lg:pt-0">
+                  {/* 0. Ver Árvore Genealógica Interativa */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedTreeBirdId(bird.id)
+                      setSelectedRingNumber(bird.ringNumber)
+                      setViewMode('TREE')
+                    }}
+                    className="w-7 h-7 bg-[#009fe3] hover:bg-[#008ac7] text-white rounded flex items-center justify-center transition shadow-xs cursor-pointer"
+                    title="Ver Toda a Árvore Genealógica Desta Ave"
+                  >
+                    <BirdIcon className="w-3.5 h-3.5" />
+                  </button>
+
                   {/* 1. Imprimir Árvore Genealógica (Certificado A4) */}
                   <button
                     type="button"
@@ -551,6 +583,18 @@ export default function GenealogiaPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function GenealogiaPage() {
+  return (
+    <Suspense fallback={
+      <div className="bg-white rounded-md border border-slate-200 p-12 text-center text-xs text-slate-400">
+        Carregando árvore genealógica...
+      </div>
+    }>
+      <GenealogiaContent />
+    </Suspense>
   )
 }
 

@@ -10,10 +10,17 @@ import {
   Check, 
   Search, 
   X, 
-  CheckCircle2
+  CheckCircle2,
+  Printer,
+  ExternalLink,
+  Award,
+  Sparkles,
+  Bird as BirdIcon
 } from 'lucide-react'
 import { db } from '@/lib/db'
 import { Bird } from '@/types'
+import { PrintPedigreeModal } from '@/components/modals/print-pedigree-modal'
+import { PrintBadgeModal } from '@/components/modals/print-badge-modal'
 
 // Desenho nítido e autêntico de passarinho pousado no galho, fiel ao print de genealogia
 export function PassarinhoIcon({ 
@@ -84,12 +91,14 @@ interface NodeData {
 
 export interface NovaGenealogiaEnvironmentProps {
   initialBirdId?: string
+  initialRingNumber?: string
   showBackButton?: boolean
   onBack?: () => void
 }
 
 export function NovaGenealogiaEnvironment({
   initialBirdId,
+  initialRingNumber,
   showBackButton = true,
   onBack
 }: NovaGenealogiaEnvironmentProps) {
@@ -124,6 +133,16 @@ export function NovaGenealogiaEnvironment({
   const [matGrandfather, setMatGrandfather] = useState<NodeData>({ name: '', ringNumber: '', sex: 'MALE' })
   const [matGrandmother, setMatGrandmother] = useState<NodeData>({ name: '', ringNumber: '', sex: 'FEMALE' })
 
+  // Full Active Bird Object for actions / modals
+  const [selectedFullBird, setSelectedFullBird] = useState<Bird | null>(null)
+  const [isPedigreeOpen, setIsPedigreeOpen] = useState(false)
+  const [isBadgeOpen, setIsBadgeOpen] = useState(false)
+
+  // Ring Number Quick Search State
+  const [ringSearchQuery, setRingSearchQuery] = useState('')
+  const [showRingSuggestions, setShowRingSuggestions] = useState(false)
+  const [ringNotFound, setRingNotFound] = useState<string | null>(null)
+
   // Selection Modal State
   const [modalTarget, setModalTarget] = useState<
     'main' | 'father' | 'mother' | 'patGF' | 'patGM' | 'matGF' | 'matGM' | null
@@ -141,7 +160,7 @@ export function NovaGenealogiaEnvironment({
     setManualRing('')
   }
 
-  // Handle bird selection from database safely
+  // Handle bird selection from database with full recursive genealogy ancestry resolution
   const handleSelectBird = (bird: Bird, targetOverride?: 'main' | 'father' | 'mother' | 'patGF' | 'patGM' | 'matGF' | 'matGM') => {
     if (!bird) return
     const target = targetOverride || modalTarget
@@ -154,48 +173,128 @@ export function NovaGenealogiaEnvironment({
 
     if (target === 'main') {
       setMainBird(data)
-      // Auto-populate parents if available in DB
-      if (bird.fatherName) {
-        setFather({
-          name: bird.fatherName,
-          ringNumber: bird.fatherRing || '',
-          sex: 'MALE'
-        })
+      setSelectedFullBird(bird)
+      setRingNotFound(null)
+
+      // 1. Resolve Father
+      let fName = bird.fatherName || ''
+      let fRing = bird.fatherRing || ''
+      const fBird = allBirds.find(b => 
+        (bird.fatherId && b.id === bird.fatherId) ||
+        (fRing && b.ringNumber && b.ringNumber.toLowerCase().trim() === fRing.toLowerCase().trim()) ||
+        (fName && b.name && b.name.toLowerCase().trim() === fName.toLowerCase().trim())
+      )
+
+      if (fBird) {
+        fName = fBird.name
+        fRing = fBird.ringNumber || fRing
       }
-      if (bird.motherName) {
-        setMother({
-          name: bird.motherName,
-          ringNumber: bird.motherRing || '',
-          sex: 'FEMALE'
-        })
+
+      setFather({
+        id: fBird?.id,
+        name: fName,
+        ringNumber: fRing,
+        sex: 'MALE'
+      })
+
+      // 2. Resolve Mother
+      let mName = bird.motherName || ''
+      let mRing = bird.motherRing || ''
+      const mBird = allBirds.find(b => 
+        (bird.motherId && b.id === bird.motherId) ||
+        (mRing && b.ringNumber && b.ringNumber.toLowerCase().trim() === mRing.toLowerCase().trim()) ||
+        (mName && b.name && b.name.toLowerCase().trim() === mName.toLowerCase().trim())
+      )
+
+      if (mBird) {
+        mName = mBird.name
+        mRing = mBird.ringNumber || mRing
       }
-      if (bird.paternalGrandfatherId) {
-        setPatGrandfather({
-          name: bird.paternalGrandfatherId,
-          ringNumber: '',
-          sex: 'MALE'
-        })
+
+      setMother({
+        id: mBird?.id,
+        name: mName,
+        ringNumber: mRing,
+        sex: 'FEMALE'
+      })
+
+      // 3. Resolve Paternal Grandparents
+      let patGfName = bird.paternalGrandfatherId || fBird?.fatherName || ''
+      let patGfRing = fBird?.fatherRing || ''
+      let patGmName = bird.paternalGrandmotherId || fBird?.motherName || ''
+      let patGmRing = fBird?.motherRing || ''
+
+      const patGfBird = allBirds.find(b => 
+        (patGfRing && b.ringNumber && b.ringNumber.toLowerCase().trim() === patGfRing.toLowerCase().trim()) || 
+        (patGfName && b.name && b.name.toLowerCase().trim() === patGfName.toLowerCase().trim())
+      )
+      if (patGfBird) {
+        patGfName = patGfBird.name
+        patGfRing = patGfBird.ringNumber || patGfRing
       }
-      if (bird.paternalGrandmotherId) {
-        setPatGrandmother({
-          name: bird.paternalGrandmotherId,
-          ringNumber: '',
-          sex: 'FEMALE'
-        })
+
+      const patGmBird = allBirds.find(b => 
+        (patGmRing && b.ringNumber && b.ringNumber.toLowerCase().trim() === patGmRing.toLowerCase().trim()) || 
+        (patGmName && b.name && b.name.toLowerCase().trim() === patGmName.toLowerCase().trim())
+      )
+      if (patGmBird) {
+        patGmName = patGmBird.name
+        patGmRing = patGmBird.ringNumber || patGmRing
       }
-      if (bird.maternalGrandfatherId) {
-        setMatGrandfather({
-          name: bird.maternalGrandfatherId,
-          ringNumber: '',
-          sex: 'MALE'
-        })
+
+      setPatGrandfather({
+        id: patGfBird?.id,
+        name: patGfName,
+        ringNumber: patGfRing,
+        sex: 'MALE'
+      })
+      setPatGrandmother({
+        id: patGmBird?.id,
+        name: patGmName,
+        ringNumber: patGmRing,
+        sex: 'FEMALE'
+      })
+
+      // 4. Resolve Maternal Grandparents
+      let matGfName = bird.maternalGrandfatherId || mBird?.fatherName || ''
+      let matGfRing = mBird?.fatherRing || ''
+      let matGmName = bird.maternalGrandmotherId || mBird?.motherName || ''
+      let matGmRing = mBird?.motherRing || ''
+
+      const matGfBird = allBirds.find(b => 
+        (matGfRing && b.ringNumber && b.ringNumber.toLowerCase().trim() === matGfRing.toLowerCase().trim()) || 
+        (matGfName && b.name && b.name.toLowerCase().trim() === matGfName.toLowerCase().trim())
+      )
+      if (matGfBird) {
+        matGfName = matGfBird.name
+        matGfRing = matGfBird.ringNumber || matGfRing
       }
-      if (bird.maternalGrandmotherId) {
-        setMatGrandmother({
-          name: bird.maternalGrandmotherId,
-          ringNumber: '',
-          sex: 'FEMALE'
-        })
+
+      const matGmBird = allBirds.find(b => 
+        (matGmRing && b.ringNumber && b.ringNumber.toLowerCase().trim() === matGmRing.toLowerCase().trim()) || 
+        (matGmName && b.name && b.name.toLowerCase().trim() === matGmName.toLowerCase().trim())
+      )
+      if (matGmBird) {
+        matGmName = matGmBird.name
+        matGmRing = matGmBird.ringNumber || matGmRing
+      }
+
+      setMatGrandfather({
+        id: matGfBird?.id,
+        name: matGfName,
+        ringNumber: matGfRing,
+        sex: 'MALE'
+      })
+      setMatGrandmother({
+        id: matGmBird?.id,
+        name: matGmName,
+        ringNumber: matGmRing,
+        sex: 'FEMALE'
+      })
+
+      // Se houver qualquer avô ou avó cadastrado, abre automaticamente 3 gerações
+      if (patGfName || patGmName || matGfName || matGmName) {
+        setGenerations(3)
       }
     } else if (target === 'father') {
       setFather(data)
@@ -214,29 +313,88 @@ export function NovaGenealogiaEnvironment({
     setModalTarget(null)
   }
 
-  // Auto-seleciona a ave inicial, ou a ave recém-salva via Criar Crachá (localStorage), ou a mais recente
+  // Quick Ring Search Handler
+  const handleSearchByRing = (queryOverride?: string) => {
+    const q = (queryOverride !== undefined ? queryOverride : ringSearchQuery).trim()
+    if (!q) return
+
+    const qClean = q.toLowerCase()
+    const qAlpha = qClean.replace(/[^a-z0-9]/g, '')
+
+    const found = db.getBirdByRingNumber(q) || allBirds.find(b => {
+      if (!b.ringNumber) return false
+      const bRing = b.ringNumber.toLowerCase().trim()
+      const bAlpha = bRing.replace(/[^a-z0-9]/g, '')
+      return (
+        bRing === qClean || 
+        (qAlpha && bAlpha === qAlpha) || 
+        bRing.includes(qClean) || 
+        (qAlpha && bAlpha.includes(qAlpha)) ||
+        (b.name && b.name.toLowerCase().includes(qClean))
+      )
+    })
+
+    if (found) {
+      handleSelectBird(found, 'main')
+      setShowRingSuggestions(false)
+      setRingNotFound(null)
+    } else {
+      setRingNotFound(q)
+      setShowRingSuggestions(false)
+    }
+  }
+
+  // Ring suggestions list as user types
+  const ringSuggestions = ringSearchQuery.trim()
+    ? allBirds.filter(b => {
+        if (!b.ringNumber) return false
+        const q = ringSearchQuery.toLowerCase().trim()
+        const qAlpha = q.replace(/[^a-z0-9]/g, '')
+        const r = b.ringNumber.toLowerCase()
+        const rAlpha = r.replace(/[^a-z0-9]/g, '')
+        const n = (b.name || '').toLowerCase()
+        return r.includes(q) || (qAlpha && rAlpha.includes(qAlpha)) || n.includes(q)
+      }).slice(0, 6)
+    : []
+
+  // Auto-seleciona a ave inicial, por ID ou por número da anilha, ou localStorage
   useEffect(() => {
     if (!Array.isArray(allBirds) || allBirds.length === 0) return
 
     let targetBirdId = initialBirdId
-    if (!targetBirdId && typeof window !== 'undefined') {
+    let targetRing = initialRingNumber
+
+    if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search)
-      targetBirdId = urlParams.get('birdId') || localStorage.getItem('birdpro_active_tree_bird_id') || undefined
+      if (!targetBirdId) targetBirdId = urlParams.get('birdId') || localStorage.getItem('birdpro_active_tree_bird_id') || undefined
+      if (!targetRing) targetRing = urlParams.get('anilha') || undefined
     }
 
-    let birdToSelect = targetBirdId ? allBirds.find(b => b && b.id === targetBirdId) : undefined
+    let birdToSelect: Bird | undefined
+
+    if (targetRing) {
+      const qClean = targetRing.toLowerCase().trim()
+      const qAlpha = qClean.replace(/[^a-z0-9]/g, '')
+      birdToSelect = allBirds.find(b => {
+        if (!b.ringNumber) return false
+        const bRing = b.ringNumber.toLowerCase().trim()
+        const bAlpha = bRing.replace(/[^a-z0-9]/g, '')
+        return bRing === qClean || (qAlpha && bAlpha === qAlpha) || bRing.includes(qClean)
+      })
+    }
+
+    if (!birdToSelect && targetBirdId) {
+      birdToSelect = allBirds.find(b => b && b.id === targetBirdId)
+    }
+
     if (!birdToSelect && allBirds.length > 0) {
-      // Procura primeiro aves que já possuam linhagem/pais preenchidos
       birdToSelect = allBirds.find(b => b && (b.fatherName || b.motherName)) || allBirds[0]
     }
 
     if (birdToSelect) {
       handleSelectBird(birdToSelect, 'main')
-      if (birdToSelect.paternalGrandfatherId || birdToSelect.maternalGrandfatherId) {
-        setGenerations(3)
-      }
     }
-  }, [initialBirdId, allBirds])
+  }, [initialBirdId, initialRingNumber, allBirds])
 
   // Handle manual bird assignment
   const handleApplyManual = () => {
@@ -353,6 +511,194 @@ export function NovaGenealogiaEnvironment({
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 1. BARRA DE BUSCA RÁPIDA POR NÚMERO DA ANILHA                              */}
+      {/* ========================================================================= */}
+      <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 shadow-xs relative">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          <div className="flex items-center gap-2 text-slate-700 shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700">
+              <BirdIcon className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-black text-slate-900 block leading-tight">Buscar por Número da Anilha</span>
+              <span className="text-[10px] text-slate-400">Encontre a ave e toda a árvore cadastrada</span>
+            </div>
+          </div>
+
+          {/* Input with real-time suggestions */}
+          <div className="flex-1 relative">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Digite a anilha (ex: SISPASS 2.2 RS/A 041738, 041738, 2024)..."
+                value={ringSearchQuery}
+                onChange={(e) => {
+                  setRingSearchQuery(e.target.value)
+                  setShowRingSuggestions(true)
+                  setRingNotFound(null)
+                }}
+                onFocus={() => setShowRingSuggestions(true)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleSearchByRing()
+                  }
+                }}
+                className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#00c853] focus:bg-white font-mono transition"
+              />
+              {ringSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRingSearchQuery('')
+                    setShowRingSuggestions(false)
+                    setRingNotFound(null)
+                  }}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Dropdown Floating Suggestions */}
+            {showRingSuggestions && ringSuggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 z-40 max-h-60 overflow-y-auto divide-y divide-slate-100">
+                <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Anilhas Encontradas ({ringSuggestions.length}):
+                </div>
+                {ringSuggestions.map((sug) => (
+                  <div
+                    key={sug.id}
+                    onClick={() => {
+                      setRingSearchQuery(sug.ringNumber)
+                      handleSearchByRing(sug.ringNumber)
+                    }}
+                    className="px-3 py-2 hover:bg-emerald-50/70 cursor-pointer flex items-center justify-between transition group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-xs text-slate-900 group-hover:text-emerald-700">
+                        {sug.ringNumber}
+                      </span>
+                      <span className="text-xs text-slate-700 font-medium truncate max-w-[150px]">
+                        {sug.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        ({sug.species.split('(')[0].trim()})
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {sug.sex === 'MALE' ? (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">♂ Macho</span>
+                      ) : sug.sex === 'FEMALE' ? (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800">♀ Fêmea</span>
+                      ) : null}
+                      <span className="text-[10px] font-bold text-emerald-600 group-hover:underline">Ver Árvore →</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Action Button */}
+          <button
+            type="button"
+            onClick={() => handleSearchByRing()}
+            className="px-4 py-2 bg-[#00c853] hover:bg-[#00b84a] active:bg-[#009e3e] text-white font-bold text-xs rounded-lg shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span>Buscar Árvore</span>
+          </button>
+        </div>
+
+        {/* Not Found Alert */}
+        {ringNotFound && (
+          <div className="mt-2.5 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-xs flex items-center justify-between animate-in fade-in">
+            <span>
+              Nenhuma ave cadastrada encontrada com a anilha <strong>&quot;{ringNotFound}&quot;</strong>. Verifique o número digitado ou importe/cadastre a ave.
+            </span>
+            <button
+              type="button"
+              onClick={() => setRingNotFound(null)}
+              className="text-amber-700 hover:text-amber-950 p-1 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 2. CARD RESUMO DA AVE ATIVA NA ÁRVORE COM AÇÕES RÁPIDAS                    */}
+      {/* ========================================================================= */}
+      {(selectedFullBird || mainBird.name) && (
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 text-white rounded-xl p-3 sm:p-4 shadow-sm border border-emerald-900/60 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 shrink-0">
+              <PassarinhoIcon sex={mainBird.sex} className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Ave em Destaque na Árvore
+                </span>
+                <span className="font-mono font-bold text-xs bg-black/40 px-2 py-0.5 rounded border border-white/10 text-emerald-400">
+                  Anilha: {mainBird.ringNumber || 'Sem Anilha'}
+                </span>
+              </div>
+              <h2 className="text-sm sm:text-base font-black text-white mt-0.5">
+                {mainBird.name}
+                {selectedFullBird?.species ? (
+                  <span className="text-xs font-normal text-slate-300 ml-2">
+                    • {selectedFullBird.species.split('(')[0].trim()}
+                  </span>
+                ) : null}
+              </h2>
+            </div>
+          </div>
+
+          {/* Quick Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedFullBird && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsPedigreeOpen(true)}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+                  title="Imprimir Certificado Genealógico Oficial A4"
+                >
+                  <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Pedigree A4</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsBadgeOpen(true)}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+                  title="Imprimir Etiqueta da Gaiola com QR Code"
+                >
+                  <Award className="w-3.5 h-3.5" />
+                  <span>Etiqueta Gaiola</span>
+                </button>
+
+                <Link
+                  href={`/dashboard/aves/${selectedFullBird.id}`}
+                  className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition"
+                  title="Ver Ficha Zootécnica Completa"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Ficha Completa</span>
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -799,6 +1145,24 @@ export function NovaGenealogiaEnvironment({
 
           </div>
         </div>
+      )}
+
+      {/* Modal de Impressão de Genealogia A4 */}
+      {isPedigreeOpen && selectedFullBird && (
+        <PrintPedigreeModal
+          bird={selectedFullBird}
+          isOpen={isPedigreeOpen}
+          onClose={() => setIsPedigreeOpen(false)}
+        />
+      )}
+
+      {/* Modal de Impressão de Etiqueta da Gaiola */}
+      {isBadgeOpen && selectedFullBird && (
+        <PrintBadgeModal
+          bird={selectedFullBird}
+          isOpen={isBadgeOpen}
+          onClose={() => setIsBadgeOpen(false)}
+        />
       )}
 
     </div>

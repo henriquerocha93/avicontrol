@@ -110,7 +110,7 @@ const SECTIONS: SectionConfig[] = [
   { 
     id: 'faq', 
     label: 'Dúvidas Frequentes', 
-    shortLabel: 'Dúvidas / FAQ',
+    shortLabel: 'FAQ',
     icon: HelpCircle,
     badge: 'Tire Dúvidas',
     tagline: 'Perguntas e respostas sobre SISPASS, Pedigree, Consanguinidade e Planos'
@@ -299,11 +299,13 @@ export default function LandingPage() {
       {/* 1. TOP NAVBAR (GLASSMORPHISM FIXED)                                       */}
       {/* ========================================================================= */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#070e0b]/92 backdrop-blur-md border-b border-emerald-900/30 shadow-lg transition-all duration-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-18 sm:h-20 flex items-center justify-between">
-          <Logo variant="light" size="md" href="/" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-18 sm:h-20 flex items-center justify-between gap-3 sm:gap-4">
+          <div className="shrink-0">
+            <Logo variant="light" size="md" href="/" />
+          </div>
 
           {/* Desktop Navigation Links (Direct Section Selectors) */}
-          <nav className="hidden lg:flex items-center gap-6 text-xs sm:text-sm font-semibold text-slate-300">
+          <nav className="hidden xl:flex items-center gap-1.5 2xl:gap-3 text-xs 2xl:text-sm font-semibold text-slate-300 shrink-0">
             {SECTIONS.map((sec) => {
               const Icon = sec.icon;
               const isActive = activeSection === sec.id;
@@ -311,54 +313,55 @@ export default function LandingPage() {
                 <button
                   key={sec.id}
                   onClick={() => handleSelectSection(sec.id)}
-                  className={`flex items-center gap-1.5 transition-all duration-200 py-1.5 px-2.5 rounded-lg cursor-pointer ${
+                  className={`flex items-center gap-1.5 transition-all duration-200 py-1.5 px-2.5 rounded-lg cursor-pointer whitespace-nowrap shrink-0 ${
                     isActive 
                       ? 'text-emerald-300 bg-emerald-950/60 border border-emerald-700/50 shadow-xs' 
                       : 'text-slate-300 hover:text-emerald-400 hover:bg-emerald-950/30'
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
-                  <span>{sec.shortLabel}</span>
+                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
+                  <span className="whitespace-nowrap">{sec.shortLabel}</span>
                 </button>
               );
             })}
           </nav>
 
           {/* Desktop Action Buttons */}
-          <div className="hidden lg:flex items-center gap-3">
-            <Link href="/login">
-              <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-emerald-950/40 text-xs font-bold">
+          <div className="hidden xl:flex items-center gap-2.5 shrink-0">
+            <Link href="/login" className="shrink-0">
+              <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-emerald-950/40 text-xs font-bold whitespace-nowrap shrink-0 h-9 px-3">
                 Entrar
               </Button>
             </Link>
-            <Link href="/checkout?plano=anual">
-              <Button size="sm" className="bg-[#00c853] hover:bg-emerald-600 text-white font-black text-xs shadow-lg shadow-emerald-950/50 transition-all hover:scale-105 active:scale-95">
-                Assinar Agora →
+            <Link href="/checkout?plano=anual" className="shrink-0">
+              <Button size="sm" className="bg-[#00c853] hover:bg-emerald-600 text-white font-black text-xs shadow-lg shadow-emerald-950/50 transition-all hover:scale-105 active:scale-95 whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 h-9 px-4 rounded-xl">
+                <span>Assinar Agora</span>
+                <ArrowRight className="w-3.5 h-3.5 shrink-0" />
               </Button>
             </Link>
           </div>
 
           {/* Mobile & Tablet Action Buttons (Login + Assinar + Menu) */}
-          <div className="flex lg:hidden items-center gap-1.5 sm:gap-2">
-            <Link href="/login">
+          <div className="flex xl:hidden items-center gap-1.5 sm:gap-2 shrink-0">
+            <Link href="/login" className="shrink-0">
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="border-emerald-700/60 bg-[#091710] hover:bg-emerald-950 text-emerald-300 hover:text-white font-bold text-[11px] px-2.5 py-1.5 rounded-xl shadow-xs"
+                className="border-emerald-700/60 bg-[#091710] hover:bg-emerald-950 text-emerald-300 hover:text-white font-bold text-[11px] px-2.5 py-1.5 rounded-xl shadow-xs whitespace-nowrap shrink-0"
               >
                 Login
               </Button>
             </Link>
 
-            <Link href="/checkout?plano=anual">
-              <Button size="sm" className="bg-[#00c853] hover:bg-emerald-600 text-white font-black text-[11px] px-3 py-1.5 shadow-md rounded-xl">
+            <Link href="/checkout?plano=anual" className="shrink-0">
+              <Button size="sm" className="bg-[#00c853] hover:bg-emerald-600 text-white font-black text-[11px] px-3 py-1.5 shadow-md rounded-xl whitespace-nowrap shrink-0">
                 Assinar
               </Button>
             </Link>
 
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-1.5 text-slate-300 hover:text-white hover:bg-emerald-950/60 rounded-xl transition cursor-pointer border border-emerald-800/40"
+              className="p-1.5 text-slate-300 hover:text-white hover:bg-emerald-950/60 rounded-xl transition cursor-pointer border border-emerald-800/40 shrink-0"
               aria-label="Abrir Menu Principal"
             >
               {isMobileMenuOpen ? <X className="w-5 h-5 text-emerald-400" /> : <Menu className="w-5 h-5 text-emerald-400" />}
@@ -368,7 +371,7 @@ export default function LandingPage() {
 
         {/* Mobile Dropdown Menu Drawer */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden bg-[#0a1611]/98 border-b border-emerald-800/50 backdrop-blur-2xl px-5 py-5 space-y-3 shadow-2xl animate-in slide-in-from-top-4 duration-300">
+          <div className="xl:hidden bg-[#0a1611]/98 border-b border-emerald-800/50 backdrop-blur-2xl px-5 py-5 space-y-3 shadow-2xl animate-in slide-in-from-top-4 duration-300">
             <div className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider px-2">
               Navegar pelas Seções:
             </div>

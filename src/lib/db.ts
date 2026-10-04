@@ -575,6 +575,57 @@ class DataService {
     return this.state.birds.find(b => b.id === id);
   }
 
+  getBirdByRingNumber(ringNumber: string, tenantId?: string): Bird | undefined {
+    if (!ringNumber || !ringNumber.trim()) return undefined;
+    const clean = ringNumber.trim().toLowerCase();
+    const cleanAlpha = clean.replace(/[^a-z0-9]/g, '');
+    const birds = tenantId ? this.getBirds(tenantId) : this.state.birds;
+
+    // 1. Exact match (case insensitive)
+    const exact = birds.find(b => b.ringNumber && b.ringNumber.trim().toLowerCase() === clean);
+    if (exact) return exact;
+
+    // 2. Normalized match (without hyphens, dots or spaces)
+    if (cleanAlpha) {
+      const normalizedExact = birds.find(b => {
+        if (!b.ringNumber) return false;
+        const norm = b.ringNumber.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return norm === cleanAlpha;
+      });
+      if (normalizedExact) return normalizedExact;
+
+      // 3. Normalized partial match (ring contains query or query contains ring)
+      const partial = birds.find(b => {
+        if (!b.ringNumber) return false;
+        const norm = b.ringNumber.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return norm.includes(cleanAlpha) || cleanAlpha.includes(norm);
+      });
+      if (partial) return partial;
+    }
+
+    return undefined;
+  }
+
+  searchBirdsByRing(ringQuery: string, tenantId?: string): Bird[] {
+    if (!ringQuery || !ringQuery.trim()) return [];
+    const clean = ringQuery.trim().toLowerCase();
+    const cleanAlpha = clean.replace(/[^a-z0-9]/g, '');
+    const birds = tenantId ? this.getBirds(tenantId) : this.state.birds;
+
+    return birds.filter(b => {
+      if (!b.ringNumber) return false;
+      const bRing = b.ringNumber.toLowerCase().trim();
+      const bAlpha = bRing.replace(/[^a-z0-9]/g, '');
+      const bName = (b.name || '').toLowerCase();
+      
+      return (
+        bRing.includes(clean) ||
+        (cleanAlpha && bAlpha.includes(cleanAlpha)) ||
+        bName.includes(clean)
+      );
+    });
+  }
+
   addBird(birdData: Omit<Bird, 'id' | 'createdAt' | 'updatedAt'>): Bird {
     const newBird: Bird = {
       ...birdData,
