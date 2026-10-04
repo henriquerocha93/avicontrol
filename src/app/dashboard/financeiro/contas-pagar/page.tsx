@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Plus, 
@@ -34,35 +34,23 @@ export default function ContasPagarPage() {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDENTE' | 'PAGO' | 'VENCIDO'>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const [contas, setContas] = useState<ContaPagar[]>([
-    {
-      id: 'cp-01',
-      descricao: 'Ração Super Cria & Farinhada Especial',
-      categoria: 'Alimentação / Rações',
-      fornecedor: 'NutriBird Alimentos',
-      valor: 450.00,
-      vencimento: '2026-10-15',
-      status: 'PENDENTE'
-    },
-    {
-      id: 'cp-02',
-      descricao: 'Anilhas Oficiais FOB/IBAMA (Lote 2026)',
-      categoria: 'Anilhas Oficiais',
-      fornecedor: 'Federação Ornitológica',
-      valor: 320.00,
-      vencimento: '2026-10-10',
-      status: 'PENDENTE'
-    },
-    {
-      id: 'cp-03',
-      descricao: 'Complexo Vitamínico & Cálcio Líquido',
-      categoria: 'Medicamentos & Vacinas',
-      fornecedor: 'VetFarma Comercial',
-      valor: 180.00,
-      vencimento: '2026-09-28',
-      status: 'PAGO'
+  const [contas, setContas] = useState<ContaPagar[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('birdpro_contas_pagar');
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
     }
-  ]);
+    return [];
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('birdpro_contas_pagar', JSON.stringify(contas));
+    }
+  }, [contas]);
 
   const [form, setForm] = useState({
     descricao: '',

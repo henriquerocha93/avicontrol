@@ -27,32 +27,23 @@ export default function ComportamentoPage() {
   const [birds, setBirds] = useState<BirdType[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const [records, setRecords] = useState<BehaviorItem[]>([
-    {
-      id: 'b-1',
-      birdId: 'bird-01',
-      birdName: 'Soberano Real',
-      birdRing: 'FOB-2024-BR-0891',
-      tameness: 5,
-      singing: 5,
-      reproduction: 5,
-      stress: 1,
-      notes: 'Excelente postura em roda de canto, manso no manejo de gaiola.',
-      date: '2026-02-15'
-    },
-    {
-      id: 'b-2',
-      birdId: 'bird-03',
-      birdName: 'Maestro Clássico',
-      birdRing: 'SISPASS-2023-SP-5502',
-      tameness: 4,
-      singing: 5,
-      reproduction: 4,
-      stress: 2,
-      notes: 'Dialeto clássico perfeito com alta repetição de estrofes.',
-      date: '2026-02-20'
+  const [records, setRecords] = useState<BehaviorItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('birdpro_comportamento');
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
     }
-  ]);
+    return [];
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('birdpro_comportamento', JSON.stringify(records));
+    }
+  }, [records]);
 
   const [form, setForm] = useState({
     birdId: '',

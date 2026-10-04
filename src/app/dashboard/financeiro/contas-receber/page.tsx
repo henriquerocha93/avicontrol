@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Plus, 
@@ -34,35 +34,23 @@ export default function ContasReceberPage() {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDENTE' | 'RECEBIDO'>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const [contas, setContas] = useState<ContaReceber[]>([
-    {
-      id: 'cr-01',
-      descricao: 'Venda Filhote Curió Reprodutor Matriz (Anilha 04829)',
-      categoria: 'Venda de Filhotes',
-      cliente: 'Carlos Andrade',
-      valor: 3500.00,
-      vencimento: '2026-10-12',
-      status: 'PENDENTE'
-    },
-    {
-      id: 'cr-02',
-      descricao: 'Reserva Fêmea Bicudo Canto Clássico',
-      categoria: 'Reserva de Aves',
-      cliente: 'Marcos Vinicius',
-      valor: 1200.00,
-      vencimento: '2026-10-05',
-      status: 'RECEBIDO'
-    },
-    {
-      id: 'cr-03',
-      descricao: 'Venda Casal Canário da Terra Campeão',
-      categoria: 'Venda de Filhotes',
-      cliente: 'João Paulo Ferreira',
-      valor: 2000.00,
-      vencimento: '2026-09-30',
-      status: 'RECEBIDO'
+  const [contas, setContas] = useState<ContaReceber[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('birdpro_contas_receber');
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
     }
-  ]);
+    return [];
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('birdpro_contas_receber', JSON.stringify(contas));
+    }
+  }, [contas]);
 
   const [form, setForm] = useState({
     descricao: '',

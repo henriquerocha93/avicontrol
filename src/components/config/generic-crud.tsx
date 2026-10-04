@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { 
   Package, Plus, Search, Tag, DollarSign, AlertTriangle, 
   Trash2, Edit3, Grid3X3, Dna, Activity, ListFilter, GitFork, ShieldCheck
@@ -12,15 +12,38 @@ interface GenericCrudProps {
   subtitle: string
   icon: any
   unitName: string
-  items: Array<{ id: string; name: string; category?: string; code?: string; extra?: string }>
+  items?: Array<{ id: string; name: string; category?: string; code?: string; extra?: string }>
+  storageKey?: string
 }
 
-function GenericConfigCrud({ title, subtitle, icon: Icon, unitName, items: initialItems }: GenericCrudProps) {
-  const [items, setItems] = useState(initialItems)
+function GenericConfigCrud({ title, subtitle, icon: Icon, unitName, items: initialItems = [], storageKey }: GenericCrudProps) {
+  const finalStorageKey = storageKey || 'birdpro_config_' + title.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  
+  const [items, setItems] = useState<Array<{ id: string; name: string; category?: string; code?: string; extra?: string }>>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [newItemName, setNewItemName] = useState('')
   const [newItemExtra, setNewItemExtra] = useState('')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(finalStorageKey);
+      if (stored) {
+        try {
+          setItems(JSON.parse(stored));
+          return;
+        } catch {}
+      }
+      setItems(initialItems || []);
+    }
+  }, [finalStorageKey]);
+
+  const saveItems = (newItems: typeof items) => {
+    setItems(newItems)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(finalStorageKey, JSON.stringify(newItems))
+    }
+  }
 
   const filtered = items.filter(i => 
     i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -30,7 +53,8 @@ function GenericConfigCrud({ title, subtitle, icon: Icon, unitName, items: initi
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
     if (!newItemName) return
-    setItems([...items, { id: String(Date.now()), name: newItemName, extra: newItemExtra }])
+    const updated = [...items, { id: String(Date.now()), name: newItemName, extra: newItemExtra }]
+    saveItems(updated)
     setIsModalOpen(false)
     setNewItemName('')
     setNewItemExtra('')
@@ -38,7 +62,8 @@ function GenericConfigCrud({ title, subtitle, icon: Icon, unitName, items: initi
 
   const handleDelete = (id: string) => {
     if (confirm(`Deseja realmente remover este registro de ${unitName}?`)) {
-      setItems(items.filter(i => i.id !== id))
+      const updated = items.filter(i => i.id !== id)
+      saveItems(updated)
     }
   }
 

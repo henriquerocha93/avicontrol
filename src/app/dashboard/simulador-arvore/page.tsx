@@ -115,6 +115,9 @@ export default function TreeSimulatorPage() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('birdpro_simulated_bird', JSON.stringify(simulatedChild))
+    }
     setPreviewBird(simulatedChild)
     setIsPrintModalOpen(true)
   }

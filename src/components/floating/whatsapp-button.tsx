@@ -8,7 +8,7 @@ interface WhatsAppButtonProps {
 }
 
 export function WhatsAppButton({
-  phoneNumber = '5511999999999',
+  phoneNumber = '555182251103',
   defaultMessage = 'Olá! Gostaria de saber mais sobre a plataforma BIRDPRO e tirar algumas dúvidas.'
 }: WhatsAppButtonProps) {
   const [isHovered, setIsHovered] = useState(false);

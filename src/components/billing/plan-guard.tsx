@@ -181,7 +181,7 @@ export function PlanGuard({ children }: PlanGuardProps) {
           <div className="text-[11px] text-slate-400 flex items-center justify-center gap-2">
             <span>Precisa de ajuda ou deseja parcelar?</span>
             <a
-              href={`https://wa.me/5555991343265?text=${encodeURIComponent(`Olá! Meu painel do criatório ${currentTenant.name} foi suspenso por atraso e gostaria de regularizar meu pagamento.`)}`}
+              href={`https://wa.me/555182251103?text=${encodeURIComponent(`Olá! Meu painel do criatório ${currentTenant.name} foi suspenso por atraso e gostaria de regularizar meu pagamento.`)}`}
               target="_blank"
               rel="noreferrer"
               className="text-emerald-400 hover:underline font-bold flex items-center gap-1"

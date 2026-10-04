@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { 
   Bird, 
@@ -61,8 +61,12 @@ export default function DashboardPage() {
   
   const inBreeding = birds.filter(b => b.status === 'BREEDING').length;
   const inTreatment = birds.filter(b => b.status === 'IN_TREATMENT' || b.status === 'QUARANTINE').length;
-  const activeFledglings = birds.filter(b => b.name.toLowerCase().includes('filhote') || (b.birthDate && new Date(b.birthDate) > new Date(Date.now() - 60*24*60*60*1000))).length;
-  const adults = totalBirds - activeFledglings;
+  const activeFledglings = birds.filter(b => 
+    b.name.toLowerCase().includes('filhote') || 
+    (b.origin === 'BRED_HERE' && (!b.birthDate || new Date(b.birthDate) > new Date(Date.now() - 180 * 24 * 60 * 60 * 1000))) ||
+    (b.birthDate && new Date(b.birthDate) > new Date(Date.now() - 90 * 24 * 60 * 60 * 1000))
+  ).length;
+  const adults = Math.max(0, totalBirds - activeFledglings);
 
   const activePairs = pairs.filter(p => p.status === 'ACTIVE').length;
   const incubatingEggs = eggs.filter(e => e.status === 'INCUBATING' || e.status === 'FERTILE').length;
@@ -75,15 +79,66 @@ export default function DashboardPage() {
   }).length;
   const availableCages = cages.length - occupiedCages;
 
-  // Evolution chart mock data
-  const evolutionData = [
-    { month: 'Out', nascimentos: 2, mortalidade: 0, total: 10 },
-    { month: 'Nov', nascimentos: 4, mortalidade: 0, total: 12 },
-    { month: 'Dez', nascimentos: 3, mortalidade: 0, total: 13 },
-    { month: 'Jan', nascimentos: 5, mortalidade: 1, total: 15 },
-    { month: 'Fev', nascimentos: 4, mortalidade: 0, total: 16 },
-    { month: 'Mar (Prev)', nascimentos: 3, mortalidade: 0, total: 19 },
-  ];
+  // Real Evolution & Births calculation (Last 6 Months dynamically computed from real data)
+  const evolutionData = useMemo(() => {
+    const now = new Date();
+    const monthsData: { month: string; nascimentos: number; mortalidade: number; total: number }[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const rawMonth = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+      const monthLabel = rawMonth.charAt(0).toUpperCase() + rawMonth.slice(1);
+      const startOfMonth = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+      const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+
+      // Nascimentos no mês: aves com birthDate no período ou ovos eclodidos
+      const nascimentos = birds.filter(b => {
+        if (b.birthDate) {
+          const bd = new Date(b.birthDate);
+          return bd >= startOfMonth && bd <= endOfMonth;
+        }
+        if (b.origin === 'BRED_HERE') {
+          const ed = b.entryDate ? new Date(b.entryDate) : (b.createdAt ? new Date(b.createdAt) : null);
+          return ed ? (ed >= startOfMonth && ed <= endOfMonth) : false;
+        }
+        return false;
+      }).length;
+
+      // Mortalidade no mês:
+      const mortalidade = birds.filter(b => {
+        if (b.status === 'DECEASED' && b.exitDate) {
+          const ed = new Date(b.exitDate);
+          return ed >= startOfMonth && ed <= endOfMonth;
+        }
+        return false;
+      }).length;
+
+      // Total de aves ativas no criatório até o final daquele mês:
+      const total = birds.filter(b => {
+        const entry = b.entryDate 
+          ? new Date(b.entryDate) 
+          : (b.birthDate ? new Date(b.birthDate) : (b.createdAt ? new Date(b.createdAt) : null));
+        
+        if (entry && entry > endOfMonth) return false;
+
+        if (b.exitDate) {
+          const exit = new Date(b.exitDate);
+          if (exit <= endOfMonth) return false;
+        }
+
+        return true;
+      }).length;
+
+      monthsData.push({
+        month: monthLabel,
+        nascimentos,
+        mortalidade,
+        total
+      });
+    }
+
+    return monthsData;
+  }, [birds]);
 
   // Species distribution data
   const speciesCount: Record<string, number> = {};
@@ -320,72 +375,80 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-          {notifications.filter(n => n.status !== 'COMPLETED').slice(0, 3).map((notif) => {
-            const isMed = notif.category === 'MEDICATION';
-            const isHatch = notif.category === 'EGG_HATCH';
-            const isSexing = notif.category === 'SEXING';
+        {notifications.filter(n => n.status !== 'COMPLETED').length === 0 ? (
+          <div className="py-6 px-4 text-center rounded-2xl bg-slate-50/70 border border-slate-100 flex flex-col items-center justify-center">
+            <CheckCircle2 className="w-7 h-7 text-emerald-500 mb-1.5" />
+            <p className="text-xs font-bold text-slate-700">Tudo em dia no criatório!</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Nenhum alerta de medicamento, eclosão ou manejo sanitário pendente para as próximas 48 horas.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+            {notifications.filter(n => n.status !== 'COMPLETED').slice(0, 3).map((notif) => {
+              const isMed = notif.category === 'MEDICATION';
+              const isHatch = notif.category === 'EGG_HATCH';
+              const isSexing = notif.category === 'SEXING';
 
-            let cardBg = 'bg-slate-50/60 border-slate-200';
-            let headerText = 'text-slate-800';
-            let iconColor = 'text-slate-600';
-            let badgeBg = 'bg-slate-200 text-slate-900';
-            let IconComponent = Clock;
-            let categoryTitle = 'Lembrete';
-            let linkColor = 'text-slate-800';
+              let cardBg = 'bg-slate-50/60 border-slate-200';
+              let headerText = 'text-slate-800';
+              let iconColor = 'text-slate-600';
+              let badgeBg = 'bg-slate-200 text-slate-900';
+              let IconComponent = Clock;
+              let categoryTitle = 'Lembrete';
+              let linkColor = 'text-slate-800';
 
-            if (isMed) {
-              cardBg = 'bg-amber-50/60 border-amber-200';
-              headerText = 'text-amber-800';
-              iconColor = 'text-amber-600';
-              badgeBg = 'bg-amber-200 text-amber-900';
-              IconComponent = Pill;
-              categoryTitle = 'Medicamento Hoje';
-              linkColor = 'text-amber-800';
-            } else if (isHatch) {
-              cardBg = 'bg-emerald-50/60 border-emerald-200';
-              headerText = 'text-emerald-800';
-              iconColor = 'text-emerald-600';
-              badgeBg = 'bg-emerald-200 text-emerald-900';
-              IconComponent = EggIcon;
-              categoryTitle = 'Previsão de Eclosão';
-              linkColor = 'text-emerald-800';
-            } else if (isSexing) {
-              cardBg = 'bg-sky-50/60 border-sky-200';
-              headerText = 'text-sky-800';
-              iconColor = 'text-sky-600';
-              badgeBg = 'bg-sky-200 text-sky-900';
-              IconComponent = Sparkles;
-              categoryTitle = 'Sexagem DNA Filhotes';
-              linkColor = 'text-sky-800';
-            }
+              if (isMed) {
+                cardBg = 'bg-amber-50/60 border-amber-200';
+                headerText = 'text-amber-800';
+                iconColor = 'text-amber-600';
+                badgeBg = 'bg-amber-200 text-amber-900';
+                IconComponent = Pill;
+                categoryTitle = 'Medicamento Hoje';
+                linkColor = 'text-amber-800';
+              } else if (isHatch) {
+                cardBg = 'bg-emerald-50/60 border-emerald-200';
+                headerText = 'text-emerald-800';
+                iconColor = 'text-emerald-600';
+                badgeBg = 'bg-emerald-200 text-emerald-900';
+                IconComponent = EggIcon;
+                categoryTitle = 'Previsão de Eclosão';
+                linkColor = 'text-emerald-800';
+              } else if (isSexing) {
+                cardBg = 'bg-sky-50/60 border-sky-200';
+                headerText = 'text-sky-800';
+                iconColor = 'text-sky-600';
+                badgeBg = 'bg-sky-200 text-sky-900';
+                IconComponent = Sparkles;
+                categoryTitle = 'Sexagem DNA Filhotes';
+                linkColor = 'text-sky-800';
+              }
 
-            return (
-              <div key={notif.id} className={`p-4 rounded-2xl border space-y-2 flex flex-col justify-between ${cardBg}`}>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${headerText}`}>
-                      <IconComponent className={`w-4 h-4 ${iconColor}`} /> {categoryTitle}
-                    </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${badgeBg}`}>
-                      {notif.dueTime || notif.dueDate || 'Pendente'}
-                    </span>
+              return (
+                <div key={notif.id} className={`p-4 rounded-2xl border space-y-2 flex flex-col justify-between ${cardBg}`}>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${headerText}`}>
+                        <IconComponent className={`w-4 h-4 ${iconColor}`} /> {categoryTitle}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${badgeBg}`}>
+                        {notif.dueTime || notif.dueDate || 'Pendente'}
+                      </span>
+                    </div>
+                    <p className="text-sm font-bold text-slate-900">{notif.title}</p>
+                    <p className="text-xs text-slate-600">
+                      {notif.dosage ? `Dose: ${notif.dosage} ${notif.cageName ? `(${notif.cageName})` : ''}` : notif.message}
+                    </p>
                   </div>
-                  <p className="text-sm font-bold text-slate-900">{notif.title}</p>
-                  <p className="text-xs text-slate-600">
-                    {notif.dosage ? `Dose: ${notif.dosage} ${notif.cageName ? `(${notif.cageName})` : ''}` : notif.message}
-                  </p>
+                  <Link 
+                    href="/dashboard/alertas" 
+                    className={`inline-block text-xs font-bold hover:underline pt-1 ${linkColor}`}
+                  >
+                    {notif.actionText || 'Ver alerta completo →'}
+                  </Link>
                 </div>
-                <Link 
-                  href="/dashboard/alertas" 
-                  className={`inline-block text-xs font-bold hover:underline pt-1 ${linkColor}`}
-                >
-                  {notif.actionText || 'Ver alerta completo →'}
-                </Link>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Interactive Charts Section (Recharts) */}
@@ -402,6 +465,26 @@ export default function DashboardPage() {
             </span>
           </div>
 
+          {totalBirds === 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs text-slate-600">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-100/80 text-emerald-700 rounded-xl shrink-0">
+                  <Bird className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-800">Nenhuma ave ou filhote cadastrado</p>
+                  <p className="text-[11px] text-slate-500">O gráfico reflete os dados reais do seu criatório (0 aves). Conforme cadastrar matrizes ou registrar nascimentos, a curva de crescimento será desenhada aqui em tempo real.</p>
+                </div>
+              </div>
+              <Link href="/dashboard/aves?action=new" className="shrink-0">
+                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs">
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  Cadastrar Ave
+                </Button>
+              </Link>
+            </div>
+          )}
+
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={evolutionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -417,7 +500,7 @@ export default function DashboardPage() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                 <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748B' }} />
-                <YAxis tick={{ fontSize: 12, fill: '#64748B' }} />
+                <YAxis allowDecimals={false} domain={[0, (dataMax: number) => Math.max(5, Math.ceil(dataMax * 1.1))]} tick={{ fontSize: 12, fill: '#64748B' }} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#0F172A', borderRadius: '12px', border: 'none', color: '#fff' }}
                   itemStyle={{ fontSize: 12, padding: '2px 0' }}
@@ -437,41 +520,53 @@ export default function DashboardPage() {
             <p className="text-xs text-slate-500">Proporção de aves cadastradas no plantel</p>
           </div>
 
-          <div className="h-60 w-full flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={speciesChartData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={4}
-                  dataKey="value"
-                >
-                  {speciesChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#0F172A', borderRadius: '12px', border: 'none', color: '#fff' }}
-                  itemStyle={{ fontSize: 12 }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="space-y-1.5 max-h-28 overflow-y-auto custom-scrollbar">
-            {speciesChartData.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2 truncate">
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                  <span className="text-slate-700 truncate">{item.name}</span>
-                </div>
-                <span className="font-bold text-slate-900">{item.value} aves</span>
+          {speciesChartData.length === 0 ? (
+            <div className="h-60 w-full flex flex-col items-center justify-center text-center p-4">
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 mb-2">
+                <Bird className="w-8 h-8 text-slate-300" />
               </div>
-            ))}
-          </div>
+              <p className="text-xs font-bold text-slate-600">Nenhuma espécie cadastrada</p>
+              <p className="text-[11px] text-slate-400 max-w-xs mt-0.5">Cadastre suas aves para visualizar a distribuição do plantel.</p>
+            </div>
+          ) : (
+            <>
+              <div className="h-60 w-full flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={speciesChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={4}
+                      dataKey="value"
+                    >
+                      {speciesChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#0F172A', borderRadius: '12px', border: 'none', color: '#fff' }}
+                      itemStyle={{ fontSize: 12 }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="space-y-1.5 max-h-28 overflow-y-auto custom-scrollbar">
+                {speciesChartData.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 truncate">
+                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
+                      <span className="text-slate-700 truncate">{item.name}</span>
+                    </div>
+                    <span className="font-bold text-slate-900">{item.value} aves</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -503,36 +598,54 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {birds.slice(0, 6).map((bird) => (
-                <tr key={bird.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3 px-4 font-semibold text-slate-900 flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
-                      {bird.photoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={bird.photoUrl} alt={bird.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <Bird className="w-4 h-4 text-slate-400" />
-                      )}
+              {birds.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-10 text-center">
+                    <div className="flex flex-col items-center justify-center text-slate-400 space-y-2">
+                      <Bird className="w-8 h-8 opacity-30 text-slate-400" />
+                      <p className="text-xs font-semibold text-slate-600">Nenhuma ave cadastrada ainda no plantel</p>
+                      <p className="text-[11px] text-slate-400">Cadastre suas matrizes ou importe anilhas para começar a povoar seu criatório.</p>
+                      <Link href="/dashboard/aves?action=new" className="pt-2">
+                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs">
+                          <Plus className="w-3.5 h-3.5 mr-1" />
+                          Cadastrar Primeira Ave
+                        </Button>
+                      </Link>
                     </div>
-                    <div>
-                      <p className="font-bold text-slate-900 text-xs">{bird.name}</p>
-                      {bird.nickname && <p className="text-[10px] text-slate-400">&quot;{bird.nickname}&quot;</p>}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 font-mono font-semibold text-slate-700">{bird.ringNumber}</td>
-                  <td className="py-3 px-4 text-slate-600">{bird.species.split('(')[0]}</td>
-                  <td className="py-3 px-4"><SexBadge sex={bird.sex} /></td>
-                  <td className="py-3 px-4"><StatusBadge status={bird.status} /></td>
-                  <td className="py-3 px-4 text-slate-600 font-medium">{bird.cageId || 'Não alocada'}</td>
-                  <td className="py-3 px-4 text-right">
-                    <Link href={`/dashboard/aves/${bird.id}`}>
-                      <Button variant="ghost" size="sm" className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50">
-                        Abrir Ficha →
-                      </Button>
-                    </Link>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                birds.slice(0, 6).map((bird) => (
+                  <tr key={bird.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3 px-4 font-semibold text-slate-900 flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                        {bird.photoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={bird.photoUrl} alt={bird.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Bird className="w-4 h-4 text-slate-400" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900 text-xs">{bird.name}</p>
+                        {bird.nickname && <p className="text-[10px] text-slate-400">&quot;{bird.nickname}&quot;</p>}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 font-mono font-semibold text-slate-700">{bird.ringNumber}</td>
+                    <td className="py-3 px-4 text-slate-600">{bird.species.split('(')[0]}</td>
+                    <td className="py-3 px-4"><SexBadge sex={bird.sex} /></td>
+                    <td className="py-3 px-4"><StatusBadge status={bird.status} /></td>
+                    <td className="py-3 px-4 text-slate-600 font-medium">{bird.cageId || 'Não alocada'}</td>
+                    <td className="py-3 px-4 text-right">
+                      <Link href={`/dashboard/aves/${bird.id}`}>
+                        <Button variant="ghost" size="sm" className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50">
+                          Abrir Ficha →
+                        </Button>
+                      </Link>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
