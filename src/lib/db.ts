@@ -112,6 +112,59 @@ class DataService {
           this.state.globalConfig.gatewayProvider = 'MERCADOPAGO';
           this.state.globalConfig.gatewayApiKey = INITIAL_GLOBAL_CONFIG.gatewayApiKey;
         }
+
+        // Auto-sanitize legacy demo data from tenants in storage
+        if (this.state.tenants && this.state.tenants.length > 0) {
+          this.state.tenants = this.state.tenants.map(t => {
+            const hasLegacyDemo = 
+              t.slug === 'madruguinha' || 
+              t.name?.includes('Madruguinha') || 
+              t.facebook?.includes('MADRUGUINHA') ||
+              t.instagram?.includes('MADRUGUINHA') ||
+              t.address === 'Rua das violetas' ||
+              t.website?.includes('madruguinha');
+
+            if (hasLegacyDemo) {
+              return {
+                ...t,
+                name: t.name?.includes('Madruguinha') ? '' : t.name,
+                slug: t.slug === 'madruguinha' ? '' : t.slug,
+                document: t.document === '022.034.960-61' ? '' : t.document,
+                email: t.email === 'luis.henrique.schreiber@hotmail.com' ? '' : t.email,
+                phone: t.phone === '(55) 9134-3265' ? '' : t.phone,
+                cellphone: t.cellphone === '(55) 9 9134-3265' ? '' : t.cellphone,
+                whatsapp: (t.whatsapp === '5555991343265' || t.whatsapp === '(55) 9 9134-3265') ? '' : t.whatsapp,
+                address: t.address === 'Rua das violetas' ? '' : t.address,
+                addressNumber: t.addressNumber === '109' ? '' : t.addressNumber,
+                neighborhood: t.neighborhood === 'universitario' ? '' : t.neighborhood,
+                city: t.city === 'IJUI' ? '' : t.city,
+                state: t.state === 'RS' && t.city === 'IJUI' ? '' : t.state,
+                zipCode: (t.zipCode === '98700-000' || t.zipCode === '98700 000') ? '' : t.zipCode,
+                registryNumber: t.registryNumber === '4719754' ? '' : t.registryNumber,
+                facebook: t.facebook?.includes('MADRUGUINHA') ? '' : t.facebook,
+                instagram: t.instagram?.includes('MADRUGUINHA') ? '' : t.instagram,
+                website: t.website?.includes('madruguinha') ? '' : t.website,
+                owners: (t.owners || []).filter(o => !o.name?.includes('Madruguinha') && !o.nickname?.includes('Madruguinha'))
+              };
+            }
+            return t;
+          });
+        }
+
+        // Auto-sanitize legacy demo user
+        if (this.state.users && this.state.users.length > 0) {
+          this.state.users = this.state.users.map(u => {
+            if (u.email === 'luis.henrique.schreiber@hotmail.com' || u.name?.includes('Schreiber')) {
+              return {
+                ...u,
+                name: 'Usuário BIRDPRO',
+                email: 'usuario@birdpro.com.br',
+                phone: ''
+              };
+            }
+            return u;
+          });
+        }
       } else {
         this.saveToStorage();
       }
@@ -175,6 +228,100 @@ class DataService {
   getUserByEmail(email: string): User | undefined {
     const clean = email.toLowerCase().trim();
     return (this.state.users || []).find(u => u.email.toLowerCase().trim() === clean);
+  }
+
+  updateUser(id: string, updates: Partial<User>): User | null {
+    const idx = (this.state.users || []).findIndex(u => u.id === id);
+    if (idx >= 0) {
+      this.state.users[idx] = { ...this.state.users[idx], ...updates };
+      this.saveToStorage();
+      return this.state.users[idx];
+    }
+    return null;
+  }
+
+  updateUserCredentials(userIdOrEmail: string, newEmail: string, newPassword?: string): { success: boolean; message: string; user?: User } {
+    const cleanCurrent = (userIdOrEmail || '').toLowerCase().trim();
+    const cleanNewEmail = (newEmail || '').toLowerCase().trim();
+
+    // 1. Locate user
+    let user = (this.state.users || []).find(u => 
+      u.id === userIdOrEmail || 
+      u.email.toLowerCase().trim() === cleanCurrent
+    );
+
+    // If not found in users, check if there's a user associated with the active tenant
+    if (!user) {
+      const tenant = (this.state.tenants || []).find(t => 
+        t.email.toLowerCase().trim() === cleanCurrent || 
+        t.id === userIdOrEmail
+      );
+      if (tenant) {
+        user = (this.state.users || []).find(u => u.tenantId === tenant.id);
+      }
+    }
+
+    // If still not found, create or fallback
+    if (!user) {
+      user = this.state.users[0] || {
+        id: `user-${Date.now()}`,
+        name: 'Usuário BIRDPRO',
+        email: cleanNewEmail || 'usuario@birdpro.com.br',
+        password: newPassword || '123',
+        role: 'OWNER',
+        tenantId: 'tenant-demo-01',
+        active: true,
+        createdAt: new Date().toISOString()
+      };
+      if (!this.state.users.some(u => u.id === user!.id)) {
+        this.state.users.push(user);
+      }
+    }
+
+    // 2. Check if new email is already taken by another user
+    if (cleanNewEmail && cleanNewEmail !== user.email.toLowerCase().trim()) {
+      const emailConflict = (this.state.users || []).find(u => 
+        u.id !== user!.id && u.email.toLowerCase().trim() === cleanNewEmail
+      );
+      if (emailConflict) {
+        return { success: false, message: 'Este e-mail já está em uso por outro usuário no sistema.' };
+      }
+      user.email = cleanNewEmail;
+      
+      const linkedTenant = (this.state.tenants || []).find(t => t.id === user!.tenantId);
+      if (linkedTenant) {
+        linkedTenant.email = cleanNewEmail;
+      }
+    }
+
+    // 3. Update password if provided
+    if (newPassword && newPassword.trim().length > 0) {
+      user.password = newPassword.trim();
+    }
+
+    this.saveToStorage();
+
+    // 4. Update session
+    if (this.isBrowser) {
+      try {
+        const rawSession = localStorage.getItem('birdpro_current_user');
+        if (rawSession) {
+          const sessionUser = JSON.parse(rawSession);
+          if (sessionUser && (sessionUser.id === user.id || sessionUser.email === cleanCurrent || sessionUser.tenantId === user.tenantId)) {
+            const updatedSession = { ...sessionUser, email: user.email, name: user.name || sessionUser.name };
+            localStorage.setItem('birdpro_current_user', JSON.stringify(updatedSession));
+          }
+        }
+      } catch (e) {
+        console.error('Error updating session user:', e);
+      }
+    }
+
+    return { 
+      success: true, 
+      message: 'Credenciais de acesso atualizadas com sucesso!', 
+      user 
+    };
   }
 
   findAccountForPasswordReset(identifier: string): { 
@@ -379,7 +526,7 @@ class DataService {
           password: newPassword.trim(),
           role: 'SUPER_ADMIN',
           tenantId: 'tenant-demo-01',
-          phone: '(55) 9 9134-3265',
+          phone: '',
           active: true,
           createdAt: new Date().toISOString()
         };

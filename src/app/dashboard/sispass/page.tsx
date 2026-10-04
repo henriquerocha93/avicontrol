@@ -60,7 +60,7 @@ const SAMPLE_SISPASS_DATA: ParsedSispassBird[] = [
     origin: 'Reprodução em Cativeiro (Criador Amadorista)',
     name: 'Tui-Tui Estrela',
     status: 'ACTIVE',
-    notes: 'Anilha oficial IBAMA diâmetro 2.2mm. Registro SISPASS 4719754.',
+    notes: 'Anilha oficial IBAMA diâmetro 2.2mm. Registro SISPASS homologado.',
     photoUrl: ''
   },
   {

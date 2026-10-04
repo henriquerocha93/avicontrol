@@ -277,7 +277,7 @@ export function BadgeFrontAndBack({
           <div className="col-span-3">
             <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Registro CTF</span>
             <div className="bg-white border border-slate-400 px-1 py-0.5 text-center font-mono font-bold text-[9.5px] truncate text-slate-800">
-              {tenant?.registryNumber || '4719754'}
+              {tenant?.registryNumber || '—'}
             </div>
           </div>
         </div>

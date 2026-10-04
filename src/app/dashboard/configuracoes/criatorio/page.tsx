@@ -21,7 +21,12 @@ import {
   SlidersHorizontal,
   Link2,
   FolderUp,
-  Camera
+  Camera,
+  Lock,
+  KeyRound,
+  Eye,
+  EyeOff,
+  ShieldCheck
 } from 'lucide-react'
 import { db } from '@/lib/db'
 import { Tenant, BreederOwner, TenantVisualConfig } from '@/types'
@@ -32,6 +37,15 @@ export default function CriatorioConfigPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isLoadingCep, setIsLoadingCep] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  // Credentials (Login & Password) State
+  const [loginEmail, setLoginEmail] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isSavingCredentials, setIsSavingCredentials] = useState(false)
+  const [credentialMessage, setCredentialMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Image Selector Modal State
   const [isImageModalOpen, setIsImageModalOpen] = useState(false)
@@ -50,13 +64,48 @@ export default function CriatorioConfigPage() {
     name: '',
     cpf: '',
     city: '',
-    state: 'RS',
+    state: 'SP',
     avatarUrl: ''
   })
 
   useEffect(() => {
     const t = db.getTenant()
-    setTenant(t)
+    if (t) {
+      // Sanitize any legacy demo/mock data if present in state
+      const sanitized: Tenant = {
+        ...t,
+        name: t.name?.includes('Madruguinha') ? '' : (t.name || ''),
+        slug: t.slug === 'madruguinha' ? '' : (t.slug || ''),
+        document: (t.document === '022.034.960-61' || t.document === '000.000.000-00') ? '' : (t.document || ''),
+        email: t.email === 'luis.henrique.schreiber@hotmail.com' ? '' : (t.email || ''),
+        phone: t.phone === '(55) 9134-3265' ? '' : (t.phone || ''),
+        cellphone: t.cellphone === '(55) 9 9134-3265' ? '' : (t.cellphone || ''),
+        whatsapp: (t.whatsapp === '5555991343265' || t.whatsapp === '(55) 9 9134-3265') ? '' : (t.whatsapp || ''),
+        address: t.address === 'Rua das violetas' ? '' : (t.address || ''),
+        addressNumber: t.addressNumber === '109' ? '' : (t.addressNumber || ''),
+        neighborhood: t.neighborhood === 'universitario' ? '' : (t.neighborhood || ''),
+        city: t.city === 'IJUI' ? '' : (t.city || ''),
+        state: (t.state === 'RS' && t.city === 'IJUI') ? '' : (t.state || ''),
+        zipCode: (t.zipCode === '98700-000' || t.zipCode === '98700 000') ? '' : (t.zipCode || ''),
+        registryNumber: t.registryNumber === '4719754' ? '' : (t.registryNumber || ''),
+        facebook: t.facebook?.includes('MADRUGUINHA') ? '' : (t.facebook || ''),
+        instagram: t.instagram?.includes('MADRUGUINHA') ? '' : (t.instagram || ''),
+        website: t.website?.includes('madruguinha') ? '' : (t.website || ''),
+        owners: (t.owners || []).filter(o => !o.name?.includes('Madruguinha') && !o.nickname?.includes('Madruguinha'))
+      }
+      setTenant(sanitized)
+
+      // Initialize login email from session or tenant
+      try {
+        const rawSession = typeof window !== 'undefined' ? localStorage.getItem('birdpro_current_user') : null
+        if (rawSession) {
+          const sessionUser = JSON.parse(rawSession)
+          if (sessionUser?.email) setLoginEmail(sessionUser.email)
+        } else if (sanitized.email) {
+          setLoginEmail(sanitized.email)
+        }
+      } catch {}
+    }
   }, [])
 
   if (!tenant) {
@@ -127,8 +176,8 @@ export default function CriatorioConfigPage() {
         id: `own_${Date.now()}`,
         name: '',
         cpf: '',
-        city: tenant.city || 'IJUI',
-        state: tenant.state || 'RS',
+        city: tenant.city || '',
+        state: tenant.state || 'SP',
         avatarUrl: ''
       })
       setEditingOwnerIndex(null)
@@ -177,6 +226,62 @@ export default function CriatorioConfigPage() {
   const showToast = (msg: string) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3500)
+  }
+
+  const handleSaveCredentials = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    setCredentialMessage(null)
+
+    const cleanEmail = loginEmail.trim().toLowerCase()
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setCredentialMessage({ type: 'error', text: 'Por favor, informe um endereço de e-mail de login válido.' })
+      return
+    }
+
+    if (newPassword) {
+      if (newPassword.length < 4) {
+        setCredentialMessage({ type: 'error', text: 'A nova senha deve possuir pelo menos 4 caracteres.' })
+        return
+      }
+      if (newPassword !== confirmPassword) {
+        setCredentialMessage({ type: 'error', text: 'A confirmação de senha não confere com a nova senha digitada.' })
+        return
+      }
+    }
+
+    setIsSavingCredentials(true)
+    try {
+      let activeUserId = tenant?.id
+      if (typeof window !== 'undefined') {
+        const rawSession = localStorage.getItem('birdpro_current_user')
+        if (rawSession) {
+          const parsed = JSON.parse(rawSession)
+          if (parsed?.id) activeUserId = parsed.id
+        }
+      }
+
+      const res = db.updateUserCredentials(activeUserId || cleanEmail, cleanEmail, newPassword || undefined)
+      if (!res.success) {
+        setCredentialMessage({ type: 'error', text: res.message })
+        setIsSavingCredentials(false)
+        return
+      }
+
+      // Sync tenant email if updated
+      if (tenant && tenant.email !== cleanEmail) {
+        setTenant(prev => prev ? { ...prev, email: cleanEmail } : null)
+      }
+
+      setCredentialMessage({ type: 'success', text: '✓ Login e senha alterados com sucesso!' })
+      setNewPassword('')
+      setConfirmPassword('')
+      showToast('Credenciais de login salvas com sucesso!')
+    } catch (err) {
+      console.error('Error saving credentials:', err)
+      setCredentialMessage({ type: 'error', text: 'Erro ao atualizar credenciais de acesso.' })
+    } finally {
+      setIsSavingCredentials(false)
+    }
   }
 
   const processImageFile = (file: File, field: keyof TenantVisualConfig) => {
@@ -265,6 +370,24 @@ export default function CriatorioConfigPage() {
   const handleSave = () => {
     if (!tenant) return
     setIsSaving(true)
+
+    // Save credentials if modified
+    if ((loginEmail && loginEmail !== tenant.email) || newPassword) {
+      try {
+        let activeUserId = tenant.id
+        if (typeof window !== 'undefined') {
+          const rawSession = localStorage.getItem('birdpro_current_user')
+          if (rawSession) {
+            const parsed = JSON.parse(rawSession)
+            if (parsed?.id) activeUserId = parsed.id
+          }
+        }
+        db.updateUserCredentials(activeUserId, loginEmail.trim().toLowerCase(), newPassword || undefined)
+      } catch (e) {
+        console.error('Error auto-saving credentials:', e)
+      }
+    }
+
     setTimeout(() => {
       db.saveTenant(tenant)
       setIsSaving(false)
@@ -387,7 +510,7 @@ export default function CriatorioConfigPage() {
                   type="text"
                   value={tenant.name || ''}
                   onChange={(e) => handleInputChange('name', e.target.value)}
-                  placeholder="Luis Henrique Schreiber Júnior 'Madruguinha'"
+                  placeholder="Ex: Criatório Canto & Fibra"
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
                 />
               </div>
@@ -401,7 +524,7 @@ export default function CriatorioConfigPage() {
                     handleInputChange('registryNumber', e.target.value)
                     handleInputChange('registrationNumber', e.target.value)
                   }}
-                  placeholder="4719754"
+                  placeholder="Ex: 1234567"
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
                 />
               </div>
@@ -482,7 +605,7 @@ export default function CriatorioConfigPage() {
                   type="text"
                   value={tenant.website || ''}
                   onChange={(e) => handleInputChange('website', e.target.value)}
-                  placeholder="madruguinha_999 ou face luis henrique Madruguinha"
+                  placeholder="https://seusite.com.br ou @seucriatorio"
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
                 />
               </div>
@@ -503,7 +626,7 @@ export default function CriatorioConfigPage() {
                   handleInputChange('whatsapp', e.target.value)
                   setTenant(prev => prev ? { ...prev, socialMedia: { ...prev.socialMedia, whatsapp: e.target.value } } : null)
                 }}
-                placeholder="(55) 9 9134-3265"
+                placeholder="(00) 00000-0000"
                 className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
               />
             </div>
@@ -517,7 +640,7 @@ export default function CriatorioConfigPage() {
                   handleInputChange('facebook', e.target.value)
                   setTenant(prev => prev ? { ...prev, socialMedia: { ...prev.socialMedia, facebook: e.target.value } } : null)
                 }}
-                placeholder="LUIS HENRIQUE MADRUGUINHA"
+                placeholder="facebook.com/seucriatorio"
                 className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
               />
             </div>
@@ -531,6 +654,7 @@ export default function CriatorioConfigPage() {
                   handleInputChange('twitter', e.target.value)
                   setTenant(prev => prev ? { ...prev, socialMedia: { ...prev.socialMedia, twitter: e.target.value } } : null)
                 }}
+                placeholder="@seucriatorio"
                 className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
               />
             </div>
@@ -544,7 +668,7 @@ export default function CriatorioConfigPage() {
                   handleInputChange('instagram', e.target.value)
                   setTenant(prev => prev ? { ...prev, socialMedia: { ...prev.socialMedia, instagram: e.target.value } } : null)
                 }}
-                placeholder="LUIS HENRIQUE MADRUGUINHA"
+                placeholder="@seucriatorio"
                 className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
               />
             </div>
@@ -558,6 +682,7 @@ export default function CriatorioConfigPage() {
                   handleInputChange('youtube', e.target.value)
                   setTenant(prev => prev ? { ...prev, socialMedia: { ...prev.socialMedia, youtube: e.target.value } } : null)
                 }}
+                placeholder="youtube.com/@seucriatorio"
                 className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
               />
             </div>
@@ -574,7 +699,7 @@ export default function CriatorioConfigPage() {
                 type="text"
                 value={tenant.phone || ''}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
-                placeholder="(55) 9134-3265"
+                placeholder="(00) 0000-0000"
                 className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
               />
             </div>
@@ -588,7 +713,7 @@ export default function CriatorioConfigPage() {
                   handleInputChange('cellphone', e.target.value)
                   handleInputChange('mobile', e.target.value)
                 }}
-                placeholder="(55) 9 9134-3265"
+                placeholder="(00) 00000-0000"
                 className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
               />
             </div>
@@ -599,7 +724,7 @@ export default function CriatorioConfigPage() {
                 type="email"
                 value={tenant.email || ''}
                 onChange={(e) => handleInputChange('email', e.target.value)}
-                placeholder="luis.henrique.schreiber@hotmail.com"
+                placeholder="contato@seucriatorio.com.br"
                 className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
               />
             </div>
@@ -622,7 +747,7 @@ export default function CriatorioConfigPage() {
                       handleInputChange('zipCode', e.target.value)
                       handleInputChange('cep', e.target.value)
                     }}
-                    placeholder="98700 000"
+                    placeholder="00000-000"
                     className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-l text-slate-800 focus:outline-none focus:border-[#00c853]"
                   />
                   <button
@@ -645,7 +770,7 @@ export default function CriatorioConfigPage() {
                   type="text"
                   value={tenant.address || ''}
                   onChange={(e) => handleInputChange('address', e.target.value)}
-                  placeholder="Rua das violetas"
+                  placeholder="Ex: Rua das Flores"
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
                 />
               </div>
@@ -661,7 +786,7 @@ export default function CriatorioConfigPage() {
                     handleInputChange('addressNumber', e.target.value)
                     handleInputChange('number', e.target.value)
                   }}
-                  placeholder="109"
+                  placeholder="Ex: 123"
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
                 />
               </div>
@@ -677,7 +802,7 @@ export default function CriatorioConfigPage() {
                   type="text"
                   value={tenant.neighborhood || ''}
                   onChange={(e) => handleInputChange('neighborhood', e.target.value)}
-                  placeholder="universitario"
+                  placeholder="Ex: Centro"
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
                 />
               </div>
@@ -687,18 +812,38 @@ export default function CriatorioConfigPage() {
                   UF<span className="text-red-500">*</span>
                 </label>
                 <select
-                  value={tenant.state || 'RS'}
+                  value={tenant.state || ''}
                   onChange={(e) => handleInputChange('state', e.target.value)}
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
                 >
-                  <option value="RS">RS</option>
-                  <option value="SP">SP</option>
-                  <option value="RJ">RJ</option>
-                  <option value="MG">MG</option>
-                  <option value="PR">PR</option>
-                  <option value="SC">SC</option>
+                  <option value="">Selecione UF</option>
+                  <option value="AC">AC</option>
+                  <option value="AL">AL</option>
+                  <option value="AP">AP</option>
+                  <option value="AM">AM</option>
                   <option value="BA">BA</option>
+                  <option value="CE">CE</option>
+                  <option value="DF">DF</option>
+                  <option value="ES">ES</option>
                   <option value="GO">GO</option>
+                  <option value="MA">MA</option>
+                  <option value="MT">MT</option>
+                  <option value="MS">MS</option>
+                  <option value="MG">MG</option>
+                  <option value="PA">PA</option>
+                  <option value="PB">PB</option>
+                  <option value="PR">PR</option>
+                  <option value="PE">PE</option>
+                  <option value="PI">PI</option>
+                  <option value="RJ">RJ</option>
+                  <option value="RN">RN</option>
+                  <option value="RS">RS</option>
+                  <option value="RO">RO</option>
+                  <option value="RR">RR</option>
+                  <option value="SC">SC</option>
+                  <option value="SP">SP</option>
+                  <option value="SE">SE</option>
+                  <option value="TO">TO</option>
                 </select>
               </div>
 
@@ -710,7 +855,7 @@ export default function CriatorioConfigPage() {
                   type="text"
                   value={tenant.city || ''}
                   onChange={(e) => handleInputChange('city', e.target.value)}
-                  placeholder="IJUI"
+                  placeholder="Ex: Sua Cidade"
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
                 />
               </div>
@@ -723,6 +868,7 @@ export default function CriatorioConfigPage() {
                 type="text"
                 value={tenant.complement || ''}
                 onChange={(e) => handleInputChange('complement', e.target.value)}
+                placeholder="Ex: Bloco B, Apto 101, Chácara 02"
                 className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
               />
             </div>
@@ -796,7 +942,125 @@ export default function CriatorioConfigPage() {
           </div>
         </div>
 
-        {/* 6. SEÇÃO IMAGEM */}
+        {/* 6. SEÇÃO ACESSO & SEGURANÇA (MUDAR LOGIN E SENHA) */}
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-slate-200 gap-2">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-md bg-[#00c853]/10 text-[#00c853] flex items-center justify-center shrink-0">
+                <KeyRound className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                  Acesso & Segurança
+                  <span className="text-[10px] font-normal normal-case bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                    Login e Senha
+                  </span>
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Atualize seu e-mail de acesso e altere sua senha de entrada no sistema
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSaveCredentials}
+              disabled={isSavingCredentials}
+              className="self-start sm:self-auto px-4 py-2 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-bold rounded flex items-center space-x-1.5 transition shadow-xs disabled:opacity-50"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>{isSavingCredentials ? 'Atualizando...' : 'Atualizar Credenciais'}</span>
+            </button>
+          </div>
+
+          {credentialMessage && (
+            <div
+              className={`p-3 rounded text-xs mb-4 flex items-center gap-2 ${
+                credentialMessage.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                  : 'bg-red-50 text-red-800 border border-red-200'
+              }`}
+            >
+              {credentialMessage.type === 'success' ? (
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <X className="w-4 h-4 text-red-600 shrink-0" />
+              )}
+              <span>{credentialMessage.text}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* E-mail de Login */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                E-mail de Login / Acesso
+              </label>
+              <div className="relative">
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="seu-email@exemplo.com"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+                />
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">E-mail utilizado para entrar na plataforma.</p>
+            </div>
+
+            {/* Nova Senha */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Nova Senha
+              </label>
+              <div className="relative">
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="•••••••• (deixe em branco se não for alterar)"
+                  className="w-full text-xs pl-3 pr-8 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">Mínimo de 4 caracteres.</p>
+            </div>
+
+            {/* Confirmar Nova Senha */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Confirmar Nova Senha
+              </label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  disabled={!newPassword}
+                  className="w-full text-xs pl-3 pr-8 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853] disabled:bg-slate-100 disabled:text-slate-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  disabled={!newPassword}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 disabled:opacity-50"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">Repita exatamente a nova senha.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 7. SEÇÃO IMAGEM */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
@@ -1462,7 +1726,7 @@ export default function CriatorioConfigPage() {
                   required
                   value={ownerForm.name}
                   onChange={(e) => setOwnerForm({ ...ownerForm, name: e.target.value })}
-                  placeholder="Luis Henrique Schreiber júnior 'Madruguinha'"
+                  placeholder="Ex: João da Silva"
                   className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
                 />
               </div>
@@ -1474,7 +1738,7 @@ export default function CriatorioConfigPage() {
                   required
                   value={ownerForm.cpf}
                   onChange={(e) => setOwnerForm({ ...ownerForm, cpf: e.target.value })}
-                  placeholder="022.034.960-61"
+                  placeholder="000.000.000-00"
                   className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
                 />
               </div>
@@ -1486,7 +1750,7 @@ export default function CriatorioConfigPage() {
                     type="text"
                     value={ownerForm.city}
                     onChange={(e) => setOwnerForm({ ...ownerForm, city: e.target.value })}
-                    placeholder="IJUI"
+                    placeholder="Ex: São Paulo"
                     className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
                   />
                 </div>
@@ -1496,7 +1760,7 @@ export default function CriatorioConfigPage() {
                     type="text"
                     value={ownerForm.state}
                     onChange={(e) => setOwnerForm({ ...ownerForm, state: e.target.value.toUpperCase() })}
-                    placeholder="RS"
+                    placeholder="SP"
                     maxLength={2}
                     className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
                   />

@@ -253,7 +253,7 @@ export function PrintPedigreeModal({
                   <p className={`text-[11px] font-bold uppercase tracking-wider ${
                     themeStyle === 'DARK_PRESTIGE' ? 'text-slate-400' : 'text-slate-600'
                   }`}>
-                    {tenant?.name || 'CRIATÓRIO DE ELITE'} • REGISTRO IBAMA / SISPASS: {tenant?.registryNumber || '4719754'}
+                    {tenant?.name || 'CRIATÓRIO'} • REGISTRO IBAMA / SISPASS: {tenant?.registryNumber || '—'}
                   </p>
                 </div>
               )}

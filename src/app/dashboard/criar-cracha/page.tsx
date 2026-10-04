@@ -43,7 +43,7 @@ export default function CriarCrachaPage() {
     species: 'Canário-da-terra (Sicalis flaveola)',
     sex: 'MALE' as 'MALE' | 'FEMALE',
     birthDate: '2025-11-20',
-    registryNumber: tenant?.registryNumber || '4719754'
+    registryNumber: tenant?.registryNumber || ''
   });
 
   // 2. Pais (1ª Geração)
@@ -160,7 +160,7 @@ export default function CriarCrachaPage() {
       species: 'Canário-da-terra (Sicalis flaveola)',
       sex: 'MALE',
       birthDate: new Date().toISOString().split('T')[0],
-      registryNumber: tenant?.registryNumber || '4719754'
+      registryNumber: tenant?.registryNumber || ''
     });
     setParents({ fatherName: '', motherName: '' });
     setGrandparents({
@@ -183,12 +183,12 @@ export default function CriarCrachaPage() {
 
   const handleLoadSample = () => {
     setBirdData({
-      name: 'Madreguinha Diamante',
-      ringNumber: 'FOB-2026-RS-47197',
+      name: 'Canto & Fibra Campeão',
+      ringNumber: 'FOB-2026-BR-01234',
       species: 'Canário-da-terra (Sicalis flaveola brasiliensis)',
       sex: 'MALE',
       birthDate: '2025-10-15',
-      registryNumber: tenant?.registryNumber || '4719754'
+      registryNumber: tenant?.registryNumber || ''
     });
     setParents({
       fatherName: '05898 EP (Campeão Nacional)',

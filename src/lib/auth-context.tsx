@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: cleanEmail,
         role: 'SUPER_ADMIN',
         tenantId: 'tenant-demo-01',
-        phone: '(55) 9 9134-3265',
+        phone: '',
         active: true,
         createdAt: '2026-01-01T00:00:00Z'
       };

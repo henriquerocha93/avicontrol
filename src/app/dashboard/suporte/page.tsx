@@ -246,8 +246,8 @@ export default function SuportePage() {
     const newTkt = db.addTicket({
       tenantId: tenant?.id || 'tenant-demo-01',
       criatorioName: tenant?.name || 'Meu Criatório',
-      userName: user?.name || 'Luis Henrique',
-      userEmail: user?.email || 'contato@criatorio.com.br',
+      userName: user?.name || tenant?.name || 'Criador',
+      userEmail: user?.email || tenant?.email || 'contato@criatorio.com.br',
       userWhatsapp: form.userWhatsapp.trim(),
       subject: form.subject.trim(),
       category: form.category,
@@ -266,7 +266,7 @@ export default function SuportePage() {
     e.preventDefault();
     if (!replyMessage.trim() || !selectedTicket) return;
 
-    db.addTicketMessage(selectedTicket.id, user?.name || 'Luis Henrique', replyMessage.trim(), false, 'USER');
+    db.addTicketMessage(selectedTicket.id, user?.name || tenant?.name || 'Criador', replyMessage.trim(), false, 'USER');
     setReplyMessage('');
     loadTickets();
     const updated = db.getTickets(tenant?.id).find(t => t.id === selectedTicket.id);

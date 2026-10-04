@@ -350,7 +350,7 @@ export default function AssinaturaPage() {
                       type="text"
                       value={couponCodeInput}
                       onChange={(e) => setCouponCodeInput(e.target.value)}
-                      placeholder="Ex: MADRUGUINHA10, BIRDPRO10"
+                      placeholder="Ex: PROMO10, BIRDPRO10"
                       className="w-full h-9 px-3 text-xs uppercase font-mono bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#00c853]"
                     />
                     <button

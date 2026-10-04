@@ -145,7 +145,7 @@ export function PrintBadgeModal({
                     </div>
                   )}
                   <span className="text-[9px] font-black uppercase tracking-wider block mt-1 text-slate-900">
-                    {tenant.name?.split(' ')[0] || 'MADRUGUINHA'}
+                    {tenant.name?.split(' ')[0] || 'CRIATÓRIO'}
                   </span>
                 </div>
 
@@ -210,7 +210,7 @@ export function PrintBadgeModal({
                 <div className="col-span-4">
                   <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Registro</span>
                   <div className="bg-white border border-slate-400 px-1 py-0.5 text-center font-mono font-bold text-[10px] truncate">
-                    {tenant.registryNumber || tenant.registrationNumber || '4719754'}
+                    {tenant.registryNumber || tenant.registrationNumber || '—'}
                   </div>
                 </div>
               </div>
@@ -221,10 +221,10 @@ export function PrintBadgeModal({
                   <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Proprietário</span>
                   <div className="flex border border-slate-400 text-[8.5px] font-bold">
                     <div className="flex-1 px-1.5 py-0.5 bg-white border-r border-slate-400 truncate">
-                      {tenant.name || 'Luis Henrique Schreiber Júnior "Madruguinha"'}
+                      {tenant.name || '—'}
                     </div>
                     <div className="px-2 py-0.5 bg-white shrink-0">
-                      {tenant.phone || tenant.cellphone || '(55) 9134-3265'}
+                      {tenant.phone || tenant.cellphone || '—'}
                     </div>
                   </div>
                 </div>

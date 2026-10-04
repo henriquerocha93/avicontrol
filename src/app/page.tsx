@@ -36,7 +36,8 @@ import {
   Lock,
   Thermometer,
   Shield,
-  FileCheck
+  FileCheck,
+  HelpCircle
 } from 'lucide-react';
 import { Logo } from '@/components/ui/logo';
 import { Button } from '@/components/ui/button';
@@ -44,8 +45,9 @@ import { DynamicDaytimeAmbience } from '@/components/landing/dynamic-daytime-amb
 import { LiveBreedingStatus } from '@/components/landing/live-breeding-status';
 import { DailyProofsSection } from '@/components/landing/daily-proofs-section';
 import { PrintableBadgePreview } from '@/components/landing/printable-badge-preview';
+import { FaqAndSeoSection } from '@/components/landing/faq-and-seo-section';
 
-type SectionId = 'recursos' | 'comparativo' | 'pedigree' | 'criatorios' | 'ambiente' | 'planos';
+type SectionId = 'recursos' | 'comparativo' | 'pedigree' | 'criatorios' | 'ambiente' | 'planos' | 'faq';
 
 interface SectionConfig {
   id: SectionId;
@@ -105,6 +107,14 @@ const SECTIONS: SectionConfig[] = [
     badge: 'R$ 14,99/mês',
     tagline: 'Sem taxas ocultas, 100% dos recursos liberados'
   },
+  { 
+    id: 'faq', 
+    label: 'Dúvidas Frequentes', 
+    shortLabel: 'Dúvidas / FAQ',
+    icon: HelpCircle,
+    badge: 'Tire Dúvidas',
+    tagline: 'Perguntas e respostas sobre SISPASS, Pedigree, Consanguinidade e Planos'
+  },
 ];
 
 export default function LandingPage() {
@@ -120,6 +130,14 @@ export default function LandingPage() {
   // Switch section with smooth scroll and transition effect
   const handleSelectSection = (id: SectionId) => {
     setActiveSection(id);
+    if (id === 'faq') {
+      const faqElem = document.getElementById('faq');
+      if (faqElem) {
+        const topOffset = faqElem.getBoundingClientRect().top + window.scrollY - 100;
+        window.scrollTo({ top: topOffset, behavior: 'smooth' });
+        return;
+      }
+    }
     if (sectionRef.current) {
       const topOffset = sectionRef.current.getBoundingClientRect().top + window.scrollY - 100;
       window.scrollTo({ top: topOffset, behavior: 'smooth' });
@@ -1208,20 +1226,78 @@ export default function LandingPage() {
 
           </div>
 
+        {/* ======================================================================= */}
+        {/* FAQ & SEARCH ENGINE OPTIMIZATION SECTION (CRAWLABLE CONTENT & JSON-LD) */}
+        {/* ======================================================================= */}
+        <FaqAndSeoSection />
+
       </main>
 
       {/* ========================================================================= */}
-      {/* 5. FOOTER (CLEAN & MINIMALIST)                                            */}
+      {/* 5. FOOTER (RICH SEO NAVIGATION & BRANDING)                                */}
       {/* ========================================================================= */}
-      <footer className="border-t border-emerald-950/80 bg-[#050b08] py-10 text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <Logo variant="light" size="sm" href="/" />
-          <div className="flex items-center gap-6 text-slate-400">
-            <Link href="/login" className="hover:text-emerald-400 transition-colors">Login</Link>
-            <Link href="/checkout?plano=anual" className="hover:text-emerald-400 transition-colors">Assinar BIRDPRO</Link>
-            <Link href="/dashboard" className="hover:text-emerald-400 transition-colors">Dashboard</Link>
+      <footer className="border-t border-emerald-950/80 bg-[#050b08] py-14 text-xs text-slate-400">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-10">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            
+            {/* Col 1: Brand Info */}
+            <div className="space-y-3 md:col-span-1">
+              <Logo variant="light" size="sm" href="/" />
+              <p className="text-slate-400 text-xs leading-relaxed">
+                A mais avançada plataforma zootécnica em nuvem para criadores de aves do Brasil. Genealogia, SISPASS, FOB, Pedigree A4 com QR Code e controle de plantel.
+              </p>
+              <div className="flex items-center gap-2 text-[11px] text-emerald-400 font-semibold pt-1">
+                <span className="w-2 h-2 rounded-full bg-[#00c853] animate-pulse" />
+                <span>Servidores em Nuvem Ativos (24/7)</span>
+              </div>
+            </div>
+
+            {/* Col 2: Recursos & Módulos */}
+            <div className="space-y-2.5">
+              <h4 className="text-white font-bold text-xs uppercase tracking-wider">Recursos Zootécnicos</h4>
+              <ul className="space-y-1.5 text-slate-400">
+                <li><button onClick={() => handleSelectSection('recursos')} className="hover:text-emerald-400 transition cursor-pointer">Importação SISPASS / IBAMA</button></li>
+                <li><button onClick={() => handleSelectSection('pedigree')} className="hover:text-emerald-400 transition cursor-pointer">Pedigree A4 Oficial FOB</button></li>
+                <li><button onClick={() => handleSelectSection('recursos')} className="hover:text-emerald-400 transition cursor-pointer">Cálculo de Consanguinidade Wright</button></li>
+                <li><button onClick={() => handleSelectSection('ambiente')} className="hover:text-emerald-400 transition cursor-pointer">Ovoscopia & Postura</button></li>
+                <li><button onClick={() => handleSelectSection('recursos')} className="hover:text-emerald-400 transition cursor-pointer">Gaiolas & QR Code Físico</button></li>
+              </ul>
+            </div>
+
+            {/* Col 3: Espécies Atendidas */}
+            <div className="space-y-2.5">
+              <h4 className="text-white font-bold text-xs uppercase tracking-wider">Espécies & Plantéis</h4>
+              <ul className="space-y-1.5 text-slate-400">
+                <li><span className="text-slate-300">Curió & Bicudo</span> (Canto & Fibra)</li>
+                <li><span className="text-slate-300">Trinca-Ferro & Pixarro</span> (Manejo)</li>
+                <li><span className="text-slate-300">Coleiro & Papa-Capim</span> (Tui Tui)</li>
+                <li><span className="text-slate-300">Canário Belga & da Terra</span> (Cor/Porte)</li>
+                <li><span className="text-slate-300">Calopsita, Agapornis & Ringneck</span></li>
+              </ul>
+            </div>
+
+            {/* Col 4: Links Rápidos & Segurança */}
+            <div className="space-y-2.5">
+              <h4 className="text-white font-bold text-xs uppercase tracking-wider">Acesso Rápido</h4>
+              <ul className="space-y-1.5 text-slate-400">
+                <li><Link href="/login" className="hover:text-emerald-400 transition">Acessar Minha Conta (Login)</Link></li>
+                <li><Link href="/contratar" className="hover:text-emerald-400 transition">Planos e Preços (R$ 14,99/mês)</Link></li>
+                <li><Link href="/cadastro" className="hover:text-emerald-400 transition">Criar Conta no BIRDPRO</Link></li>
+                <li><Link href="/qr_code" className="hover:text-emerald-400 transition">Verificação de QR Code</Link></li>
+                <li><button onClick={() => handleSelectSection('faq')} className="hover:text-emerald-400 transition cursor-pointer">Dúvidas Frequentes (FAQ)</button></li>
+              </ul>
+            </div>
+
           </div>
-          <p>© {new Date().getFullYear()} BIRDPRO • Gestão Aviária &amp; Conservação da Natureza.</p>
+
+          <div className="pt-8 border-t border-emerald-950 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-400">
+            <p>© {new Date().getFullYear()} BIRDPRO • Gestão Aviária &amp; Conservação. Todos os direitos reservados.</p>
+            <div className="flex items-center gap-4">
+              <Link href="/contratar" className="hover:text-emerald-400 transition">Assinar BIRDPRO</Link>
+              <Link href="/login" className="hover:text-emerald-400 transition">Área do Criador</Link>
+              <span className="text-emerald-400 font-bold">100% em Nuvem</span>
+            </div>
+          </div>
         </div>
       </footer>
     </div>

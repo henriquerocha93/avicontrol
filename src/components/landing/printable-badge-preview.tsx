@@ -46,7 +46,7 @@ export function PrintableBadgePreview() {
     criatorio: 'CRIATÓRIO ELITE BRASIL',
     criador: 'Carlos Alberto Silveira',
     phone: '(11) 98765-4321',
-    registry: 'SISPASS 4719754 / FOB-BR'
+    registry: 'SISPASS 1234567 / FOB-BR'
   };
 
   const publicUrl = 'https://birdpro.com.br/ave/soberano-real';
@@ -272,7 +272,7 @@ export function PrintableBadgePreview() {
         <div className="col-span-4 bg-slate-100 border border-slate-400 rounded p-1.5 text-center">
           <span className="text-[7px] font-bold uppercase text-slate-600 block">Nº SISPASS</span>
           <span className="font-mono font-bold text-xs text-slate-900">
-            4719754
+            1234567
           </span>
         </div>
       </div>
