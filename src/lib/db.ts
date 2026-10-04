@@ -115,40 +115,47 @@ class DataService {
 
         // Auto-sanitize legacy demo data from tenants in storage
         if (this.state.tenants && this.state.tenants.length > 0) {
+          let hadDemoFields = false;
           this.state.tenants = this.state.tenants.map(t => {
-            const hasLegacyDemo = 
+            const isDemo = 
               t.slug === 'madruguinha' || 
               t.name?.includes('Madruguinha') || 
               t.facebook?.includes('MADRUGUINHA') ||
               t.instagram?.includes('MADRUGUINHA') ||
               t.address === 'Rua das violetas' ||
+              t.city === 'IJUI' ||
+              t.registryNumber === '4719754' ||
               t.website?.includes('madruguinha');
 
-            if (hasLegacyDemo) {
-              return {
-                ...t,
-                name: t.name?.includes('Madruguinha') ? '' : t.name,
-                slug: t.slug === 'madruguinha' ? '' : t.slug,
-                document: t.document === '022.034.960-61' ? '' : t.document,
-                email: t.email === 'luis.henrique.schreiber@hotmail.com' ? '' : t.email,
-                phone: t.phone === '(55) 9134-3265' ? '' : t.phone,
-                cellphone: t.cellphone === '(55) 9 9134-3265' ? '' : t.cellphone,
-                whatsapp: (t.whatsapp === '5555991343265' || t.whatsapp === '(55) 9 9134-3265') ? '' : t.whatsapp,
-                address: t.address === 'Rua das violetas' ? '' : t.address,
-                addressNumber: t.addressNumber === '109' ? '' : t.addressNumber,
-                neighborhood: t.neighborhood === 'universitario' ? '' : t.neighborhood,
-                city: t.city === 'IJUI' ? '' : t.city,
-                state: t.state === 'RS' && t.city === 'IJUI' ? '' : t.state,
-                zipCode: (t.zipCode === '98700-000' || t.zipCode === '98700 000') ? '' : t.zipCode,
-                registryNumber: t.registryNumber === '4719754' ? '' : t.registryNumber,
-                facebook: t.facebook?.includes('MADRUGUINHA') ? '' : t.facebook,
-                instagram: t.instagram?.includes('MADRUGUINHA') ? '' : t.instagram,
-                website: t.website?.includes('madruguinha') ? '' : t.website,
-                owners: (t.owners || []).filter(o => !o.name?.includes('Madruguinha') && !o.nickname?.includes('Madruguinha'))
-              };
+            if (isDemo || t.address === 'Rua das violetas' || t.city === 'IJUI' || t.registryNumber === '4719754') {
+              hadDemoFields = true;
             }
-            return t;
+
+            return {
+              ...t,
+              name: t.name?.includes('Madruguinha') ? '' : t.name,
+              slug: t.slug === 'madruguinha' ? '' : t.slug,
+              document: (t.document === '022.034.960-61' || t.document === '000.000.000-00') ? '' : t.document,
+              email: t.email === 'luis.henrique.schreiber@hotmail.com' ? '' : t.email,
+              phone: (t.phone === '(55) 9134-3265' || t.phone === '(55) 9 9134-3265') ? '' : t.phone,
+              cellphone: (t.cellphone === '(55) 9 9134-3265' || t.cellphone === '(55) 9134-3265') ? '' : t.cellphone,
+              whatsapp: (t.whatsapp === '5555991343265' || t.whatsapp === '(55) 9 9134-3265' || t.whatsapp === '5591343265') ? '' : t.whatsapp,
+              address: t.address === 'Rua das violetas' ? '' : t.address,
+              addressNumber: t.addressNumber === '109' ? '' : t.addressNumber,
+              neighborhood: t.neighborhood === 'universitario' ? '' : t.neighborhood,
+              city: t.city === 'IJUI' ? '' : t.city,
+              state: (t.state === 'RS' && (t.city === 'IJUI' || !t.city)) ? '' : t.state,
+              zipCode: (t.zipCode === '98700-000' || t.zipCode === '98700 000') ? '' : t.zipCode,
+              registryNumber: t.registryNumber === '4719754' ? '' : t.registryNumber,
+              facebook: t.facebook?.includes('MADRUGUINHA') ? '' : t.facebook,
+              instagram: t.instagram?.includes('MADRUGUINHA') ? '' : t.instagram,
+              website: (t.website?.includes('madruguinha') || t.website?.includes('Madruguinha')) ? '' : t.website,
+              owners: (t.owners || []).filter(o => !o.name?.includes('Madruguinha') && !o.nickname?.includes('Madruguinha') && !o.name?.includes('Schreiber'))
+            };
           });
+          if (hadDemoFields) {
+            this.saveToStorage();
+          }
         }
 
         // Auto-sanitize legacy demo user
@@ -1364,20 +1371,48 @@ class DataService {
     this.saveToStorage();
   }
 
-  updatePayoutStatus(id: string, status: 'PROCESSING' | 'COMPLETED' | 'REJECTED'): void {
+  updatePayoutStatus(id: string, status: 'PROCESSING' | 'COMPLETED' | 'REJECTED', receiptUrl?: string): void {
     if (!this.state.payouts) return;
     const p = this.state.payouts.find(x => x.id === id);
     if (p) {
       p.status = status;
-      if (status === 'COMPLETED') p.completedAt = new Date().toISOString();
-      if (status === 'REJECTED') {
-        // Refund balance to seller
-        const seller = this.getSellerById(p.affiliateId);
-        if (seller) {
-          seller.balanceAvailable += p.amount;
-          seller.totalCommissionsPaid = Math.max(0, seller.totalCommissionsPaid - p.amount);
+      if (receiptUrl) p.receiptUrl = receiptUrl;
+      if (status === 'COMPLETED') {
+        p.completedAt = new Date().toISOString();
+        if (!p.receiptUrl) {
+          p.receiptUrl = `https://comprovante.pix.birdpro.com.br/tx-${Date.now()}`;
         }
       }
+
+      // Sync with user referral if it came from Indique & Ganhe
+      const refProg = this.state.userReferrals?.[p.affiliateId];
+      if (refProg) {
+        const itemInProg = refProg.payouts.find(x => x.id === id);
+        if (itemInProg) {
+          itemInProg.status = status;
+          if (status === 'COMPLETED') {
+            itemInProg.completedAt = p.completedAt;
+            itemInProg.receiptUrl = p.receiptUrl;
+            refProg.totalWithdrawn += p.amount;
+          }
+        }
+        if (status === 'REJECTED') {
+          refProg.balanceAvailable += p.amount;
+        }
+      }
+
+      // Sync with seller if affiliate was a seller
+      const seller = this.getSellerById(p.affiliateId);
+      if (seller) {
+        if (status === 'REJECTED') {
+          seller.balanceAvailable += p.amount;
+          seller.totalCommissionsPaid = Math.max(0, seller.totalCommissionsPaid - p.amount);
+        } else if (status === 'COMPLETED') {
+          seller.totalCommissionsPaid += p.amount;
+        }
+      }
+
+      this.logAction(p.affiliateId, 'PAYOUT_STATUS_UPDATED', 'FINANCEIRO', `Status do repasse de R$ ${p.amount.toFixed(2)} atualizado para: ${status}`);
       this.saveToStorage();
     }
   }
@@ -1424,26 +1459,126 @@ class DataService {
     return prog;
   }
 
+  isCouponAvailable(rawCode: string, currentTenantId: string): { available: boolean; reason?: string } {
+    if (!rawCode || !rawCode.trim()) {
+      return { available: false, reason: 'O nome do cupom não pode estar em branco.' };
+    }
+    const clean = rawCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+    if (clean.length < 3) {
+      return { available: false, reason: 'O cupom deve conter no mínimo 3 caracteres (letras e números).' };
+    }
+    if (clean.length > 25) {
+      return { available: false, reason: 'O cupom pode conter no máximo 25 caracteres.' };
+    }
+
+    // Palavras reservadas do sistema
+    const SYSTEM_RESERVED = ['BIRDPRO10', 'BIRDPRO20', 'PRIMEIROANO', 'CRIADORVIP', 'BIRDPRO50', 'PROMO10', 'ADMIN', 'ROOT', 'SUPERADMIN'];
+    if (SYSTEM_RESERVED.includes(clean)) {
+      return { available: false, reason: 'Este cupom é uma palavra reservada do sistema. Por favor, escolha outro nome.' };
+    }
+
+    // 1. Varredura nos Vendedores / Parceiros cadastrados
+    const sellers = this.state.sellers || [];
+    for (const seller of sellers) {
+      if (seller.linkedTenantId !== currentTenantId) {
+        if (seller.couponCode && seller.couponCode.toUpperCase() === clean) {
+          return { available: false, reason: 'Este cupom já está em uso por outro parceiro ou vendedor.' };
+        }
+        if (seller.affiliateCode && seller.affiliateCode.toUpperCase() === clean) {
+          return { available: false, reason: 'Este código já está em uso como identificador de afiliado.' };
+        }
+      }
+    }
+
+    // 2. Varredura nos Cupons de Indique & Ganhe de todos os usuários
+    const referrals = this.state.userReferrals || {};
+    for (const tId in referrals) {
+      if (tId !== currentTenantId) {
+        const prog = referrals[tId];
+        if (prog.couponCode && prog.couponCode.toUpperCase() === clean) {
+          return { available: false, reason: 'Este cupom já está sendo utilizado por outro usuário do sistema.' };
+        }
+        if (prog.referralCode && prog.referralCode.toUpperCase() === clean) {
+          return { available: false, reason: 'Este código de indicação já está registrado para outro criador.' };
+        }
+      }
+    }
+
+    return { available: true };
+  }
+
+  updateUserCouponCode(tenantId: string, rawCode: string): { success: boolean; message: string; updatedCoupon?: string; updatedUrl?: string } {
+    const clean = rawCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+    const check = this.isCouponAvailable(clean, tenantId);
+    if (!check.available) {
+      return { success: false, message: check.reason || 'Cupom indisponível.' };
+    }
+
+    const prog = this.getUserReferral(tenantId);
+    prog.couponCode = clean;
+    prog.referralCode = clean.toLowerCase();
+    prog.referralUrl = `https://www.birdpro.com.br/cadastro?ref=${clean.toLowerCase()}`;
+
+    // Sincroniza vendedor vinculado se existir
+    const linked = this.getSellerByTenantId(tenantId);
+    if (linked) {
+      linked.couponCode = clean;
+      linked.affiliateCode = clean.toLowerCase();
+      linked.affiliateUrl = prog.referralUrl;
+    }
+
+    this.logAction(tenantId, 'UPDATE_COUPON', 'INDIQUE_E_GANHE', `Cupom de indicação alterado com sucesso para: ${clean}`);
+    this.saveToStorage();
+    return {
+      success: true,
+      message: `Cupom alterado para "${clean}" com sucesso!`,
+      updatedCoupon: clean,
+      updatedUrl: prog.referralUrl
+    };
+  }
+
   requestUserReferralPayout(tenantId: string, amount: number, pixKey: string): AffiliatePayout | null {
     const prog = this.getUserReferral(tenantId);
     if (!prog || amount <= 0 || amount > prog.balanceAvailable) return null;
 
+    const tenant = this.getTenant(tenantId);
+    const tenantName = tenant?.name || 'Criatório Parceiro';
+    const now = new Date();
+    const dueAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+
     const payout: AffiliatePayout = {
       id: `pay-ref-${Date.now()}`,
       affiliateId: tenantId,
-      affiliateName: this.getTenant(tenantId)?.name || 'Criatório Parceiro',
+      affiliateName: tenantName,
       amount,
       pixKey,
-      receiptUrl: `https://comprovante.pix.birdpro.com.br/tx-ref-${Date.now()}`,
-      status: 'COMPLETED',
-      createdAt: new Date().toISOString(),
-      completedAt: new Date().toISOString()
+      pixKeyType: prog.pixKeyType || 'EMAIL',
+      receiptUrl: '',
+      status: 'REQUESTED',
+      createdAt: now.toISOString(),
+      dueAt,
+      type: 'REFERRAL_USER'
     };
 
     prog.balanceAvailable = Math.max(0, prog.balanceAvailable - amount);
-    prog.totalWithdrawn += amount;
     prog.payouts.unshift(payout);
-    this.logAction(tenantId, 'PAYOUT_REFERRAL', 'INDIQUE_E_GANHE', `Saque PIX de R$ ${amount.toFixed(2)} efetuado via Indique & Ganhe`);
+
+    // Registra nos pagamentos globais para gestão do painel Super Admin
+    if (!this.state.payouts) this.state.payouts = [];
+    this.state.payouts.unshift(payout);
+
+    // Alerta de alta prioridade para o Administrador do sistema
+    this.addNotification({
+      tenantId: 'tenant-demo-01',
+      title: '🚨 NOVO SAQUE PIX SOLICITADO (PRAZO: 24H)',
+      message: `O criatório "${tenantName}" solicitou saque de R$ ${amount.toFixed(2)} via PIX (${pixKey}). Prazo para pagamento: 24 horas.`,
+      type: 'FINANCIAL',
+      priority: 'HIGH',
+      link: '/dashboard/admin/financeiro',
+      read: false
+    });
+
+    this.logAction(tenantId, 'PAYOUT_REQUESTED', 'INDIQUE_E_GANHE', `Solicitação de saque PIX de R$ ${amount.toFixed(2)} registrada. Prazo de 24 horas para efetivação.`);
     this.saveToStorage();
     return payout;
   }
@@ -1559,6 +1694,11 @@ class DataService {
     expiresAt?: string;
     planStatus?: 'ACTIVE' | 'TRIAL' | 'PAST_DUE' | 'CANCELLED';
     password?: string;
+    customDiscountType?: 'NONE' | 'PERCENT' | 'FIXED' | 'CUSTOM_PRICE';
+    customDiscountValue?: number;
+    customDiscountReason?: string;
+    originalPrice?: number;
+    finalPrice?: number;
   }): { tenant: Tenant; user: User } {
     const tenantId = `tenant-${Date.now()}`;
     const slug = data.name.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 20);
@@ -1572,6 +1712,22 @@ class DataService {
       } else {
         calculatedExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
       }
+    }
+
+    const standardPrice = data.billingCycle === 'MENSAL' ? 14.99 : data.billingCycle === 'ANUAL' ? 169.99 : 0;
+    const originalPrice = data.originalPrice !== undefined ? data.originalPrice : standardPrice;
+    let finalPrice = originalPrice;
+
+    if (data.customDiscountType && data.customDiscountType !== 'NONE' && data.customDiscountValue !== undefined) {
+      if (data.customDiscountType === 'PERCENT') {
+        finalPrice = Math.max(0, originalPrice * (1 - data.customDiscountValue / 100));
+      } else if (data.customDiscountType === 'FIXED') {
+        finalPrice = Math.max(0, originalPrice - data.customDiscountValue);
+      } else if (data.customDiscountType === 'CUSTOM_PRICE') {
+        finalPrice = Math.max(0, data.customDiscountValue);
+      }
+    } else if (data.finalPrice !== undefined) {
+      finalPrice = data.finalPrice;
     }
 
     const newTenant: Tenant = {
@@ -1588,6 +1744,12 @@ class DataService {
       setupProgress: 100,
       expiresAt: calculatedExpiresAt,
       createdAt: new Date().toISOString(),
+      customDiscountType: data.customDiscountType || 'NONE',
+      customDiscountValue: data.customDiscountValue,
+      customDiscountReason: data.customDiscountReason,
+      originalPrice,
+      finalPrice,
+      priceAmount: finalPrice,
       owners: data.responsibleName ? [
         {
           id: `owner-${Date.now()}`,
@@ -1619,7 +1781,7 @@ class DataService {
 
     this.state.tenants.unshift(newTenant);
     this.state.users.unshift(newUser);
-    this.logAction('tenant-demo-01', 'CREATE_TENANT_MANUAL', 'ADMIN_TENANTS', `Criatório ${newTenant.name} (${newTenant.billingCycle} - ${newTenant.plan}) cadastrado manualmente`);
+    this.logAction('tenant-demo-01', 'CREATE_TENANT_MANUAL', 'ADMIN_TENANTS', `Criatório ${newTenant.name} (${newTenant.billingCycle} - ${newTenant.plan}) cadastrado manualmente com valor final R$ ${finalPrice.toFixed(2)}`);
     this.saveToStorage();
     return { tenant: newTenant, user: newUser };
   }
@@ -1640,6 +1802,11 @@ class DataService {
       planStatus: any;
       expiresAt: string;
       maxBirds: number;
+      customDiscountType?: 'NONE' | 'PERCENT' | 'FIXED' | 'CUSTOM_PRICE';
+      customDiscountValue?: number;
+      customDiscountReason?: string;
+      originalPrice?: number;
+      finalPrice?: number;
     }
   ): void {
     const t = this.state.tenants.find(x => x.id === tenantId);
@@ -1651,6 +1818,14 @@ class DataService {
       t.planStatus = data.planStatus;
       t.expiresAt = data.expiresAt;
       t.maxBirds = data.maxBirds;
+      if (data.customDiscountType !== undefined) t.customDiscountType = data.customDiscountType;
+      if (data.customDiscountValue !== undefined) t.customDiscountValue = data.customDiscountValue;
+      if (data.customDiscountReason !== undefined) t.customDiscountReason = data.customDiscountReason;
+      if (data.originalPrice !== undefined) t.originalPrice = data.originalPrice;
+      if (data.finalPrice !== undefined) {
+        t.finalPrice = data.finalPrice;
+        t.priceAmount = data.finalPrice;
+      }
     }
 
     // Also update linked owner user credentials

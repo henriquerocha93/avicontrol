@@ -27,7 +27,8 @@ import {
   Calendar,
   AlertCircle,
   Briefcase,
-  Target
+  Target,
+  Tag
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { db } from '@/lib/db';
@@ -44,11 +45,14 @@ export default function IndiqueEGanhePage() {
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
   const [isPixModalOpen, setIsPixModalOpen] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
 
   // Forms
   const [payoutAmount, setPayoutAmount] = useState('');
   const [pixKeyForm, setPixKeyForm] = useState('');
   const [pixTypeForm, setPixTypeForm] = useState<'CPF' | 'CNPJ' | 'EMAIL' | 'PHONE' | 'RANDOM'>('EMAIL');
+  const [couponForm, setCouponForm] = useState('');
+  const [couponError, setCouponError] = useState<string | null>(null);
 
   const tenantId = tenant?.id || 'tenant-demo-01';
 
@@ -94,8 +98,32 @@ export default function IndiqueEGanhePage() {
     setTimeout(() => setCopiedCoupon(false), 2500);
   };
 
+  const handleOpenCouponModal = () => {
+    setCouponForm(referralData?.couponCode || '');
+    setCouponError(null);
+    setIsCouponModalOpen(true);
+  };
+
+  const handleSaveCoupon = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCouponError(null);
+    const clean = couponForm.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+    if (!clean) {
+      setCouponError('Por favor, informe o nome do cupom.');
+      return;
+    }
+    const res = db.updateUserCouponCode(tenantId, clean);
+    if (!res.success) {
+      setCouponError(res.message);
+      return;
+    }
+    loadData();
+    setIsCouponModalOpen(false);
+    alert(res.message);
+  };
+
   const readyMessage = referralData 
-    ? `Olá amigo criador! 🐦\n\nEstou usando o BIRDPRO para gerenciar todo meu criatório, matrizes, filhotes, reprodução, anilhas e genealogia aviária completa.\n\nUse meu link exclusivo para criar sua conta com 30 DIAS GRÁTIS + 10% DE DESCONTO na sua assinatura:\n👉 ${referralData.referralUrl}\n\nOu use o cupom no checkout: ${referralData.couponCode}`
+    ? `Olá amigo criador!\n\nEstou usando o BIRDPRO para gerenciar todo o meu criatório: matrizes, filhotes, reprodução, anilhas e genealogia completa.\n\nAssine com 10% DE DESCONTO EXCLUSIVO no link:\n${referralData.referralUrl}\n\nOu utilize meu cupom no checkout: ${referralData.couponCode}`
     : '';
 
   const handleCopyReadyMessage = () => {
@@ -138,7 +166,7 @@ export default function IndiqueEGanhePage() {
       loadData();
       setIsPayoutModalOpen(false);
       setPayoutAmount('');
-      alert(`🎉 Saque PIX de R$ ${amount.toFixed(2)} registrado com sucesso! O valor será transferido para sua chave cadastrada.`);
+      alert(`Solicitação de saque PIX de R$ ${amount.toFixed(2)} enviada com sucesso! O pagamento será processado em até 24 horas úteis diretamente na sua chave PIX cadastrada.`);
     }
   };
 
@@ -150,42 +178,42 @@ export default function IndiqueEGanhePage() {
     );
   }
 
-  // Calculate Gamification Tier
+  // Calculate Gamification Tier (Bronze 1-4, Prata 5-14, Ouro 15-49, Diamante 50+)
   const totalPaid = referralData.totalPaid || 0;
   let currentTier = {
     name: 'Criador Conector',
     level: 1,
     badge: '🥉 Bronze',
     color: 'from-amber-700 to-amber-900',
-    nextLevelAt: 3,
+    nextLevelAt: 5,
     bonusInfo: `${referralData.userCommissionPercent || 20}% de comissão no PIX`
   };
 
-  if (totalPaid >= 10) {
+  if (totalPaid >= 50) {
     currentTier = {
       name: 'Lenda da Ornitologia BIRDPRO',
       level: 4,
       badge: '💎 Diamante',
       color: 'from-cyan-500 to-blue-600',
-      nextLevelAt: 10,
+      nextLevelAt: 50,
       bonusInfo: `${Math.max(25, referralData.userCommissionPercent)}% de comissão + Selo Embaixador Vitalício`
     };
-  } else if (totalPaid >= 6) {
+  } else if (totalPaid >= 15) {
     currentTier = {
       name: 'Embaixador de Ouro',
       level: 3,
       badge: '🥇 Ouro',
       color: 'from-amber-400 to-yellow-600',
-      nextLevelAt: 10,
+      nextLevelAt: 50,
       bonusInfo: `${Math.max(22, referralData.userCommissionPercent)}% de comissão + 1 Ano de BIRDPRO Premium Grátis`
     };
-  } else if (totalPaid >= 3) {
+  } else if (totalPaid >= 5) {
     currentTier = {
       name: 'Criador Influente',
       level: 2,
       badge: '🥈 Prata',
       color: 'from-slate-300 to-slate-500',
-      nextLevelAt: 6,
+      nextLevelAt: 15,
       bonusInfo: `${referralData.userCommissionPercent}% de comissão + Destaque no Painel`
     };
   }
@@ -458,7 +486,7 @@ export default function IndiqueEGanhePage() {
                   Seu Cupom de Desconto
                 </label>
                 <div className="flex items-center space-x-2">
-                  <div className="flex-1 bg-amber-50/70 border border-amber-200 rounded-lg px-3 py-1.5 text-xs font-mono font-black text-amber-800 uppercase tracking-widest text-center">
+                  <div className="flex-1 bg-amber-50/70 border border-amber-200 rounded-lg px-3 py-1.5 text-xs font-mono font-black text-amber-800 uppercase tracking-widest text-center truncate">
                     {referralData.couponCode}
                   </div>
                   <button
@@ -467,6 +495,13 @@ export default function IndiqueEGanhePage() {
                     title="Copiar Cupom"
                   >
                     {copiedCoupon ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                  <button
+                    onClick={handleOpenCouponModal}
+                    className="px-2.5 py-1.5 text-xs font-bold text-amber-700 hover:text-amber-900 bg-amber-100/60 hover:bg-amber-100 rounded-lg border border-amber-200 transition cursor-pointer"
+                    title="Personalizar Cupom"
+                  >
+                    Editar
                   </button>
                 </div>
               </div>
@@ -566,28 +601,28 @@ export default function IndiqueEGanhePage() {
               
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-amber-800">🥉 Nível Bronze (1-2)</span>
+                  <span className="font-bold text-amber-800">🥉 Nível Bronze (1-4)</span>
                 </div>
                 <span className="font-bold text-slate-700">20% no PIX</span>
               </div>
 
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-700">🥈 Nível Prata (3-5)</span>
+                  <span className="font-bold text-slate-700">🥈 Nível Prata (5-14)</span>
                 </div>
                 <span className="font-bold text-slate-700">20% + Destaque</span>
               </div>
 
               <div className="flex items-center justify-between p-2 rounded-lg bg-amber-50/50 border border-amber-200">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-amber-700">🥇 Nível Ouro (6-9)</span>
+                  <span className="font-bold text-amber-700">🥇 Nível Ouro (15-49)</span>
                 </div>
                 <span className="font-bold text-amber-800">22% + 1 Ano Grátis</span>
               </div>
 
               <div className="flex items-center justify-between p-2 rounded-lg bg-cyan-50/50 border border-cyan-200">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-blue-700">💎 Nível Diamante (10+)</span>
+                  <span className="font-bold text-blue-700">💎 Nível Diamante (50+)</span>
                 </div>
                 <span className="font-bold text-blue-800">25% Vitalício</span>
               </div>
@@ -631,7 +666,7 @@ export default function IndiqueEGanhePage() {
             </div>
             <h4 className="font-bold text-xs text-slate-800">Amigo ganha 10% OFF</h4>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              Ao criar a conta pelo seu link, seu amigo ganha 30 dias grátis de teste e 10% de desconto na primeira anuidade.
+              Ao assinar utilizando seu link ou cupom exclusivo, seu amigo ganha 10% de desconto imediato na anuidade.
             </p>
           </div>
 
@@ -705,7 +740,7 @@ export default function IndiqueEGanhePage() {
                         </span>
                       ) : friend.status === 'TRIAL' ? (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                          Teste Grátis (30 Dias)
+                          Aguardando Assinatura
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
@@ -931,6 +966,81 @@ export default function IndiqueEGanhePage() {
             >
               Fechar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================================== */}
+      {/* MODAL: EDITAR CUPOM DE DESCONTO COM VARREDURA ANTI-CONFLITO         */}
+      {/* ==================================================================== */}
+      {isCouponModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Tag className="w-4 h-4 text-amber-600" />
+                <h3 className="text-sm font-bold text-slate-800">Personalizar Seu Cupom de Desconto</h3>
+              </div>
+              <button 
+                onClick={() => setIsCouponModalOpen(false)} 
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCoupon}>
+              <div className="p-5 space-y-4">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Defina o nome do seu cupom de divulgação. O sistema fará uma <strong>varredura automática</strong> para garantir que ninguém mais esteja utilizando esse código antes de salvar.
+                </p>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                    Nome do Cupom (Letras e Números)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={couponForm}
+                    onChange={(e) => {
+                      setCouponError(null);
+                      setCouponForm(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''));
+                    }}
+                    placeholder="Ex: CRIATORIO10"
+                    maxLength={25}
+                    className="w-full h-10 px-3 text-sm font-mono font-bold uppercase tracking-wider bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500"
+                  />
+                  <span className="text-[10px] text-slate-400 block">
+                    Mínimo 3 caracteres, letras maiúsculas e números.
+                  </span>
+                </div>
+
+                {couponError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs flex items-start gap-2">
+                    <X className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                    <span className="leading-tight">{couponError}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCouponModalOpen(false)}
+                  className="px-4 py-2 text-xs text-slate-600 hover:text-slate-900 cursor-pointer font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Verificar &amp; Salvar Cupom</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

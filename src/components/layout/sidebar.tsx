@@ -108,13 +108,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   // Exclusive menu items for Super Admin
   const openTicketsCount = db.getAllTickets().filter(t => t.status === 'OPEN' || t.unreadByAdmin).length;
+  const pendingPixCount = db.getPayouts().filter(p => p.status === 'REQUESTED' || p.status === 'PROCESSING').length;
 
   const adminMenuItems = [
-    { name: 'Painel Master ADM', href: '/dashboard/admin', icon: ShieldCheck },
+    { name: 'Painel Master ADM', href: '/dashboard/admin', icon: ShieldCheck, badge: pendingPixCount > 0 ? 'PIX!' : undefined },
     { name: 'Central de Chamados', href: '/dashboard/admin/chamados', icon: Headphones, badge: openTicketsCount > 0 ? `${openTicketsCount}` : undefined },
     { name: 'Vendedores & Afiliados', href: '/dashboard/admin/vendedores', icon: Users },
     { name: 'Criatórios & Licenças', href: '/dashboard/admin/criatorios', icon: Building2 },
-    { name: 'Financeiro & Saques', href: '/dashboard/admin/financeiro', icon: DollarSign },
+    { name: 'Financeiro & Saques', href: '/dashboard/admin/financeiro', icon: DollarSign, badge: pendingPixCount > 0 ? `${pendingPixCount} PIX` : undefined },
     { name: 'Configurações Globais', href: '/dashboard/admin/configuracoes', icon: Settings },
     { name: 'Logs de Auditoria', href: '/dashboard/admin/logs', icon: FileText },
   ];

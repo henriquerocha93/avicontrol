@@ -28,7 +28,9 @@ import {
   FileText,
   Eye,
   EyeOff,
-  Key
+  Key,
+  Tag,
+  Percent
 } from 'lucide-react'
 import { db } from '@/lib/db'
 import { Tenant, PlanType } from '@/types'
@@ -56,6 +58,11 @@ export default function AdminCriatoriosPage() {
   const [formCustomExpires, setFormCustomExpires] = useState('')
   const [formPlanStatus, setFormPlanStatus] = useState<'ACTIVE' | 'TRIAL'>('ACTIVE')
 
+  // New Tenant Manual Discount States
+  const [formDiscountType, setFormDiscountType] = useState<'NONE' | 'PERCENT' | 'FIXED' | 'CUSTOM_PRICE'>('NONE')
+  const [formDiscountValue, setFormDiscountValue] = useState('')
+  const [formDiscountReason, setFormDiscountReason] = useState('')
+
   // Edit form states
   const [editPlan, setEditPlan] = useState<PlanType>('PREMIUM')
   const [editBillingCycle, setEditBillingCycle] = useState<'MENSAL' | 'ANUAL' | 'ISENTO'>('MENSAL')
@@ -66,12 +73,43 @@ export default function AdminCriatoriosPage() {
   const [editPassword, setEditPassword] = useState('')
   const [showEditPassword, setShowEditPassword] = useState(false)
 
+  // Edit Tenant Manual Discount States
+  const [editDiscountType, setEditDiscountType] = useState<'NONE' | 'PERCENT' | 'FIXED' | 'CUSTOM_PRICE'>('NONE')
+  const [editDiscountValue, setEditDiscountValue] = useState('')
+  const [editDiscountReason, setEditDiscountReason] = useState('')
+
   useEffect(() => {
     refresh()
   }, [])
 
   const refresh = () => {
     setTenants([...db.getAllTenants()])
+  }
+
+  const getStandardPrice = (cycle: 'MENSAL' | 'ANUAL' | 'ISENTO') => {
+    if (cycle === 'MENSAL') return 14.99
+    if (cycle === 'ANUAL') return 169.99
+    return 0
+  }
+
+  const calculateFinalPrice = (
+    cycle: 'MENSAL' | 'ANUAL' | 'ISENTO',
+    discountType: 'NONE' | 'PERCENT' | 'FIXED' | 'CUSTOM_PRICE',
+    discountValueStr: string
+  ) => {
+    const base = getStandardPrice(cycle)
+    if (cycle === 'ISENTO' || discountType === 'NONE') return base
+    const val = parseFloat(discountValueStr) || 0
+    if (discountType === 'PERCENT') {
+      return Math.max(0, base * (1 - val / 100))
+    }
+    if (discountType === 'FIXED') {
+      return Math.max(0, base - val)
+    }
+    if (discountType === 'CUSTOM_PRICE') {
+      return Math.max(0, val)
+    }
+    return base
   }
 
   const resetNewForm = () => {
@@ -86,6 +124,9 @@ export default function AdminCriatoriosPage() {
     setFormMaxBirds('9999')
     setFormCustomExpires('')
     setFormPlanStatus('ACTIVE')
+    setFormDiscountType('NONE')
+    setFormDiscountValue('')
+    setFormDiscountReason('')
   }
 
   const handleOpenNew = () => {
@@ -100,6 +141,9 @@ export default function AdminCriatoriosPage() {
     }
 
     let calculatedExpires = formCustomExpires ? new Date(formCustomExpires).toISOString() : undefined;
+    const originalPrice = getStandardPrice(formBillingCycle);
+    const finalPrice = calculateFinalPrice(formBillingCycle, formDiscountType, formDiscountValue);
+    const numDiscountValue = formDiscountValue ? parseFloat(formDiscountValue) : undefined;
 
     db.createTenantManual({
       name: formName.trim(),
@@ -112,7 +156,12 @@ export default function AdminCriatoriosPage() {
       billingCycle: formBillingCycle,
       maxBirds: parseInt(formMaxBirds, 10) || 9999,
       expiresAt: calculatedExpires,
-      planStatus: formPlanStatus
+      planStatus: formPlanStatus,
+      customDiscountType: formDiscountType,
+      customDiscountValue: numDiscountValue,
+      customDiscountReason: formDiscountReason.trim() || undefined,
+      originalPrice,
+      finalPrice
     })
 
     refresh()
@@ -128,6 +177,11 @@ export default function AdminCriatoriosPage() {
     setEditPlanStatus(t.planStatus || 'ACTIVE')
     setEditExpiresAt(t.expiresAt ? t.expiresAt.split('T')[0] : '')
     setEditMaxBirds(t.maxBirds || 9999)
+
+    // Load discount states
+    setEditDiscountType(t.customDiscountType || 'NONE')
+    setEditDiscountValue(t.customDiscountValue !== undefined ? String(t.customDiscountValue) : '')
+    setEditDiscountReason(t.customDiscountReason || '')
 
     // Load linked user credentials
     const linkedUser = db.getTenantOwnerUser(t.id)
@@ -148,6 +202,10 @@ export default function AdminCriatoriosPage() {
       expDate = '2099-12-31T23:59:59Z'
     }
 
+    const originalPrice = getStandardPrice(editBillingCycle);
+    const finalPrice = calculateFinalPrice(editBillingCycle, editDiscountType, editDiscountValue);
+    const numDiscountValue = editDiscountValue ? parseFloat(editDiscountValue) : undefined;
+
     db.updateTenantAndCredentials(editingTenant.id, {
       email: editEmail.trim(),
       password: editPassword.trim() || undefined,
@@ -155,12 +213,17 @@ export default function AdminCriatoriosPage() {
       billingCycle: editBillingCycle,
       planStatus: editPlanStatus,
       expiresAt: expDate,
-      maxBirds: editMaxBirds
+      maxBirds: editMaxBirds,
+      customDiscountType: editDiscountType,
+      customDiscountValue: numDiscountValue,
+      customDiscountReason: editDiscountReason.trim() || undefined,
+      originalPrice,
+      finalPrice
     })
 
     refresh()
     setEditingTenant(null)
-    alert('✅ Alterações e credenciais de login/senha salvas com sucesso!')
+    alert('✅ Alterações e credenciais salvas com sucesso!')
   }
 
   const handleQuickRenew = (t: Tenant, months = 1) => {
@@ -304,7 +367,7 @@ export default function AdminCriatoriosPage() {
                 <th className="text-left px-5 py-3">Criatório / Titular</th>
                 <th className="text-left px-4 py-3">Documento / Contato</th>
                 <th className="text-center px-4 py-3">Plano</th>
-                <th className="text-center px-4 py-3">Tipo Cobrança</th>
+                <th className="text-center px-4 py-3">Cobrança &amp; Valor</th>
                 <th className="text-center px-4 py-3">Limite Aves</th>
                 <th className="text-center px-4 py-3">Vencimento &amp; Situação</th>
                 <th className="text-center px-5 py-3">Ações</th>
@@ -354,17 +417,41 @@ export default function AdminCriatoriosPage() {
 
                       <td className="px-4 py-3.5 text-center">
                         {isIsento ? (
-                          <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                          <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 inline-block">
                             🛡️ Isento / Cortesia
                           </span>
                         ) : t.billingCycle === 'MENSAL' ? (
-                          <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                            📅 Mensal
-                          </span>
+                          <div className="space-y-1">
+                            <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 inline-block">
+                              📅 Mensal
+                            </span>
+                            {t.customDiscountType && t.customDiscountType !== 'NONE' ? (
+                              <div className="text-[11px] font-black text-emerald-700 flex items-center justify-center gap-1" title={t.customDiscountReason || 'Desconto manual aplicado'}>
+                                <span>R$ {(t.finalPrice ?? 14.99).toFixed(2)}</span>
+                                <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded border border-emerald-200">
+                                  {t.customDiscountType === 'PERCENT' ? `-${t.customDiscountValue}%` : `R$ ${t.customDiscountValue} OFF`}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="text-[10px] text-slate-500 font-medium">R$ 14,99 /mês</div>
+                            )}
+                          </div>
                         ) : (
-                          <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            🗓️ Anual
-                          </span>
+                          <div className="space-y-1">
+                            <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 inline-block">
+                              🗓️ Anual
+                            </span>
+                            {t.customDiscountType && t.customDiscountType !== 'NONE' ? (
+                              <div className="text-[11px] font-black text-emerald-700 flex items-center justify-center gap-1" title={t.customDiscountReason || 'Desconto manual aplicado'}>
+                                <span>R$ {(t.finalPrice ?? 169.99).toFixed(2)}</span>
+                                <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded border border-emerald-200">
+                                  {t.customDiscountType === 'PERCENT' ? `-${t.customDiscountValue}%` : `R$ ${t.customDiscountValue} OFF`}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="text-[10px] text-slate-500 font-medium">R$ 169,99 /ano</div>
+                            )}
+                          </div>
                         )}
                       </td>
 
@@ -648,6 +735,144 @@ export default function AdminCriatoriosPage() {
                   </div>
                 )}
               </div>
+
+              {/* BLOCO DE DESCONTO MANUAL / PREÇO ESPECIAL */}
+              <div className="p-3.5 bg-emerald-50/70 rounded-xl border border-emerald-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Desconto Manual / Preço Especial (Opcional)</span>
+                  </span>
+                  {formDiscountType !== 'NONE' && (
+                    <span className="text-[10px] font-bold bg-emerald-600 text-white px-2 py-0.5 rounded-full">
+                      Desconto Ativo
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Tipo de Desconto</label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => { setFormDiscountType('NONE'); setFormDiscountValue(''); }}
+                      className={`py-1.5 px-1 text-center rounded-lg border text-[10px] font-bold transition cursor-pointer ${
+                        formDiscountType === 'NONE'
+                          ? 'bg-slate-800 text-white border-slate-800'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      Sem Desconto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormDiscountType('PERCENT')}
+                      className={`py-1.5 px-1 text-center rounded-lg border text-[10px] font-bold transition cursor-pointer ${
+                        formDiscountType === 'PERCENT'
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      % Porcentagem
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormDiscountType('FIXED')}
+                      className={`py-1.5 px-1 text-center rounded-lg border text-[10px] font-bold transition cursor-pointer ${
+                        formDiscountType === 'FIXED'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      R$ Abatimento
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormDiscountType('CUSTOM_PRICE')}
+                      className={`py-1.5 px-1 text-center rounded-lg border text-[10px] font-bold transition cursor-pointer ${
+                        formDiscountType === 'CUSTOM_PRICE'
+                          ? 'bg-purple-600 text-white border-purple-600'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      Preço Fixo
+                    </button>
+                  </div>
+                </div>
+
+                {formDiscountType !== 'NONE' && (
+                  <div className="space-y-3 pt-2 border-t border-emerald-200/70">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-700 block">
+                          {formDiscountType === 'PERCENT' && 'Porcentagem de Desconto (%)'}
+                          {formDiscountType === 'FIXED' && 'Valor do Abatimento (R$)'}
+                          {formDiscountType === 'CUSTOM_PRICE' && 'Novo Preço Final Cobrado (R$)'}
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={formDiscountValue}
+                          onChange={(e) => setFormDiscountValue(e.target.value)}
+                          placeholder={formDiscountType === 'PERCENT' ? 'Ex: 20' : 'Ex: 10.00'}
+                          className="w-full h-8.5 px-3 text-xs bg-white border border-emerald-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-bold text-slate-800"
+                        />
+                      </div>
+
+                      {formDiscountType === 'PERCENT' && (
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-medium text-slate-500 block">Atalhos rápidos:</label>
+                          <div className="flex gap-1 pt-0.5">
+                            {[10, 20, 30, 50].map((pct) => (
+                              <button
+                                key={pct}
+                                type="button"
+                                onClick={() => setFormDiscountValue(String(pct))}
+                                className="px-2 py-1 text-[10px] font-bold bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded transition cursor-pointer"
+                              >
+                                {pct}%
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Resumo do cálculo */}
+                    <div className="bg-white p-2.5 rounded-lg border border-emerald-200 text-xs flex items-center justify-between">
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">Preço Original de Tabela:</span>
+                        <span className="font-semibold text-slate-600 line-through">
+                          R$ {getStandardPrice(formBillingCycle).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-emerald-700 block text-[10px] font-bold">Valor Final a Cobrar:</span>
+                        <span className="font-black text-emerald-700 text-sm">
+                          R$ {calculateFinalPrice(formBillingCycle, formDiscountType, formDiscountValue).toFixed(2)}
+                          <span className="text-[10px] font-normal text-slate-500 ml-1">
+                            /{formBillingCycle === 'MENSAL' ? 'mês' : formBillingCycle === 'ANUAL' ? 'ano' : 'cortesia'}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold text-slate-600 block">
+                        Motivo / Justificativa do Desconto (opcional)
+                      </label>
+                      <input
+                        type="text"
+                        value={formDiscountReason}
+                        onChange={(e) => setFormDiscountReason(e.target.value)}
+                        placeholder="Ex: Negociado no WhatsApp, Amigo do criador, etc."
+                        className="w-full h-8 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500 text-slate-700"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end space-x-2">
@@ -826,6 +1051,144 @@ export default function AdminCriatoriosPage() {
                       onChange={(e) => setEditExpiresAt(e.target.value)}
                       className="w-full h-8.5 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#00c853]"
                     />
+                  </div>
+                )}
+              </div>
+
+              {/* BLOCO DE DESCONTO MANUAL / PREÇO ESPECIAL */}
+              <div className="p-3.5 bg-emerald-50/70 rounded-xl border border-emerald-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Desconto Manual / Preço Especial</span>
+                  </span>
+                  {editDiscountType !== 'NONE' && (
+                    <span className="text-[10px] font-bold bg-emerald-600 text-white px-2 py-0.5 rounded-full">
+                      Desconto Ativo
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Tipo de Desconto</label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => { setEditDiscountType('NONE'); setEditDiscountValue(''); }}
+                      className={`py-1.5 px-1 text-center rounded-lg border text-[10px] font-bold transition cursor-pointer ${
+                        editDiscountType === 'NONE'
+                          ? 'bg-slate-800 text-white border-slate-800'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      Sem Desconto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditDiscountType('PERCENT')}
+                      className={`py-1.5 px-1 text-center rounded-lg border text-[10px] font-bold transition cursor-pointer ${
+                        editDiscountType === 'PERCENT'
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      % Porcentagem
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditDiscountType('FIXED')}
+                      className={`py-1.5 px-1 text-center rounded-lg border text-[10px] font-bold transition cursor-pointer ${
+                        editDiscountType === 'FIXED'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      R$ Abatimento
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditDiscountType('CUSTOM_PRICE')}
+                      className={`py-1.5 px-1 text-center rounded-lg border text-[10px] font-bold transition cursor-pointer ${
+                        editDiscountType === 'CUSTOM_PRICE'
+                          ? 'bg-purple-600 text-white border-purple-600'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      Preço Fixo
+                    </button>
+                  </div>
+                </div>
+
+                {editDiscountType !== 'NONE' && (
+                  <div className="space-y-3 pt-2 border-t border-emerald-200/70">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-700 block">
+                          {editDiscountType === 'PERCENT' && 'Porcentagem de Desconto (%)'}
+                          {editDiscountType === 'FIXED' && 'Valor do Abatimento (R$)'}
+                          {editDiscountType === 'CUSTOM_PRICE' && 'Novo Preço Final Cobrado (R$)'}
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={editDiscountValue}
+                          onChange={(e) => setEditDiscountValue(e.target.value)}
+                          placeholder={editDiscountType === 'PERCENT' ? 'Ex: 20' : 'Ex: 10.00'}
+                          className="w-full h-8.5 px-3 text-xs bg-white border border-emerald-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-bold text-slate-800"
+                        />
+                      </div>
+
+                      {editDiscountType === 'PERCENT' && (
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-medium text-slate-500 block">Atalhos rápidos:</label>
+                          <div className="flex gap-1 pt-0.5">
+                            {[10, 20, 30, 50].map((pct) => (
+                              <button
+                                key={pct}
+                                type="button"
+                                onClick={() => setEditDiscountValue(String(pct))}
+                                className="px-2 py-1 text-[10px] font-bold bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded transition cursor-pointer"
+                              >
+                                {pct}%
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Resumo do cálculo */}
+                    <div className="bg-white p-2.5 rounded-lg border border-emerald-200 text-xs flex items-center justify-between">
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">Preço Original de Tabela:</span>
+                        <span className="font-semibold text-slate-600 line-through">
+                          R$ {getStandardPrice(editBillingCycle).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-emerald-700 block text-[10px] font-bold">Valor Final a Cobrar:</span>
+                        <span className="font-black text-emerald-700 text-sm">
+                          R$ {calculateFinalPrice(editBillingCycle, editDiscountType, editDiscountValue).toFixed(2)}
+                          <span className="text-[10px] font-normal text-slate-500 ml-1">
+                            /{editBillingCycle === 'MENSAL' ? 'mês' : editBillingCycle === 'ANUAL' ? 'ano' : 'cortesia'}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold text-slate-600 block">
+                        Motivo / Justificativa do Desconto (opcional)
+                      </label>
+                      <input
+                        type="text"
+                        value={editDiscountReason}
+                        onChange={(e) => setEditDiscountReason(e.target.value)}
+                        placeholder="Ex: Negociado no WhatsApp, Amigo do criador, etc."
+                        className="w-full h-8 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500 text-slate-700"
+                      />
+                    </div>
                   </div>
                 )}
               </div>

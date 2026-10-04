@@ -33,13 +33,14 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
 } from 'recharts'
 import { db } from '@/lib/db'
-import { SellerAffiliate, Tenant, AffiliateCommission, GlobalSystemConfig } from '@/types'
+import { SellerAffiliate, Tenant, AffiliateCommission, GlobalSystemConfig, AffiliatePayout } from '@/types'
 import { formatDate } from '@/lib/utils'
 
 export function AdminCommercialDashboard() {
   const [sellers, setSellers] = useState<SellerAffiliate[]>([])
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [commissions, setCommissions] = useState<AffiliateCommission[]>([])
+  const [payouts, setPayouts] = useState<AffiliatePayout[]>([])
   const [globalConfig, setGlobalConfig] = useState<GlobalSystemConfig>(db.getGlobalConfig())
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
@@ -53,6 +54,7 @@ export function AdminCommercialDashboard() {
     setSellers([...db.getSellers()])
     setTenants([...db.getAllTenants()])
     setCommissions([...db.getCommissions()])
+    setPayouts([...db.getPayouts()])
     const cfg = db.getGlobalConfig()
     setGlobalConfig({ ...cfg })
     setFormSalesGoal((cfg.monthlySalesGoal ?? 25000).toString())
@@ -130,6 +132,8 @@ export function AdminCommercialDashboard() {
     { month: currentMonthLabel, vendas: currentSales, comissoes: totalCommissionsEarned, liquido: Math.max(0, currentSales - totalCommissionsEarned) },
   ]
 
+  const pendingPayouts = payouts.filter(p => p.status === 'REQUESTED' || p.status === 'PROCESSING')
+
   return (
     <div className="space-y-6 pb-12 w-full font-sans">
       
@@ -141,6 +145,95 @@ export function AdminCommercialDashboard() {
             <div className="font-black text-xs">Metas Comerciais Atualizadas!</div>
             <div className="text-[11px] text-emerald-100">
               Novas metas do mês salvas com sucesso no sistema BirdPro.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🚨 ALERTA EM DESTAQUE: SAQUES PIX PENDENTES (PRAZO: 24H) */}
+      {pendingPayouts.length > 0 && (
+        <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 p-1 rounded-2xl shadow-xl shadow-red-500/20">
+          <div className="bg-slate-900 text-white p-5 sm:p-6 rounded-[14px] space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-red-500/30 pb-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-red-500/20 text-red-400 border border-red-500/40 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-6 h-6 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-500 text-white shadow-xs">
+                      🚨 ALERTA ADMINISTRATIVO • PRAZO 24 HORAS
+                    </span>
+                    <span className="text-xs text-amber-300 font-bold">
+                      {pendingPayouts.length} saque(s) PIX aguardando transferência
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-white mt-0.5">
+                    Solicitações de Saque PIX Pendentes
+                  </h3>
+                </div>
+              </div>
+
+              <Link
+                href="/dashboard/admin/financeiro"
+                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-900 text-xs font-black rounded-xl transition shadow-xs flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+              >
+                <span>Ver no Painel Financeiro</span>
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            {/* Grid dos saques pendentes */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {pendingPayouts.map((p) => (
+                <div key={p.id} className="p-4 rounded-xl bg-slate-800/90 border border-red-500/40 flex flex-col justify-between space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Favorecido / Criatório</span>
+                      <h4 className="text-sm font-black text-white">{p.affiliateName}</h4>
+                      <span className="text-xs text-slate-400 font-mono">
+                        Chave PIX: <strong className="text-amber-300 font-mono">{p.pixKey}</strong> {p.pixKeyType ? `(${p.pixKeyType})` : ''}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Valor Solicitado</span>
+                      <span className="text-lg font-black text-emerald-400">
+                        R$ {p.amount.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2 border-t border-slate-700/60 gap-2 text-[11px]">
+                    <span className="text-amber-400 flex items-center gap-1 font-bold">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Prazo: até 24h para envio do PIX</span>
+                    </span>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(p.pixKey, p.id)}
+                        className="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                      >
+                        {copiedId === p.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedId === p.id ? 'Copiada' : 'Copiar PIX'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          db.updatePayoutStatus(p.id, 'COMPLETED');
+                          refreshData();
+                          alert('✅ Pagamento registrado e concluído com sucesso!');
+                        }}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black transition flex items-center gap-1 shadow-xs cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Marcar como Pago</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

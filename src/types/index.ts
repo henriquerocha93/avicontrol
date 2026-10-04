@@ -76,10 +76,13 @@ export interface AffiliatePayout {
   affiliateName: string;
   amount: number;
   pixKey: string;
+  pixKeyType?: string;
   receiptUrl?: string;
   status: 'REQUESTED' | 'PROCESSING' | 'COMPLETED' | 'REJECTED';
   createdAt: string;
   completedAt?: string;
+  dueAt?: string;
+  type?: 'SELLER' | 'REFERRAL_USER';
 }
 
 export interface ReferredFriend {
@@ -291,6 +294,12 @@ export interface Tenant {
   isPublic?: boolean;
   expiresAt: string;
   createdAt: string;
+  // Manual discount fields
+  customDiscountType?: 'NONE' | 'PERCENT' | 'FIXED' | 'CUSTOM_PRICE';
+  customDiscountValue?: number;
+  customDiscountReason?: string;
+  originalPrice?: number;
+  finalPrice?: number;
 }
 
 export interface Bird {
