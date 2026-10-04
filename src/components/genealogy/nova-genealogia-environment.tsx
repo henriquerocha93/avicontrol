@@ -214,12 +214,26 @@ export function NovaGenealogiaEnvironment({
     setModalTarget(null)
   }
 
-  // When initialBirdId is provided, auto-select safely
+  // Auto-seleciona a ave inicial, ou a ave recém-salva via Criar Crachá (localStorage), ou a mais recente
   useEffect(() => {
-    if (initialBirdId && Array.isArray(allBirds) && allBirds.length > 0) {
-      const bird = allBirds.find(b => b && b.id === initialBirdId)
-      if (bird) {
-        handleSelectBird(bird, 'main')
+    if (!Array.isArray(allBirds) || allBirds.length === 0) return
+
+    let targetBirdId = initialBirdId
+    if (!targetBirdId && typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      targetBirdId = urlParams.get('birdId') || localStorage.getItem('birdpro_active_tree_bird_id') || undefined
+    }
+
+    let birdToSelect = targetBirdId ? allBirds.find(b => b && b.id === targetBirdId) : undefined
+    if (!birdToSelect && allBirds.length > 0) {
+      // Procura primeiro aves que já possuam linhagem/pais preenchidos
+      birdToSelect = allBirds.find(b => b && (b.fatherName || b.motherName)) || allBirds[0]
+    }
+
+    if (birdToSelect) {
+      handleSelectBird(birdToSelect, 'main')
+      if (birdToSelect.paternalGrandfatherId || birdToSelect.maternalGrandfatherId) {
+        setGenerations(3)
       }
     }
   }, [initialBirdId, allBirds])
@@ -473,7 +487,7 @@ export function NovaGenealogiaEnvironment({
                   <span className="text-[10px] text-slate-500 block truncate mt-0.5 font-mono">
                     {father.name 
                       ? `${father.name} ${father.ringNumber ? `(${father.ringNumber})` : ''}` 
-                      : '....'}
+                      : 'INDEFINIDO'}
                   </span>
                 </div>
 
@@ -501,7 +515,7 @@ export function NovaGenealogiaEnvironment({
                         <PassarinhoIcon sex="MALE" className="w-5 h-5 mx-auto text-slate-700" />
                         <span className="text-[8px] font-bold block mt-0.5">Avô P.</span>
                         <span className="text-[7.5px] text-slate-500 truncate block font-mono">
-                          {patGrandfather.name || '....'}
+                          {patGrandfather.name || 'INDEFINIDO'}
                         </span>
                       </div>
 
@@ -515,7 +529,7 @@ export function NovaGenealogiaEnvironment({
                         <PassarinhoIcon sex="FEMALE" className="w-5 h-5 mx-auto text-slate-700" />
                         <span className="text-[8px] font-bold block mt-0.5">Avó P.</span>
                         <span className="text-[7.5px] text-slate-500 truncate block font-mono">
-                          {patGrandmother.name || '....'}
+                          {patGrandmother.name || 'INDEFINIDA'}
                         </span>
                       </div>
                     </div>
@@ -551,7 +565,7 @@ export function NovaGenealogiaEnvironment({
                   <span className="text-[10px] text-slate-500 block truncate mt-0.5 font-mono">
                     {mother.name 
                       ? `${mother.name} ${mother.ringNumber ? `(${mother.ringNumber})` : ''}` 
-                      : '....'}
+                      : 'INDEFINIDA'}
                   </span>
                 </div>
 
@@ -579,7 +593,7 @@ export function NovaGenealogiaEnvironment({
                         <PassarinhoIcon sex="MALE" className="w-5 h-5 mx-auto text-slate-700" />
                         <span className="text-[8px] font-bold block mt-0.5">Avô M.</span>
                         <span className="text-[7.5px] text-slate-500 truncate block font-mono">
-                          {matGrandfather.name || '....'}
+                          {matGrandfather.name || 'INDEFINIDO'}
                         </span>
                       </div>
 
@@ -593,7 +607,7 @@ export function NovaGenealogiaEnvironment({
                         <PassarinhoIcon sex="FEMALE" className="w-5 h-5 mx-auto text-slate-700" />
                         <span className="text-[8px] font-bold block mt-0.5">Avó M.</span>
                         <span className="text-[7.5px] text-slate-500 truncate block font-mono">
-                          {matGrandmother.name || '....'}
+                          {matGrandmother.name || 'INDEFINIDA'}
                         </span>
                       </div>
                     </div>

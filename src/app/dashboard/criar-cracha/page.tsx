@@ -14,12 +14,15 @@ import {
   Layers,
   FileText,
   Sliders,
-  Info
+  Info,
+  X,
+  ExternalLink
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { db } from '@/lib/db';
 import { Bird, Tenant } from '@/types';
 import { BadgeFrontAndBack, BadgeAncestors } from '@/components/genealogy/badge-front-and-back';
+import { SpeciesCombobox } from '@/components/ui/species-combobox';
 
 export default function CriarCrachaPage() {
   const { tenant } = useAuth();
@@ -27,6 +30,11 @@ export default function CriarCrachaPage() {
   // Modo de exibição: Apenas Frente ou Frente e Verso
   const [badgeMode, setBadgeMode] = useState<'BOTH' | 'FRONT_ONLY'>('BOTH');
   const [isSaved, setIsSaved] = useState(false);
+  const [savedBirdRecord, setSavedBirdRecord] = useState<Bird | null>(null);
+
+  const plantelBirds = useMemo(() => {
+    return db.getBirds(tenant?.id);
+  }, [tenant?.id, isSaved]);
 
   // 1. Dados da Ave Principal (de fácil preenchimento para o usuário leigo)
   const [birdData, setBirdData] = useState({
@@ -109,19 +117,39 @@ export default function CriarCrachaPage() {
 
   const handleSaveToCriatorio = () => {
     try {
-      const allBirds = db.getBirds(tenant?.id);
-      const newBird: Bird = {
-        ...previewBird,
-        id: `bird-${Date.now()}`
+      // 1. Prepara APENAS o pássaro filho no plantel com toda a linhagem vinculada
+      const childBirdData: Omit<Bird, 'id' | 'createdAt' | 'updatedAt'> = {
+        tenantId: tenant?.id || 'demo-tenant',
+        name: birdData.name || 'Nova Ave (Crachá)',
+        ringNumber: birdData.ringNumber || `ANILHA-${Date.now().toString().slice(-4)}`,
+        species: birdData.species || 'Canário-da-terra (Sicalis flaveola)',
+        sex: birdData.sex || 'MALE',
+        status: 'ALIVE',
+        origin: 'BRED_HERE',
+        fatherName: parents.fatherName || undefined,
+        motherName: parents.motherName || undefined,
+        paternalGrandfatherId: grandparents.paternalGrandfather || undefined,
+        paternalGrandmotherId: grandparents.paternalGrandmother || undefined,
+        maternalGrandfatherId: grandparents.maternalGrandfather || undefined,
+        maternalGrandmotherId: grandparents.maternalGrandmother || undefined,
+        birthDate: birdData.birthDate || new Date().toISOString().split('T')[0],
+        entryDate: birdData.birthDate || new Date().toISOString().split('T')[0],
       };
-      allBirds.push(newBird);
+
+      // 2. Salva oficialmente no banco de dados do criatório (apenas o filho entra no plantel)
+      const savedBird = db.addBird(childBirdData);
+
+      // 3. Marca este pássaro como ativo para a Árvore Genealógica carregar de imediato
       if (typeof window !== 'undefined') {
-        localStorage.setItem('birdpro_birds', JSON.stringify(allBirds));
+        localStorage.setItem('birdpro_active_tree_bird_id', savedBird.id);
+        localStorage.setItem('birdpro_simulated_bird', JSON.stringify(savedBird));
       }
+
       setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 3000);
+      setSavedBirdRecord(savedBird);
+      setTimeout(() => setIsSaved(false), 5000);
     } catch (e) {
-      console.error(e);
+      console.error('Erro ao salvar pássaro no criatório:', e);
     }
   };
 
@@ -273,13 +301,13 @@ export default function CriarCrachaPage() {
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">Espécie *</label>
-              <input
-                type="text"
-                placeholder="Ex: Canário-da-terra"
+              <SpeciesCombobox
+                label="Espécie"
+                required
                 value={birdData.species}
-                onChange={(e) => setBirdData({ ...birdData, species: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00c853]/20 focus:border-[#00c853] text-slate-800"
+                onChange={(val) => setBirdData({ ...birdData, species: val })}
+                plantelBirds={plantelBirds}
+                placeholder="Ex: Canário-da-terra"
               />
             </div>
 
@@ -500,6 +528,35 @@ export default function CriarCrachaPage() {
           </div>
         </div>
       </div>
+
+      {/* Notificação Flutuante de Sucesso com Link Direto para a Árvore */}
+      {savedBirdRecord && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white p-4 rounded-2xl shadow-2xl border border-emerald-500/50 flex flex-col sm:flex-row items-center gap-3 animate-in slide-in-from-bottom duration-300 max-w-md">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-[#00c853] flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-6 h-6 text-[#00c853]" />
+          </div>
+          <div className="flex-1 text-center sm:text-left">
+            <p className="text-xs font-black text-white">Ave salva com sucesso no Plantel!</p>
+            <p className="text-[11px] text-slate-300">
+              <strong>{savedBirdRecord.name}</strong> já está integrada e pronta na Árvore Genealógica.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link 
+              href={`/dashboard/genealogia?birdId=${savedBirdRecord.id}`}
+              className="px-3 py-1.5 bg-[#00c853] hover:bg-[#00b84a] text-slate-950 font-black text-xs rounded-lg transition"
+            >
+              Ver na Árvore →
+            </Link>
+            <button 
+              onClick={() => setSavedBirdRecord(null)}
+              className="text-slate-400 hover:text-white p-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -119,29 +119,38 @@ export function BadgeFrontAndBack({
   const frontBg = vc.labelFrontBackgroundUrl || ''
   const backBg = vc.labelBackBackgroundUrl || ''
 
-  // Genealogia completa
-  const paiNome = customAncestors?.fatherName || bird.fatherName || 'PAI'
-  const maeNome = customAncestors?.motherName || bird.motherName || 'MÃE'
+  // Genealogia completa com padrão INDEFINIDO / INDEFINIDA caso algum parentesco não seja informado
+  const formatAncestorName = (name?: string | null, isMale = true) => {
+    if (!name || !name.trim()) return isMale ? 'INDEFINIDO' : 'INDEFINIDA'
+    return name.trim().toUpperCase()
+  }
+
+  const paiNome = formatAncestorName(customAncestors?.fatherName || bird.fatherName, true)
+  const maeNome = formatAncestorName(customAncestors?.motherName || bird.motherName, false)
 
   const avos = [
-    { name: customAncestors?.paternalGrandfather || bird.paternalGrandfatherId || 'Avô Paterno', male: true },
-    { name: customAncestors?.paternalGrandmother || bird.paternalGrandmotherId || 'Avó Paterna', male: false },
-    { name: customAncestors?.maternalGrandfather || bird.maternalGrandfatherId || 'Avô Materno', male: true },
-    { name: customAncestors?.maternalGrandmother || bird.maternalGrandmotherId || 'Avó Materna', male: false }
+    { name: formatAncestorName(customAncestors?.paternalGrandfather || bird.paternalGrandfatherId, true), male: true },
+    { name: formatAncestorName(customAncestors?.paternalGrandmother || bird.paternalGrandmotherId, false), male: false },
+    { name: formatAncestorName(customAncestors?.maternalGrandfather || bird.maternalGrandfatherId, true), male: true },
+    { name: formatAncestorName(customAncestors?.maternalGrandmother || bird.maternalGrandmotherId, false), male: false }
   ]
 
-  const bisavos = customAncestors?.greatGrandparents && customAncestors.greatGrandparents.length === 8
+  const bisavos = (customAncestors?.greatGrandparents && customAncestors.greatGrandparents.length === 8
     ? customAncestors.greatGrandparents
     : [
-        { name: 'Bisavô 1', male: true },
-        { name: 'Bisavó 1', male: false },
-        { name: 'Bisavô 2', male: true },
-        { name: 'Bisavó 2', male: false },
-        { name: 'Bisavô 3', male: true },
-        { name: 'Bisavó 3', male: false },
-        { name: 'Bisavô 4', male: true },
-        { name: 'Bisavó 4', male: false }
+        { name: 'Soberano Campeão', male: true },
+        { name: 'Dourada Matriarca', male: false },
+        { name: 'Ventania Puro', male: true },
+        { name: 'Serena Campeã', male: false },
+        { name: 'Rei do Canto', male: true },
+        { name: 'Rainha Matrizes', male: false },
+        { name: 'Monte Negro Fibra', male: true },
+        { name: 'Estrela Guia Ouro', male: false }
       ]
+  ).map((bis, idx) => ({
+    name: formatAncestorName(bis.name, bis.male ?? (idx % 2 === 0)),
+    male: bis.male ?? (idx % 2 === 0)
+  }))
 
   const trisavos = [
     { name: 'Indefinido', male: true },
@@ -335,14 +344,43 @@ export function BadgeFrontAndBack({
         {/* Tree Body com Linhas Conectoras Sanguíneas em SVG Exatas (Estilo MyBirds) */}
         <div className="relative z-10 flex-1 flex items-center justify-between py-1 px-1">
           
-          {/* COLUNA 1: PAIS (2 Caixas) */}
-          <div className="w-[88px] h-full flex flex-col justify-around shrink-0 z-10">
+          {/* COLUNA 1: PAIS (2 Caixas) E NO MEIO: INFORMAÇÕES DA AVE & VALIDAÇÃO QR CODE */}
+          <div className="w-[96px] h-full flex flex-col justify-between shrink-0 z-10 py-1">
+            {/* Pai */}
             <div 
               className="py-1 px-1 text-center text-[7.5px] font-bold uppercase rounded border border-black/40 truncate shadow-2xs"
               style={{ backgroundColor: maleBg, color: maleText }}
             >
               {paiNome}
             </div>
+
+            {/* MEIO: INFORMAÇÕES DA AVE & VALIDAÇÃO (Exatamente no espaço vago entre pai e mãe) */}
+            <div className="my-auto p-1 bg-white/95 rounded border border-slate-300 shadow-2xs flex flex-col items-center justify-center text-center">
+              <span className="text-[6.5px] font-black uppercase text-slate-800 tracking-wider">
+                Validação:
+              </span>
+              <div className="w-9 h-9 p-0.5 bg-white border border-slate-400 rounded flex items-center justify-center my-0.5 shadow-2xs">
+                <QRCodeSVG value={publicUrl} size={32} level="M" />
+              </div>
+              <div className="w-full text-[6px] font-semibold text-slate-700 leading-tight space-y-0.5 pt-0.5 border-t border-slate-200">
+                <p className="font-black text-slate-900 truncate uppercase text-[6.5px]">
+                  {bird.name}
+                </p>
+                <p className="truncate text-slate-600">
+                  <strong className="text-slate-800">Espécie:</strong> {bird.species?.split('(')[0]?.trim() || 'Canário-da-terra'}
+                </p>
+                <p className="truncate font-mono font-bold text-slate-900">
+                  <strong className="font-sans font-semibold text-slate-800">Anilha:</strong> {bird.ringNumber || 'OFICIAL'}
+                </p>
+                <div className="flex items-center justify-center gap-1 text-[5.5px] text-slate-600">
+                  <span><strong className="text-slate-800">Nasc:</strong> {bird.birthDate ? formatDate(bird.birthDate) : '2026'}</span>
+                  <span>•</span>
+                  <span className="font-bold text-slate-900">{bird.sex === 'MALE' ? '♂ Macho' : bird.sex === 'FEMALE' ? '♀ Fêmea' : 'Indef.'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Mãe */}
             <div 
               className="py-1 px-1 text-center text-[7.5px] font-bold uppercase rounded border border-black/40 truncate shadow-2xs"
               style={{ backgroundColor: femaleBg, color: femaleText }}

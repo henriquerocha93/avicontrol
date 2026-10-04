@@ -31,6 +31,7 @@ import { SexBadge, StatusBadge } from '@/components/ui/badge';
 import { QRModal } from '@/components/modals/qr-modal';
 import { PrintBadgeModal } from '@/components/modals/print-badge-modal';
 import { PrintPedigreeModal } from '@/components/modals/print-pedigree-modal';
+import { SpeciesCombobox } from '@/components/ui/species-combobox';
 import { formatDate, calculateAge, exportToExcel, exportToCsv } from '@/lib/utils';
 
 function BirdsContent() {
@@ -548,24 +549,14 @@ function BirdsContent() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Espécie *</label>
-                <select
+                <SpeciesCombobox
+                  label="Espécie"
+                  required
                   value={formData.species}
-                  onChange={(e) => setFormData({ ...formData, species: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                >
-                  <option value="Canário da Terra (Sicalis flaveola)">Canário da Terra</option>
-                  <option value="Curió (Sporophila angolensis)">Curió</option>
-                  <option value="Trinca Ferro (Saltator similis)">Trinca Ferro</option>
-                  <option value="Coleiro (Sporophila caerulescens)">Coleiro</option>
-                  <option value="Bicudo (Sporophila maximiliani)">Bicudo</option>
-                  <option value="Diamante de Gould (Chloebia gouldiae)">Diamante de Gould</option>
-                  <option value="Calopsita (Nymphicus hollandicus)">Calopsita</option>
-                  <option value="Agapornis (Agapornis roseicollis)">Agapornis</option>
-                  <option value="Papagaio Verdadeiro (Amazona aestiva)">Papagaio Verdadeiro</option>
-                  <option value="Canário Belga (Serinus canaria)">Canário Belga</option>
-                  <option value="Outra Espécie">Outra Espécie</option>
-                </select>
+                  onChange={(sp) => setFormData({ ...formData, species: sp })}
+                  plantelBirds={birds}
+                  inputClassName="rounded-xl border-slate-200"
+                />
               </div>
 
               <div>

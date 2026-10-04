@@ -358,7 +358,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Central de Alertas Inteligente & Ações Imediatas */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-xs">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-amber-100 text-amber-800 rounded-xl">
@@ -454,7 +454,7 @@ export default function DashboardPage() {
       {/* Interactive Charts Section (Recharts) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Evolution Chart (2 Cols) */}
-        <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+        <div className="lg:col-span-2 bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-4 min-w-0 overflow-hidden">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-extrabold text-base text-slate-900">Evolução do Plantel & Nascimentos</h3>
@@ -514,7 +514,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Species Distribution Donut Chart (1 Col) */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-4 min-w-0 overflow-hidden">
           <div>
             <h3 className="font-extrabold text-base text-slate-900">Distribuição por Espécie</h3>
             <p className="text-xs text-slate-500">Proporção de aves cadastradas no plantel</p>
@@ -571,7 +571,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Birds Table with Instant Actions */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="font-extrabold text-base text-slate-900">Aves Registradas Recentemente</h3>
@@ -584,41 +584,27 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                <th className="py-3 px-4 rounded-l-xl">Ave</th>
-                <th className="py-3 px-4">Anilha</th>
-                <th className="py-3 px-4">Espécie</th>
-                <th className="py-3 px-4">Sexo</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Gaiola</th>
-                <th className="py-3 px-4 text-right rounded-r-xl">Ação</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {birds.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-10 text-center">
-                    <div className="flex flex-col items-center justify-center text-slate-400 space-y-2">
-                      <Bird className="w-8 h-8 opacity-30 text-slate-400" />
-                      <p className="text-xs font-semibold text-slate-600">Nenhuma ave cadastrada ainda no plantel</p>
-                      <p className="text-[11px] text-slate-400">Cadastre suas matrizes ou importe anilhas para começar a povoar seu criatório.</p>
-                      <Link href="/dashboard/aves?action=new" className="pt-2">
-                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs">
-                          <Plus className="w-3.5 h-3.5 mr-1" />
-                          Cadastrar Primeira Ave
-                        </Button>
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                birds.slice(0, 6).map((bird) => (
-                  <tr key={bird.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-4 font-semibold text-slate-900 flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+        {birds.length === 0 ? (
+          <div className="py-8 sm:py-10 text-center flex flex-col items-center justify-center text-slate-400 space-y-2 px-4 bg-slate-50/50 rounded-2xl border border-slate-100">
+            <Bird className="w-8 h-8 opacity-40 text-slate-400" />
+            <p className="text-xs font-semibold text-slate-600">Nenhuma ave cadastrada ainda no plantel</p>
+            <p className="text-[11px] text-slate-400 max-w-sm">Cadastre suas matrizes ou importe anilhas para começar a povoar seu criatório.</p>
+            <Link href="/dashboard/aves?action=new" className="pt-2">
+              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs">
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                Cadastrar Primeira Ave
+              </Button>
+            </Link>
+          </div>
+        ) : (
+          <>
+            {/* Mobile Cards View (Telas pequenas: sem rolagem horizontal cortando) */}
+            <div className="block md:hidden space-y-2.5">
+              {birds.slice(0, 6).map((bird) => (
+                <div key={bird.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
                         {bird.photoUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={bird.photoUrl} alt={bird.name} className="w-full h-full object-cover" />
@@ -626,29 +612,75 @@ export default function DashboardPage() {
                           <Bird className="w-4 h-4 text-slate-400" />
                         )}
                       </div>
-                      <div>
-                        <p className="font-bold text-slate-900 text-xs">{bird.name}</p>
-                        {bird.nickname && <p className="text-[10px] text-slate-400">&quot;{bird.nickname}&quot;</p>}
+                      <div className="truncate">
+                        <p className="font-bold text-xs text-slate-900 truncate">{bird.name}</p>
+                        <p className="font-mono text-[10px] text-slate-500">{bird.ringNumber}</p>
                       </div>
-                    </td>
-                    <td className="py-3 px-4 font-mono font-semibold text-slate-700">{bird.ringNumber}</td>
-                    <td className="py-3 px-4 text-slate-600">{bird.species.split('(')[0]}</td>
-                    <td className="py-3 px-4"><SexBadge sex={bird.sex} /></td>
-                    <td className="py-3 px-4"><StatusBadge status={bird.status} /></td>
-                    <td className="py-3 px-4 text-slate-600 font-medium">{bird.cageId || 'Não alocada'}</td>
-                    <td className="py-3 px-4 text-right">
-                      <Link href={`/dashboard/aves/${bird.id}`}>
-                        <Button variant="ghost" size="sm" className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50">
-                          Abrir Ficha →
-                        </Button>
-                      </Link>
-                    </td>
+                    </div>
+                    <SexBadge sex={bird.sex} />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1.5 border-t border-slate-200/60">
+                    <span className="truncate max-w-[150px]">{bird.species.split('(')[0]}</span>
+                    <Link href={`/dashboard/aves/${bird.id}`}>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-emerald-700 hover:bg-emerald-50 px-2 font-bold">
+                        Abrir Ficha →
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table View (Telas médias e grandes) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-3 px-4 rounded-l-xl">Ave</th>
+                    <th className="py-3 px-4">Anilha</th>
+                    <th className="py-3 px-4">Espécie</th>
+                    <th className="py-3 px-4">Sexo</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Gaiola</th>
+                    <th className="py-3 px-4 text-right rounded-r-xl">Ação</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {birds.slice(0, 6).map((bird) => (
+                    <tr key={bird.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-4 font-semibold text-slate-900 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                          {bird.photoUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={bird.photoUrl} alt={bird.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <Bird className="w-4 h-4 text-slate-400" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 text-xs">{bird.name}</p>
+                          {bird.nickname && <p className="text-[10px] text-slate-400">&quot;{bird.nickname}&quot;</p>}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 font-mono font-semibold text-slate-700">{bird.ringNumber}</td>
+                      <td className="py-3 px-4 text-slate-600">{bird.species.split('(')[0]}</td>
+                      <td className="py-3 px-4"><SexBadge sex={bird.sex} /></td>
+                      <td className="py-3 px-4"><StatusBadge status={bird.status} /></td>
+                      <td className="py-3 px-4 text-slate-600 font-medium">{bird.cageId || 'Não alocada'}</td>
+                      <td className="py-3 px-4 text-right">
+                        <Link href={`/dashboard/aves/${bird.id}`}>
+                          <Button variant="ghost" size="sm" className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50">
+                            Abrir Ficha →
+                          </Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

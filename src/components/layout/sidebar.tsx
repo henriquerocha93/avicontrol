@@ -43,6 +43,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { db } from '@/lib/db';
 import { Logo } from '@/components/ui/logo';
+import { InstallAppButton } from '@/components/pwa/pwa-installer';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -482,6 +483,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     })}
                   </div>
                 )}
+              </div>
+
+              {/* Botão Criar App / Instalar PWA no Android & iOS */}
+              <div className="px-3 py-1.5">
+                <InstallAppButton variant="sidebar" />
               </div>
 
               {/* Suporte do Sistema */}

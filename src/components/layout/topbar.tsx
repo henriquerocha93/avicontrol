@@ -17,6 +17,7 @@ import {
 import { useAuth } from '@/lib/auth-context'
 import { useTheme } from '@/lib/theme-context'
 import { db } from '@/lib/db'
+import { InstallAppButton } from '@/components/pwa/pwa-installer'
 
 interface TopbarProps {
   onOpenSidebar: () => void;
@@ -46,7 +47,10 @@ export function Topbar({ onOpenSidebar }: TopbarProps) {
       </div>
 
       {/* Right side: Dark Mode toggle & User Avatar Profile */}
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-2 sm:space-x-4">
+        {/* Criar App Button (iOS & Android) */}
+        <InstallAppButton variant="topbar" />
+
         {/* Dark Mode Toggle */}
         <button
           onClick={toggleTheme}

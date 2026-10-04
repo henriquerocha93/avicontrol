@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import { FloatingWidgets } from "@/components/floating/floating-widgets";
+import { PWAProvider } from "@/components/pwa/pwa-installer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,6 +21,12 @@ export const metadata: Metadata = {
   title: "BIRDPRO • Gestão Profissional de Criatórios de Aves",
   description: "Plataforma profissional para gestão completa de criatórios: aves, anilhas, genealogia, reprodução, gaiolas, saúde, pedigree A4 e QR Codes.",
   keywords: ["criatório de aves", "gestão de plantel", "genealogia aves", "pedigree canário", "curió", "trinca ferro", "fob", "sispass", "anilhas"],
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'BirdPro',
+  },
   icons: {
     icon: [
       { url: '/favicon.png', type: 'image/png' },
@@ -65,11 +72,20 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <head>
+        <meta name="theme-color" content="#00c853" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="BirdPro" />
+        <link rel="apple-touch-icon" href="/apple-icon.png" />
+      </head>
       <body className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans transition-colors duration-200">
         <ThemeProvider>
           <AuthProvider>
-            {children}
-            <FloatingWidgets />
+            <PWAProvider>
+              {children}
+              <FloatingWidgets />
+            </PWAProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>
