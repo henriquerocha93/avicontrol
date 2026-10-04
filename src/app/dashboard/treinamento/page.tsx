@@ -10,7 +10,7 @@ import {
   BookOpen, 
   FileText, 
   ShieldCheck, 
-  GitFork, 
+  Bird, 
   DollarSign, 
   Layers, 
   Laptop, 
@@ -43,7 +43,7 @@ export default function TreinamentoPage() {
       desc: 'Passo a passo de como exportar sua relação oficial do IBAMA em PDF/planilha e importar todo o seu plantel em segundos.'
     },
     {
-      icon: GitFork,
+      icon: Bird,
       color: 'from-emerald-500 to-teal-600',
       tag: 'Módulo 3 • Genealogia',
       title: 'Árvores Genealógicas, Pedigrees & Crachás',

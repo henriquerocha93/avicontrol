@@ -133,7 +133,7 @@ export default function GenealogiaPage() {
       <div className="bg-white rounded-md border border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 shadow-xs">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center space-x-2 text-slate-700 text-xs font-semibold mr-2">
-            <span className="text-sm font-bold">≡</span>
+            <BirdIcon className="w-4 h-4 text-emerald-600" />
             <span className="text-xs font-bold text-slate-800">Árvore Genealógica</span>
           </div>
 
@@ -148,7 +148,7 @@ export default function GenealogiaPage() {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Edit3 className="w-3.5 h-3.5" />
+              <BirdIcon className="w-3.5 h-3.5" />
               <span>Nova Genealogia (Árvore)</span>
             </button>
 

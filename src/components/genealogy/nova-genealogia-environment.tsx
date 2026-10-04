@@ -15,34 +15,62 @@ import {
 import { db } from '@/lib/db'
 import { Bird } from '@/types'
 
-// Authentic perched bird on a branch matching the user's screenshot
-function PerchedBirdIcon({ className = "w-7 h-7 text-slate-800" }: { className?: string }) {
+// Desenho nítido e autêntico de passarinho pousado no galho, fiel ao print de genealogia
+export function PassarinhoIcon({ 
+  className = "w-8 h-8 text-slate-800",
+  sex = "UNKNOWN"
+}: { 
+  className?: string
+  sex?: 'MALE' | 'FEMALE' | 'UNKNOWN'
+}) {
+  const getSexFill = () => {
+    if (sex === 'MALE') return "rgba(2, 132, 199, 0.12)" // azul suave macho
+    if (sex === 'FEMALE') return "rgba(225, 29, 72, 0.12)" // rosa suave fêmea
+    return "rgba(16, 185, 129, 0.10)" // verde suave ave raiz
+  }
+
+  const getWingFill = () => {
+    if (sex === 'MALE') return "rgba(2, 132, 199, 0.22)"
+    if (sex === 'FEMALE') return "rgba(225, 29, 72, 0.22)"
+    return "rgba(16, 185, 129, 0.20)"
+  }
+
   return (
     <svg 
-      viewBox="0 0 36 36" 
+      viewBox="0 0 32 32" 
       fill="none" 
       stroke="currentColor" 
-      strokeWidth="1.6" 
+      strokeWidth="1.8" 
       strokeLinecap="round" 
       strokeLinejoin="round" 
       className={className}
     >
-      {/* Branch */}
-      <path d="M4 27 C12 26 22 27 32 25" />
-      <path d="M24 26 Q27 23 30 23" />
-      {/* Feet */}
-      <path d="M15 23 L15 26.5" />
-      <path d="M19 23 L19 26.5" />
-      {/* Tail feathers */}
-      <path d="M11 22 L5 28 L9 24.5 L6 26.5 L11 21" />
-      {/* Body & head outline */}
-      <path d="M12 21 C10 17 12 11.5 17 9 C19.5 7.5 23.5 7.5 26 9.5 C28 11.5 28.5 14.5 27.5 17.5 C26.5 20.5 24 23 19 23.5 C15.5 23.5 13 23 12 21 Z" />
-      {/* Eye */}
-      <circle cx="23.5" cy="11.5" r="0.9" fill="currentColor" />
-      {/* Beak */}
-      <path d="M27.5 11.5 L31.5 13 L27.5 14" />
-      {/* Wing arc */}
-      <path d="M16 17 C18.5 15.5 22 16.5 21 20.5" />
+      {/* Galho horizontal com bifurcação / broto à direita */}
+      <path d="M4 25 L22 25" stroke="currentColor" />
+      <path d="M21 25 L26.5 22" stroke="currentColor" />
+      <path d="M22.5 25 L26 27.5" stroke="currentColor" />
+      
+      {/* Pés segurando o galho */}
+      <path d="M13.5 21.5 L13.5 25" stroke="currentColor" />
+      <path d="M16.5 21.5 L16.5 25" stroke="currentColor" />
+      
+      {/* Silhueta do Passarinho (rabo, dorso, cabeça, bico, papo e barriga) */}
+      <path 
+        d="M5 24.5 L9 21.5 C11 16 13 10 17.5 7.5 C18.8 7.5 19.8 8.2 20.2 9 L23.5 10.2 L20.2 11.2 C20.8 15 19.5 21.5 14 21.5 L9 21.5 Z" 
+        fill={getSexFill()}
+        stroke="currentColor"
+      />
+      
+      {/* Asa detalhada e curvada */}
+      <path 
+        d="M11 19.5 C12.5 15 14.5 12.5 16.5 13.5 C16.8 16.5 14.5 19 11 19.5 Z" 
+        fill={getWingFill()}
+        stroke="currentColor"
+      />
+      
+      {/* Olho com ponto de brilho branco */}
+      <circle cx="18.2" cy="9.8" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="9.5" r="0.3" fill="#ffffff" stroke="none" />
     </svg>
   )
 }
@@ -377,9 +405,9 @@ export function NovaGenealogiaEnvironment({
                 }`}
                 title="Clique para selecionar ou definir a ave"
               >
-                {/* Perched Bird Icon on Branch */}
+                {/* Passarinho desenhado no galho (Ave Raiz) */}
                 <div className="flex items-center justify-center text-slate-800 group-hover:text-emerald-600 transition-colors">
-                  <PerchedBirdIcon className="w-7 h-7" />
+                  <PassarinhoIcon sex="UNKNOWN" className="w-8 h-8" />
                 </div>
 
                 {/* Node Label */}
@@ -431,9 +459,9 @@ export function NovaGenealogiaEnvironment({
                     ♂
                   </span>
 
-                  {/* Perched Bird Icon */}
+                  {/* Passarinho desenhado no galho (Macho) */}
                   <div className="flex items-center justify-center text-slate-800 group-hover:text-sky-600 transition-colors">
-                    <PerchedBirdIcon className="w-7 h-7" />
+                    <PassarinhoIcon sex="MALE" className="w-8 h-8" />
                   </div>
 
                   {/* Label */}
@@ -470,7 +498,7 @@ export function NovaGenealogiaEnvironment({
                         title="Avô Paterno ♂"
                       >
                         <span className="absolute top-0.5 right-1 text-[9px] text-sky-600 font-bold">♂</span>
-                        <PerchedBirdIcon className="w-5 h-5 mx-auto text-slate-700" />
+                        <PassarinhoIcon sex="MALE" className="w-5 h-5 mx-auto text-slate-700" />
                         <span className="text-[8px] font-bold block mt-0.5">Avô P.</span>
                         <span className="text-[7.5px] text-slate-500 truncate block font-mono">
                           {patGrandfather.name || '....'}
@@ -484,7 +512,7 @@ export function NovaGenealogiaEnvironment({
                         title="Avó Paterna ♀"
                       >
                         <span className="absolute top-0.5 right-1 text-[9px] text-rose-500 font-bold">♀</span>
-                        <PerchedBirdIcon className="w-5 h-5 mx-auto text-slate-700" />
+                        <PassarinhoIcon sex="FEMALE" className="w-5 h-5 mx-auto text-slate-700" />
                         <span className="text-[8px] font-bold block mt-0.5">Avó P.</span>
                         <span className="text-[7.5px] text-slate-500 truncate block font-mono">
                           {patGrandmother.name || '....'}
@@ -509,9 +537,9 @@ export function NovaGenealogiaEnvironment({
                     ♀
                   </span>
 
-                  {/* Perched Bird Icon */}
+                  {/* Passarinho desenhado no galho (Fêmea) */}
                   <div className="flex items-center justify-center text-slate-800 group-hover:text-rose-600 transition-colors">
-                    <PerchedBirdIcon className="w-7 h-7" />
+                    <PassarinhoIcon sex="FEMALE" className="w-8 h-8" />
                   </div>
 
                   {/* Label */}
@@ -548,7 +576,7 @@ export function NovaGenealogiaEnvironment({
                         title="Avô Materno ♂"
                       >
                         <span className="absolute top-0.5 right-1 text-[9px] text-sky-600 font-bold">♂</span>
-                        <PerchedBirdIcon className="w-5 h-5 mx-auto text-slate-700" />
+                        <PassarinhoIcon sex="MALE" className="w-5 h-5 mx-auto text-slate-700" />
                         <span className="text-[8px] font-bold block mt-0.5">Avô M.</span>
                         <span className="text-[7.5px] text-slate-500 truncate block font-mono">
                           {matGrandfather.name || '....'}
@@ -562,7 +590,7 @@ export function NovaGenealogiaEnvironment({
                         title="Avó Materna ♀"
                       >
                         <span className="absolute top-0.5 right-1 text-[9px] text-rose-500 font-bold">♀</span>
-                        <PerchedBirdIcon className="w-5 h-5 mx-auto text-slate-700" />
+                        <PassarinhoIcon sex="FEMALE" className="w-5 h-5 mx-auto text-slate-700" />
                         <span className="text-[8px] font-bold block mt-0.5">Avó M.</span>
                         <span className="text-[7.5px] text-slate-500 truncate block font-mono">
                           {matGrandmother.name || '....'}
@@ -681,8 +709,8 @@ export function NovaGenealogiaEnvironment({
                   className="p-2.5 rounded-lg border border-gray-200 hover:border-[#009fe3] hover:bg-sky-50/40 transition flex items-center justify-between cursor-pointer group"
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs">
-                      {b.sex === 'MALE' ? '♂' : b.sex === 'FEMALE' ? '♀' : '•'}
+                    <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center p-1 group-hover:bg-white transition-colors">
+                      <PassarinhoIcon sex={b.sex} className="w-6 h-6" />
                     </div>
                     <div>
                       <span className="text-xs font-bold text-slate-900 group-hover:text-[#009fe3] transition-colors block">
