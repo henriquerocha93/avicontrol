@@ -421,38 +421,38 @@ export default function CriarCrachaPage() {
         {/* ========================================================================= */}
         {/* SELETOR DE MODO DE CRIAÇÃO & BOTÕES DE IMPRESSÃO                          */}
         {/* ========================================================================= */}
-        <div className="pt-4 border-t border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           
           {/* Escolha do Formato: Frente e Verso ou Apenas Frente */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-slate-700">Formato de Impressão:</span>
-            <div className="inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <span className="text-xs font-bold text-slate-700">Formato:</span>
+            <div className="inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setBadgeMode('BOTH')}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold transition ${
+                className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-md text-xs font-bold transition text-center ${
                   badgeMode === 'BOTH' ? 'bg-[#00c853] text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                🏅 Frente e Verso (Completo)
+                🏅 Frente e Verso
               </button>
               <button
                 type="button"
                 onClick={() => setBadgeMode('FRONT_ONLY')}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold transition ${
+                className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-md text-xs font-bold transition text-center ${
                   badgeMode === 'FRONT_ONLY' ? 'bg-[#00c853] text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                🪪 Apenas Frente (Etiqueta de Gaiola)
+                🪪 Apenas Frente
               </button>
             </div>
           </div>
 
           {/* Botões de Ação */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <button
               onClick={handleSaveToCriatorio}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              className="flex-1 sm:flex-initial px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
             >
               <Save className="w-3.5 h-3.5" />
               <span>{isSaved ? '✓ Salvo com Sucesso!' : 'Salvar no Criatório'}</span>
@@ -460,10 +460,10 @@ export default function CriarCrachaPage() {
 
             <button
               onClick={handlePrint}
-              className="px-5 py-2.5 bg-[#00c853] hover:bg-[#00b84a] text-slate-950 font-black rounded-lg text-xs transition flex items-center gap-2 shadow-md cursor-pointer"
+              className="flex-1 sm:flex-initial px-5 py-2.5 bg-[#00c853] hover:bg-[#00b84a] text-slate-950 font-black rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-md cursor-pointer"
             >
               <Printer className="w-4 h-4 text-slate-950" />
-              <span>Imprimir Crachá Agora</span>
+              <span>Imprimir Crachá</span>
             </button>
           </div>
 
@@ -474,25 +474,30 @@ export default function CriarCrachaPage() {
       {/* ========================================================================= */}
       {/* 2. PRÉ-VISUALIZAÇÃO AO VIVO DO CRACHÁ COM BRASÃO E CONEXÕES SANGUÍNEAS     */}
       {/* ========================================================================= */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1 print:hidden">
-          <span className="flex items-center gap-1.5">
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs font-bold text-slate-700 px-1 print:hidden">
+          <div className="flex items-center gap-1.5">
             <Layers className="w-4 h-4 text-emerald-600" />
-            Pré-visualização Oficial (Pronto para Impressão)
-          </span>
-          <span className="text-[11px] text-slate-400 font-normal">
+            <span>Pré-visualização Oficial (Pronto para Impressão)</span>
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+              Adaptável Mobile &amp; PC
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-500 font-normal">
             Imagens, fundo e cores aplicados automaticamente das configurações do criatório
           </span>
         </div>
 
         {/* Live Badge Preview Canvas */}
-        <div className="bg-slate-900/90 p-4 sm:p-8 rounded-xl border border-slate-800 overflow-x-auto flex justify-center print:p-0 print:bg-white print:border-0">
-          <BadgeFrontAndBack
-            bird={previewBird}
-            tenant={tenant || ({} as any)}
-            mode={badgeMode}
-            customAncestors={customAncestors}
-          />
+        <div className="bg-slate-900/95 p-2 sm:p-6 md:p-8 rounded-xl border border-slate-800 flex flex-col items-center justify-center print:p-0 print:bg-white print:border-0 w-full overflow-hidden">
+          <div className="w-full flex justify-center items-center">
+            <BadgeFrontAndBack
+              bird={previewBird}
+              tenant={tenant || ({} as any)}
+              mode={badgeMode}
+              customAncestors={customAncestors}
+            />
+          </div>
         </div>
       </div>
 

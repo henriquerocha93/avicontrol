@@ -29,6 +29,7 @@ import { Tenant, BreederOwner, TenantVisualConfig } from '@/types'
 export default function CriatorioConfigPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null)
   const [savedSuccess, setSavedSuccess] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [isLoadingCep, setIsLoadingCep] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
@@ -263,20 +264,57 @@ export default function CriatorioConfigPage() {
 
   const handleSave = () => {
     if (!tenant) return
-    db.saveTenant(tenant)
-    setSavedSuccess(true)
-    setTimeout(() => setSavedSuccess(false), 3500)
+    setIsSaving(true)
+    setTimeout(() => {
+      db.saveTenant(tenant)
+      setIsSaving(false)
+      setSavedSuccess(true)
+      setTimeout(() => setSavedSuccess(false), 4500)
+    }, 350)
   }
 
   const vc = tenant.visualConfig || {}
 
   return (
     <div className="space-y-4 pb-20 w-full font-sans">
-      {/* Breadcrumb estilo MyBirds */}
-      <div className="flex items-center space-x-1.5 text-xs text-slate-500 mb-2">
-        <Link href="/dashboard" className="text-[#00c853] hover:underline font-medium">Home</Link>
-        <span>/</span>
-        <span className="text-slate-400">Criador</span>
+      {/* Breadcrumb e Barra de Salvamento Superior */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+        <div className="flex items-center space-x-1.5 text-xs text-slate-500">
+          <Link href="/dashboard" className="text-[#00c853] hover:underline font-medium">Home</Link>
+          <span>/</span>
+          <span className="text-slate-400">Criador</span>
+        </div>
+
+        {/* Botão Salvar Superior Rápido */}
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={isSaving}
+          className={`px-4 py-2 text-xs font-bold rounded-lg shadow-xs transition flex items-center gap-1.5 cursor-pointer ${
+            savedSuccess 
+              ? 'bg-emerald-600 text-white ring-2 ring-emerald-400' 
+              : isSaving 
+              ? 'bg-emerald-700 text-white cursor-wait' 
+              : 'bg-[#00c853] hover:bg-[#00b84a] text-white'
+          }`}
+        >
+          {isSaving ? (
+            <>
+              <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <span>Salvando...</span>
+            </>
+          ) : savedSuccess ? (
+            <>
+              <Check className="w-3.5 h-3.5 text-white stroke-[3]" />
+              <span>✓ Salvo com Sucesso!</span>
+            </>
+          ) : (
+            <>
+              <Check className="w-3.5 h-3.5" />
+              <span>Salvar Configurações</span>
+            </>
+          )}
+        </button>
       </div>
 
       {/* Toast & Success Alerts */}
@@ -292,10 +330,23 @@ export default function CriatorioConfigPage() {
         </div>
       )}
 
+      {/* Floating Bottom Toast Notification (Visível em qualquer posição de rolagem) */}
       {savedSuccess && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded flex items-center space-x-2">
-          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>Configurações do criatório salvas com sucesso!</span>
+        <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-5 py-4 rounded-xl shadow-2xl border border-emerald-400 flex items-center gap-3 animate-in slide-in-from-bottom-5 duration-300 max-w-sm">
+          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+            <Check className="w-5 h-5 text-white stroke-[3]" />
+          </div>
+          <div>
+            <p className="text-xs font-black">Configurações Salvas com Sucesso!</p>
+            <p className="text-[11px] text-emerald-100">Todas as informações, imagens e cores foram salvas no sistema.</p>
+          </div>
+          <button 
+            type="button"
+            onClick={() => setSavedSuccess(false)}
+            className="ml-2 text-white/80 hover:text-white p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -1356,10 +1407,31 @@ export default function CriatorioConfigPage() {
               <button
                 type="button"
                 onClick={handleSave}
-                className="px-6 py-2 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-bold rounded shadow-sm transition flex items-center space-x-1.5"
+                disabled={isSaving}
+                className={`px-6 py-2.5 rounded text-xs font-bold shadow-md transition-all duration-200 flex items-center space-x-2 cursor-pointer ${
+                  savedSuccess 
+                    ? 'bg-emerald-600 text-white ring-2 ring-emerald-400 scale-[1.02]' 
+                    : isSaving 
+                    ? 'bg-emerald-700 text-white cursor-wait opacity-90' 
+                    : 'bg-[#00c853] hover:bg-[#00b84a] text-white'
+                }`}
               >
-                <Check className="w-4 h-4" />
-                <span>Salvar</span>
+                {isSaving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Salvando alterações...</span>
+                  </>
+                ) : savedSuccess ? (
+                  <>
+                    <Check className="w-4 h-4 text-white stroke-[3]" />
+                    <span>✓ Configurações Salvas com Sucesso!</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Salvar Configurações</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

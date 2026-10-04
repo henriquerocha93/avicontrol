@@ -90,6 +90,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { name: 'Home', href: '/dashboard', icon: Home },
     { name: 'Painel de Pássaro', href: '/dashboard/aves', icon: LayoutDashboard },
     { name: 'Painel do Financeiro', href: '/dashboard/painel-financeiro', icon: DollarSign },
+    { name: 'Criar Crachá', href: '/dashboard/criar-cracha', icon: Award },
     { name: 'Treinamento', href: '/dashboard/treinamento', icon: GraduationCap },
     { name: 'Calendário', href: '/dashboard/calendario', icon: Calendar },
     { name: 'Anotação', href: '/dashboard/anotacao', icon: FileText },
@@ -97,7 +98,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { name: 'Árvore Genealógica', href: '/dashboard/genealogia', icon: Bird },
     { name: 'Nova Genealogia', href: '/dashboard/configuracoes/nova-genealogia', icon: Edit3 },
     { name: 'Simulador de Árvore', href: '/dashboard/simulador-arvore', icon: Binary },
-    { name: 'Criar Crachá', href: '/dashboard/criar-cracha', icon: Award },
     { name: 'Alertas & Notificações', href: '/dashboard/alertas', icon: Bell },
     { name: 'Reserva de Pássaro', href: '/dashboard/reserva', icon: Bookmark },
     { name: 'Venda de Pássaro', href: '/dashboard/venda', icon: Tag },
@@ -321,11 +321,37 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       'flex items-center justify-between px-4 py-2.5 text-xs font-medium transition-colors hover:bg-[#2d333b] hover:text-white',
                       isActive 
                         ? 'bg-[#00c853] text-white font-semibold' 
+                        : item.name === 'Criar Crachá'
+                        ? 'text-amber-300 font-bold hover:text-white'
                         : 'text-[#8b949e]'
                     )}
                   >
                     <div className="flex items-center gap-3">
-                      <Icon className={cn('w-4 h-4 shrink-0', isActive ? 'text-white' : 'text-[#8b949e]')} />
+                      {item.name === 'Criar Crachá' ? (
+                        <div className="relative w-4 h-4 shrink-0 flex items-center justify-center">
+                          <svg className="w-4 h-4 shrink-0 drop-shadow-[0_0_5px_rgba(251,191,36,0.9)]" viewBox="0 0 24 24" fill="none">
+                            <defs>
+                              <linearGradient id="crachaMedalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#fef08a" />
+                                <stop offset="50%" stopColor="#f59e0b" />
+                                <stop offset="100%" stopColor="#d97706" />
+                              </linearGradient>
+                              <linearGradient id="crachaRibbonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#34d399" />
+                                <stop offset="100%" stopColor="#059669" />
+                              </linearGradient>
+                            </defs>
+                            {/* Fita / Ribbons */}
+                            <path d="M7 13.5L4 22L12 18.5L20 22L17 13.5" fill="url(#crachaRibbonGrad)" stroke="#047857" strokeWidth="0.8" strokeLinejoin="round" />
+                            {/* Medalha / Círculo Dourado */}
+                            <circle cx="12" cy="9" r="7.5" fill="url(#crachaMedalGrad)" stroke="#b45309" strokeWidth="1" />
+                            {/* Estrela / Selo Branco Interno */}
+                            <path d="M12 4.2L13.6 7.6L17.2 8.1L14.6 10.7L15.2 14.3L12 12.6L8.8 14.3L9.4 10.7L6.8 8.1L10.4 7.6L12 4.2Z" fill="#ffffff" />
+                          </svg>
+                        </div>
+                      ) : (
+                        <Icon className={cn('w-4 h-4 shrink-0', isActive ? 'text-white' : 'text-[#8b949e]')} />
+                      )}
                       <span>{item.name}</span>
                     </div>
                     {item.name === 'Treinamento' && (

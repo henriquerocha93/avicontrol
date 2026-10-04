@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Bird, Tenant } from '@/types'
 import { formatDate } from '@/lib/utils'
@@ -21,6 +21,79 @@ interface BadgeFrontAndBackProps {
   theme?: 'LIGHT' | 'DARK'
   mode?: 'BOTH' | 'FRONT_ONLY' | 'BACK_ONLY'
   customAncestors?: BadgeAncestors
+}
+
+// Container responsivo que redimensiona proporcionalmente o crachá no mobile/tablet/pc
+function ResponsiveBadgeCard({ 
+  children,
+  className = ''
+}: { 
+  children: React.ReactNode
+  className?: string
+}) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const w = window.innerWidth
+      if (w < 560) {
+        return Math.min(1, Math.max(0.35, (w - 36) / 530))
+      }
+    }
+    return 1
+  })
+
+  useEffect(() => {
+    const updateScale = () => {
+      if (!containerRef.current) return
+      const availableWidth = containerRef.current.clientWidth
+      const targetWidth = 530
+      if (availableWidth > 0 && availableWidth < targetWidth) {
+        // Deixa margem de respiro para não encostar na borda da tela no mobile
+        const nextScale = Math.min(1, Math.max(0.35, (availableWidth - 8) / targetWidth))
+        setScale(nextScale)
+      } else {
+        setScale(1)
+      }
+    }
+
+    updateScale()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateScale) : null
+    if (ro && containerRef.current) {
+      ro.observe(containerRef.current)
+    }
+    window.addEventListener('resize', updateScale)
+
+    return () => {
+      if (ro) ro.disconnect()
+      window.removeEventListener('resize', updateScale)
+    }
+  }, [])
+
+  const cardWidth = 530
+  const cardHeight = 340
+
+  return (
+    <div
+      ref={containerRef}
+      className={`w-full flex justify-center items-start overflow-visible print:w-auto print:block print:h-auto ${className}`}
+      style={{
+        maxWidth: `${cardWidth}px`,
+        height: scale < 1 ? `${Math.ceil(cardHeight * scale)}px` : `${cardHeight}px`,
+      }}
+    >
+      <div
+        className="shrink-0 transition-transform duration-100 origin-top print:transform-none select-none"
+        style={{
+          width: `${cardWidth}px`,
+          height: `${cardHeight}px`,
+          transform: scale < 1 ? `scale(${scale})` : undefined,
+          transformOrigin: 'top center',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  )
 }
 
 export function BadgeFrontAndBack({ 
@@ -89,18 +162,19 @@ export function BadgeFrontAndBack({
     { name: 'Indefinida', male: false }
   ]
 
-  const telefoneContato = '(51) 8225-1103'
+  const telefoneContato = tenant?.phone || '(51) 98225-1103'
 
   return (
     <div 
       id="printable-badge"
-      className="w-full max-w-[1140px] bg-white text-black p-4 relative shadow-2xl overflow-hidden border border-slate-300 font-sans print:m-0 print:border-0 print:shadow-none select-none flex flex-col md:flex-row gap-4 justify-center items-center mx-auto"
+      className="w-full max-w-[1140px] bg-white text-black p-2 sm:p-4 relative shadow-2xl border border-slate-300 font-sans print:m-0 print:border-0 print:shadow-none print:p-0 select-none flex flex-col xl:flex-row gap-4 justify-center items-center mx-auto rounded-xl print:rounded-none"
     >
       {/* ======================================================== */}
       {/* 1. LADO ESQUERDO: FRENTE DO CRACHÁ / ETIQUETA DE GAIOLA */}
       {/* ======================================================== */}
       {(mode === 'BOTH' || mode === 'FRONT_ONLY') && (
-      <div className="w-[530px] min-w-[530px] h-[340px] border-2 border-slate-800 relative bg-white flex flex-col justify-between p-3 overflow-hidden shadow-sm">
+      <ResponsiveBadgeCard>
+      <div className="w-[530px] min-w-[530px] h-[340px] border-2 border-slate-800 relative bg-white flex flex-col justify-between p-3 overflow-hidden shadow-sm rounded-lg print:rounded-none">
         {/* Background marca d'água */}
         {frontBg && (
           <div 
@@ -230,13 +304,15 @@ export function BadgeFrontAndBack({
           </div>
         </div>
       </div>
+      </ResponsiveBadgeCard>
       )}
 
       {/* ======================================================== */}
       {/* 2. LADO DIREITO: VERSO DO CRACHÁ COM ÁRVORE & CONECTORES */}
       {/* ======================================================== */}
       {(mode === 'BOTH' || mode === 'BACK_ONLY') && (
-      <div className="w-[530px] min-w-[530px] h-[340px] border-2 border-slate-800 relative bg-white flex flex-col justify-between p-2 overflow-hidden shadow-sm">
+      <ResponsiveBadgeCard>
+      <div className="w-[530px] min-w-[530px] h-[340px] border-2 border-slate-800 relative bg-white flex flex-col justify-between p-2 overflow-hidden shadow-sm rounded-lg print:rounded-none">
         {/* Background marca d'água */}
         {backBg && (
           <div 
@@ -367,6 +443,7 @@ export function BadgeFrontAndBack({
           <span className="font-mono text-emerald-800 font-bold">Documento gerado eletronicamente pela plataforma BirdPro</span>
         </div>
       </div>
+      </ResponsiveBadgeCard>
       )}
     </div>
   )
