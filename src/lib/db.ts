@@ -116,6 +116,13 @@ class DataService {
               this.state.users.push({ ...iu });
             }
           });
+          // Ensure henriquerocha93 is strictly OWNER (Criatório) and not admin
+          this.state.users = this.state.users.map(u => {
+            if (u.email.toLowerCase().trim() === 'henriquerocha93@hotmail.com') {
+              return { ...u, role: 'OWNER' as const };
+            }
+            return u;
+          });
         }
         if (this.state.globalConfig) {
           this.state.globalConfig.gatewayProvider = 'MERCADOPAGO';

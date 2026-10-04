@@ -39,6 +39,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const parsed = JSON.parse(rawStored);
         if (parsed && parsed.email) {
+          if (parsed.email.toLowerCase().trim() === 'henriquerocha93@hotmail.com' && parsed.role === 'SUPER_ADMIN') {
+            parsed.role = 'OWNER';
+            localStorage.setItem('birdpro_current_user', JSON.stringify(parsed));
+          }
           setUser(parsed);
           const t = db.getTenant(parsed.tenantId || 'tenant-demo-01');
           setTenant(t);
@@ -73,7 +77,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check if master admin
     if (
       cleanEmail === 'henrique_rocha@live.com' ||
-      cleanEmail === 'henriquerocha93@hotmail.com' ||
       cleanEmail === 'admin@birdpro.com.br' ||
       cleanEmail === 'adm@birdpro.com.br' ||
       cleanEmail === 'admin'

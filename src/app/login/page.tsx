@@ -152,7 +152,6 @@ export default function LoginPage() {
       const clean = email.toLowerCase().trim();
       if (
         clean === 'henrique_rocha@live.com' ||
-        clean === 'henriquerocha93@hotmail.com' ||
         clean === 'admin@birdpro.com.br' ||
         clean === 'adm@birdpro.com.br' ||
         clean === 'admin'

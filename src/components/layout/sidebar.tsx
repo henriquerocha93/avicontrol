@@ -186,34 +186,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 );
               })}
 
-              <div className="pt-3 px-4 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Acesso ao Criatório
-              </div>
-              <Link
-                href="/dashboard/aves"
-                onClick={onClose}
-                className="flex items-center gap-3 px-4 py-2 text-xs font-medium text-[#8b949e] hover:text-emerald-300 hover:bg-[#2d333b] transition-colors"
-              >
-                <Bird className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Painel de Pássaros</span>
-              </Link>
-              <Link
-                href="/dashboard/genealogia"
-                onClick={onClose}
-                className="flex items-center gap-3 px-4 py-2 text-xs font-medium text-[#8b949e] hover:text-emerald-300 hover:bg-[#2d333b] transition-colors"
-              >
-                <Bird className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Árvore Genealógica</span>
-              </Link>
-              <Link
-                href="/dashboard/sispass"
-                onClick={onClose}
-                className="flex items-center gap-3 px-4 py-2 text-xs font-medium text-[#8b949e] hover:text-emerald-300 hover:bg-[#2d333b] transition-colors"
-              >
-                <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>SISPASS &amp; Importação</span>
-              </Link>
-
               <div className="pt-4 px-4 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 Sessão
               </div>
