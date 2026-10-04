@@ -485,10 +485,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 )}
               </div>
 
-              {/* Botão Criar App / Instalar PWA no Android & iOS */}
-              <div className="px-3 py-1.5">
-                <InstallAppButton variant="sidebar" />
-              </div>
+              {/* Instalar Aplicativo */}
+              <InstallAppButton variant="sidebar" onAfterClick={onClose} />
 
               {/* Suporte do Sistema */}
               <Link
