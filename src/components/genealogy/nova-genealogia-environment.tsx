@@ -89,6 +89,37 @@ interface NodeData {
   sex: 'MALE' | 'FEMALE' | 'UNKNOWN'
 }
 
+// Limite prático de gerações (cada geração dobra o número de cards na tela)
+const MAX_LEVELS = 12
+
+// Caminho a partir da ave principal: 'F' = pai, 'M' = mãe ('FM' = mãe do pai, ...)
+function pathGender(path: string): 'MALE' | 'FEMALE' {
+  return path.endsWith('F') ? 'MALE' : 'FEMALE'
+}
+
+function ancestorLabel(path: string): string {
+  const male = path.endsWith('F')
+  const level = path.length
+  if (level === 1) return male ? 'Macho' : 'Fêmea'
+  if (level === 2) return male ? 'Avô' : 'Avó'
+  if (level === 3) return male ? 'Bisavô' : 'Bisavó'
+  if (level === 4) return male ? 'Trisavô' : 'Trisavó'
+  if (level === 5) return male ? 'Tataravô' : 'Tataravó'
+  return `Ger. ${level} ${male ? '♂' : '♀'}`
+}
+
+// Ex.: 'FM' -> "Mãe do pai"
+function ancestorDescription(path: string): string {
+  const rev = path.split('').reverse()
+  return rev
+    .map((c, i) => {
+      const base = c === 'F' ? 'pai' : 'mãe'
+      if (i === 0) return c === 'F' ? 'Pai' : 'Mãe'
+      return c === 'F' ? 'do pai' : 'da mãe'
+    })
+    .join(' ')
+}
+
 export interface NovaGenealogiaEnvironmentProps {
   initialBirdId?: string
   initialRingNumber?: string
@@ -118,20 +149,13 @@ export function NovaGenealogiaEnvironment({
     }
   }, [])
 
-  // Generation level: 2 = Pais (matching screenshot), 3 = Avós
-  const [generations, setGenerations] = useState<2 | 3>(2)
-  const [zoomScale, setZoomScale] = useState<number>(1)
+  // Quantidade de gerações de parentes exibidas (controlada pelos botões + e -)
+  const [levels, setLevels] = useState<number>(1)
 
   // Nodes State
   const [mainBird, setMainBird] = useState<NodeData>({ name: '', ringNumber: '', sex: 'UNKNOWN' })
-  const [father, setFather] = useState<NodeData>({ name: '', ringNumber: '', sex: 'MALE' })
-  const [mother, setMother] = useState<NodeData>({ name: '', ringNumber: '', sex: 'FEMALE' })
-
-  // Grandparents (Level 3)
-  const [patGrandfather, setPatGrandfather] = useState<NodeData>({ name: '', ringNumber: '', sex: 'MALE' })
-  const [patGrandmother, setPatGrandmother] = useState<NodeData>({ name: '', ringNumber: '', sex: 'FEMALE' })
-  const [matGrandfather, setMatGrandfather] = useState<NodeData>({ name: '', ringNumber: '', sex: 'MALE' })
-  const [matGrandmother, setMatGrandmother] = useState<NodeData>({ name: '', ringNumber: '', sex: 'FEMALE' })
+  // Ancestrais indexados por caminho ('F', 'M', 'FF', 'FM', 'MF', 'MM', 'FFF', ...)
+  const [nodes, setNodes] = useState<Record<string, NodeData>>({})
 
   // Full Active Bird Object for actions / modals
   const [selectedFullBird, setSelectedFullBird] = useState<Bird | null>(null)
@@ -144,26 +168,71 @@ export function NovaGenealogiaEnvironment({
   const [ringNotFound, setRingNotFound] = useState<string | null>(null)
 
   // Selection Modal State
-  const [modalTarget, setModalTarget] = useState<
-    'main' | 'father' | 'mother' | 'patGF' | 'patGM' | 'matGF' | 'matGM' | null
-  >(null)
+  const [modalTarget, setModalTarget] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [manualName, setManualName] = useState('')
   const [manualRing, setManualRing] = useState('')
   const [saveSuccess, setSaveSuccess] = useState(false)
 
   // Open modal to select bird
-  const handleOpenSelector = (target: 'main' | 'father' | 'mother' | 'patGF' | 'patGM' | 'matGF' | 'matGM') => {
+  const handleOpenSelector = (target: string) => {
     setModalTarget(target)
     setSearchTerm('')
     setManualName('')
     setManualRing('')
   }
 
+  const findBird = (id?: string, ring?: string, name?: string): Bird | undefined => {
+    const r = (ring || '').toLowerCase().trim()
+    const n = (name || '').toLowerCase().trim()
+    return allBirds.find(b =>
+      (id && b.id === id) ||
+      (r && b.ringNumber && b.ringNumber.toLowerCase().trim() === r) ||
+      (n && b.name && b.name.toLowerCase().trim() === n)
+    )
+  }
+
+  // Resolve recursivamente os ancestrais de uma ave a partir do plantel
+  const resolveAncestors = (
+    bird: Bird,
+    basePath: string,
+    acc: Record<string, NodeData>,
+    onlyEmpty: boolean,
+    visited: Set<string>
+  ) => {
+    if (basePath.length >= MAX_LEVELS) return
+    visited.add(bird.id)
+    const parents: Array<['F' | 'M', string | undefined, string | undefined, string | undefined]> = [
+      ['F', bird.fatherId, bird.fatherRing, bird.fatherName],
+      ['M', bird.motherId, bird.motherRing, bird.motherName]
+    ]
+    for (const [letter, pid, pring, pname] of parents) {
+      const path = basePath + letter
+      const found = findBird(pid, pring, pname)
+      const name = found?.name || pname || ''
+      if (!name && !found) continue
+      if (!onlyEmpty || !acc[path]?.name) {
+        acc[path] = {
+          id: found?.id,
+          name,
+          ringNumber: found?.ringNumber || pring || '',
+          sex: pathGender(path)
+        }
+      }
+      if (found && !visited.has(found.id)) {
+        resolveAncestors(found, path, acc, onlyEmpty, new Set(visited))
+      }
+    }
+  }
+
+  const deepestLevel = (map: Record<string, NodeData>) =>
+    Object.keys(map).reduce((m, k) => (map[k]?.name ? Math.max(m, k.length) : m), 0)
+
   // Handle bird selection from database with full recursive genealogy ancestry resolution
-  const handleSelectBird = (bird: Bird, targetOverride?: 'main' | 'father' | 'mother' | 'patGF' | 'patGM' | 'matGF' | 'matGM') => {
+  const handleSelectBird = (bird: Bird, targetOverride?: string) => {
     if (!bird) return
     const target = targetOverride || modalTarget
+    if (!target) return
     const data: NodeData = {
       id: bird.id || '',
       name: bird.name || 'Sem Nome',
@@ -176,138 +245,39 @@ export function NovaGenealogiaEnvironment({
       setSelectedFullBird(bird)
       setRingNotFound(null)
 
-      // 1. Resolve Father
-      let fName = bird.fatherName || ''
-      let fRing = bird.fatherRing || ''
-      const fBird = allBirds.find(b => 
-        (bird.fatherId && b.id === bird.fatherId) ||
-        (fRing && b.ringNumber && b.ringNumber.toLowerCase().trim() === fRing.toLowerCase().trim()) ||
-        (fName && b.name && b.name.toLowerCase().trim() === fName.toLowerCase().trim())
-      )
+      const acc: Record<string, NodeData> = {}
+      resolveAncestors(bird, '', acc, false, new Set())
 
-      if (fBird) {
-        fName = fBird.name
-        fRing = fBird.ringNumber || fRing
+      // Campos legados de avós (guardam o nome)
+      const legacy: Array<[string, string | undefined]> = [
+        ['FF', bird.paternalGrandfatherId],
+        ['FM', bird.paternalGrandmotherId],
+        ['MF', bird.maternalGrandfatherId],
+        ['MM', bird.maternalGrandmotherId]
+      ]
+      for (const [p, nm] of legacy) {
+        if (nm && !acc[p]?.name) {
+          const f = findBird(undefined, undefined, nm)
+          acc[p] = { id: f?.id, name: f?.name || nm, ringNumber: f?.ringNumber || '', sex: pathGender(p) }
+        }
       }
 
-      setFather({
-        id: fBird?.id,
-        name: fName,
-        ringNumber: fRing,
-        sex: 'MALE'
-      })
-
-      // 2. Resolve Mother
-      let mName = bird.motherName || ''
-      let mRing = bird.motherRing || ''
-      const mBird = allBirds.find(b => 
-        (bird.motherId && b.id === bird.motherId) ||
-        (mRing && b.ringNumber && b.ringNumber.toLowerCase().trim() === mRing.toLowerCase().trim()) ||
-        (mName && b.name && b.name.toLowerCase().trim() === mName.toLowerCase().trim())
-      )
-
-      if (mBird) {
-        mName = mBird.name
-        mRing = mBird.ringNumber || mRing
+      // Árvore completa salva anteriormente
+      if (bird.ancestry) {
+        for (const [p, n] of Object.entries(bird.ancestry)) {
+          if (n && n.name) acc[p] = { id: n.id, name: n.name, ringNumber: n.ringNumber || '', sex: pathGender(p) }
+        }
       }
 
-      setMother({
-        id: mBird?.id,
-        name: mName,
-        ringNumber: mRing,
-        sex: 'FEMALE'
-      })
-
-      // 3. Resolve Paternal Grandparents
-      let patGfName = bird.paternalGrandfatherId || fBird?.fatherName || ''
-      let patGfRing = fBird?.fatherRing || ''
-      let patGmName = bird.paternalGrandmotherId || fBird?.motherName || ''
-      let patGmRing = fBird?.motherRing || ''
-
-      const patGfBird = allBirds.find(b => 
-        (patGfRing && b.ringNumber && b.ringNumber.toLowerCase().trim() === patGfRing.toLowerCase().trim()) || 
-        (patGfName && b.name && b.name.toLowerCase().trim() === patGfName.toLowerCase().trim())
-      )
-      if (patGfBird) {
-        patGfName = patGfBird.name
-        patGfRing = patGfBird.ringNumber || patGfRing
-      }
-
-      const patGmBird = allBirds.find(b => 
-        (patGmRing && b.ringNumber && b.ringNumber.toLowerCase().trim() === patGmRing.toLowerCase().trim()) || 
-        (patGmName && b.name && b.name.toLowerCase().trim() === patGmName.toLowerCase().trim())
-      )
-      if (patGmBird) {
-        patGmName = patGmBird.name
-        patGmRing = patGmBird.ringNumber || patGmRing
-      }
-
-      setPatGrandfather({
-        id: patGfBird?.id,
-        name: patGfName,
-        ringNumber: patGfRing,
-        sex: 'MALE'
-      })
-      setPatGrandmother({
-        id: patGmBird?.id,
-        name: patGmName,
-        ringNumber: patGmRing,
-        sex: 'FEMALE'
-      })
-
-      // 4. Resolve Maternal Grandparents
-      let matGfName = bird.maternalGrandfatherId || mBird?.fatherName || ''
-      let matGfRing = mBird?.fatherRing || ''
-      let matGmName = bird.maternalGrandmotherId || mBird?.motherName || ''
-      let matGmRing = mBird?.motherRing || ''
-
-      const matGfBird = allBirds.find(b => 
-        (matGfRing && b.ringNumber && b.ringNumber.toLowerCase().trim() === matGfRing.toLowerCase().trim()) || 
-        (matGfName && b.name && b.name.toLowerCase().trim() === matGfName.toLowerCase().trim())
-      )
-      if (matGfBird) {
-        matGfName = matGfBird.name
-        matGfRing = matGfBird.ringNumber || matGfRing
-      }
-
-      const matGmBird = allBirds.find(b => 
-        (matGmRing && b.ringNumber && b.ringNumber.toLowerCase().trim() === matGmRing.toLowerCase().trim()) || 
-        (matGmName && b.name && b.name.toLowerCase().trim() === matGmName.toLowerCase().trim())
-      )
-      if (matGmBird) {
-        matGmName = matGmBird.name
-        matGmRing = matGmBird.ringNumber || matGmRing
-      }
-
-      setMatGrandfather({
-        id: matGfBird?.id,
-        name: matGfName,
-        ringNumber: matGfRing,
-        sex: 'MALE'
-      })
-      setMatGrandmother({
-        id: matGmBird?.id,
-        name: matGmName,
-        ringNumber: matGmRing,
-        sex: 'FEMALE'
-      })
-
-      // Se houver qualquer avô ou avó cadastrado, abre automaticamente 3 gerações
-      if (patGfName || patGmName || matGfName || matGmName) {
-        setGenerations(3)
-      }
-    } else if (target === 'father') {
-      setFather(data)
-    } else if (target === 'mother') {
-      setMother(data)
-    } else if (target === 'patGF') {
-      setPatGrandfather(data)
-    } else if (target === 'patGM') {
-      setPatGrandmother(data)
-    } else if (target === 'matGF') {
-      setMatGrandfather(data)
-    } else if (target === 'matGM') {
-      setMatGrandmother(data)
+      setNodes(acc)
+      setLevels(Math.max(1, deepestLevel(acc)))
+    } else {
+      const acc: Record<string, NodeData> = { ...nodes }
+      acc[target] = { ...data, sex: pathGender(target) }
+      // Preenche gerações mais antigas vazias com os ancestrais da ave escolhida
+      resolveAncestors(bird, target, acc, true, new Set())
+      setNodes(acc)
+      setLevels(l => Math.max(l, deepestLevel(acc)))
     }
 
     setModalTarget(null)
@@ -399,34 +369,33 @@ export function NovaGenealogiaEnvironment({
   // Handle manual bird assignment
   const handleApplyManual = () => {
     if (!manualName && !manualRing) return
+    if (!modalTarget) return
 
-    const data: NodeData = {
-      name: manualName || 'Sem Nome',
-      ringNumber: manualRing || '',
-      sex: modalTarget?.includes('mother') || modalTarget?.includes('GM') ? 'FEMALE' : 'MALE'
+    if (modalTarget === 'main') {
+      setMainBird({ name: manualName || 'Sem Nome', ringNumber: manualRing || '', sex: 'UNKNOWN' })
+    } else {
+      const target = modalTarget
+      setNodes(prev => ({
+        ...prev,
+        [target]: { name: manualName || 'Sem Nome', ringNumber: manualRing || '', sex: pathGender(target) }
+      }))
     }
-
-    if (modalTarget === 'main') setMainBird(data)
-    else if (modalTarget === 'father') setFather(data)
-    else if (modalTarget === 'mother') setMother(data)
-    else if (modalTarget === 'patGF') setPatGrandfather(data)
-    else if (modalTarget === 'patGM') setPatGrandmother(data)
-    else if (modalTarget === 'matGF') setMatGrandfather(data)
-    else if (modalTarget === 'matGM') setMatGrandmother(data)
 
     setModalTarget(null)
   }
 
   // Clear specific node
   const handleClearNode = () => {
-    const empty: NodeData = { name: '', ringNumber: '', sex: 'UNKNOWN' }
-    if (modalTarget === 'main') setMainBird(empty)
-    else if (modalTarget === 'father') setFather({ ...empty, sex: 'MALE' })
-    else if (modalTarget === 'mother') setMother({ ...empty, sex: 'FEMALE' })
-    else if (modalTarget === 'patGF') setPatGrandfather({ ...empty, sex: 'MALE' })
-    else if (modalTarget === 'patGM') setPatGrandmother({ ...empty, sex: 'FEMALE' })
-    else if (modalTarget === 'matGF') setMatGrandfather({ ...empty, sex: 'MALE' })
-    else if (modalTarget === 'matGM') setMatGrandmother({ ...empty, sex: 'FEMALE' })
+    if (modalTarget === 'main') {
+      setMainBird({ name: '', ringNumber: '', sex: 'UNKNOWN' })
+    } else if (modalTarget) {
+      const target = modalTarget
+      setNodes(prev => {
+        const next = { ...prev }
+        delete next[target]
+        return next
+      })
+    }
     setModalTarget(null)
   }
 
@@ -434,13 +403,24 @@ export function NovaGenealogiaEnvironment({
   const handleSave = () => {
     try {
       if (mainBird && mainBird.id) {
+        const ancestry: Record<string, { id?: string; name: string; ringNumber: string }> = {}
+        for (const [p, n] of Object.entries(nodes)) {
+          if (n && n.name) {
+            ancestry[p] = { ...(n.id ? { id: n.id } : {}), name: n.name, ringNumber: n.ringNumber || '' }
+          }
+        }
         db.updateBird(mainBird.id, {
-          fatherName: father?.name || undefined,
-          motherName: mother?.name || undefined,
-          paternalGrandfatherId: patGrandfather?.name || undefined,
-          paternalGrandmotherId: patGrandmother?.name || undefined,
-          maternalGrandfatherId: matGrandfather?.name || undefined,
-          maternalGrandmotherId: matGrandmother?.name || undefined,
+          fatherName: nodes.F?.name || undefined,
+          fatherRing: nodes.F?.ringNumber || undefined,
+          fatherId: nodes.F?.id || undefined,
+          motherName: nodes.M?.name || undefined,
+          motherRing: nodes.M?.ringNumber || undefined,
+          motherId: nodes.M?.id || undefined,
+          paternalGrandfatherId: nodes.FF?.name || undefined,
+          paternalGrandmotherId: nodes.FM?.name || undefined,
+          maternalGrandfatherId: nodes.MF?.name || undefined,
+          maternalGrandmotherId: nodes.MM?.name || undefined,
+          ancestry,
         })
       }
 
@@ -453,22 +433,103 @@ export function NovaGenealogiaEnvironment({
     }
   }
 
-  // Zoom / generation controls
-  const handleZoomIn = () => {
-    if (generations < 3) {
-      setGenerations(3)
-    } else {
-      setZoomScale(prev => Math.min(prev + 0.1, 1.25))
+  // Botões + e -: adicionam / removem uma geração de parentes
+  const handleAddLevel = () => setLevels(l => Math.min(l + 1, MAX_LEVELS))
+  const handleRemoveLevel = () => setLevels(l => Math.max(1, l - 1))
+
+  // Renderiza recursivamente um card e seus ancestrais
+  const renderCard = (path: string) => {
+    if (path === '') {
+      return (
+        <div
+          onClick={() => handleOpenSelector('main')}
+          className={`w-28 sm:w-32 bg-white border rounded-md p-2.5 text-center shadow-xs cursor-pointer hover:border-emerald-500 hover:shadow-sm transition-all group ${
+            mainBird.name ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300'
+          }`}
+          title="Clique para selecionar ou definir a ave"
+        >
+          <div className="flex items-center justify-center text-slate-800 group-hover:text-emerald-600 transition-colors">
+            <PassarinhoIcon sex="UNKNOWN" className="w-8 h-8" />
+          </div>
+          <span className="text-[11px] font-bold text-slate-800 block mt-1">Ave</span>
+          <span className="text-[10px] text-slate-500 block truncate mt-0.5 font-mono">
+            {mainBird.name
+              ? `${mainBird.name} ${mainBird.ringNumber ? `(${mainBird.ringNumber})` : ''}`
+              : '....'}
+          </span>
+        </div>
+      )
     }
+
+    const node = nodes[path]
+    const male = path.endsWith('F')
+    const label = ancestorLabel(path)
+    const full = node?.name ? `${node.name}${node.ringNumber ? ` (${node.ringNumber})` : ''}` : (male ? 'INDEFINIDO' : 'INDEFINIDA')
+
+    if (path.length === 1) {
+      return (
+        <div
+          onClick={() => handleOpenSelector(path)}
+          className={`w-28 sm:w-32 bg-white border rounded-md p-2.5 text-center shadow-xs cursor-pointer hover:shadow-sm transition-all relative group ${
+            male ? 'hover:border-sky-500' : 'hover:border-rose-500'
+          } ${
+            node?.name ? (male ? 'border-sky-500 bg-sky-50/20' : 'border-rose-500 bg-rose-50/20') : 'border-gray-300'
+          }`}
+          title={male ? 'Clique para definir o Pai (Macho)' : 'Clique para definir a Mãe (Fêmea)'}
+        >
+          <span className={`absolute top-1.5 right-2 text-xs font-bold text-slate-500 ${male ? 'group-hover:text-sky-600' : 'group-hover:text-rose-600'}`}>
+            {male ? '♂' : '♀'}
+          </span>
+          <div className={`flex items-center justify-center text-slate-800 transition-colors ${male ? 'group-hover:text-sky-600' : 'group-hover:text-rose-600'}`}>
+            <PassarinhoIcon sex={male ? 'MALE' : 'FEMALE'} className="w-8 h-8" />
+          </div>
+          <span className="text-[11px] font-bold text-slate-800 block mt-1">{label}</span>
+          <span className="text-[10px] text-slate-500 block truncate mt-0.5 font-mono">{full}</span>
+        </div>
+      )
+    }
+
+    return (
+      <div
+        onClick={() => handleOpenSelector(path)}
+        className={`w-20 bg-white border rounded p-1.5 text-center shadow-sm cursor-pointer relative ${
+          male ? 'hover:border-sky-500' : 'hover:border-rose-500'
+        } ${node?.name ? (male ? 'border-sky-400' : 'border-rose-400') : 'border-gray-300'}`}
+        title={`${ancestorDescription(path)} ${male ? '♂' : '♀'}: ${full}`}
+      >
+        <span className={`absolute top-0.5 right-1 text-[9px] font-bold ${male ? 'text-sky-600' : 'text-rose-500'}`}>
+          {male ? '♂' : '♀'}
+        </span>
+        <PassarinhoIcon sex={male ? 'MALE' : 'FEMALE'} className="w-5 h-5 mx-auto text-slate-700" />
+        <span className="text-[8px] font-bold block mt-0.5 truncate">{label}</span>
+        <span className="text-[7.5px] text-slate-500 truncate block font-mono">{node?.name || (male ? 'INDEFINIDO' : 'INDEFINIDA')}</span>
+      </div>
+    )
   }
 
-  const handleZoomOut = () => {
-    if (zoomScale > 1) {
-      setZoomScale(prev => Math.max(prev - 0.1, 0.85))
-    } else if (generations > 2) {
-      setGenerations(2)
-    }
+  const renderBranch = (path: string): React.ReactNode => {
+    const hasChildren = path.length < levels
+    return (
+      <div className="flex flex-col items-center">
+        {renderCard(path)}
+        {hasChildren && (
+          <>
+            <div className="w-[1.5px] h-6 bg-gray-300" />
+            <div className="flex items-start">
+              {(['F', 'M'] as const).map(letter => (
+                <div key={letter} className="relative flex flex-col items-center pt-6 px-1">
+                  <div className="absolute top-0 left-1/2 w-[1.5px] h-6 bg-gray-300" />
+                  <div className={`absolute top-0 h-[1.5px] bg-gray-300 ${letter === 'F' ? 'left-1/2 right-0' : 'left-0 right-1/2'}`} />
+                  {renderBranch(path + letter)}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    )
   }
+
 
   // Filter birds for modal with defensive null-checks
   const filteredBirds = Array.isArray(allBirds) ? allBirds.filter(b => {
@@ -720,24 +781,29 @@ export function NovaGenealogiaEnvironment({
             </span>
           </div>
 
-          {/* Right Controls: [ + ] and [ - ] Buttons (Dark slate buttons from screenshot) */}
+          {/* Right Controls: [ + ] adiciona geração de parentes, [ - ] remove */}
           <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-semibold text-slate-500 mr-1 tabular-nums">
+              {levels} {levels === 1 ? 'geração' : 'gerações'}
+            </span>
             <button
               type="button"
-              onClick={handleZoomIn}
-              className="w-7 h-7 sm:w-8 sm:h-8 bg-[#94a3b8] hover:bg-[#64748b] active:bg-[#475569] text-white rounded flex items-center justify-center shadow-sm transition cursor-pointer"
-              title="Expandir gerações ou aumentar zoom"
-              aria-label="Aumentar zoom ou gerações"
+              onClick={handleAddLevel}
+              disabled={levels >= MAX_LEVELS}
+              className="w-7 h-7 sm:w-8 sm:h-8 bg-[#94a3b8] hover:bg-[#64748b] active:bg-[#475569] disabled:opacity-40 text-white rounded flex items-center justify-center shadow-sm transition cursor-pointer"
+              title="Adicionar mais uma geração de parentes"
+              aria-label="Adicionar geração de parentes"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
             </button>
 
             <button
               type="button"
-              onClick={handleZoomOut}
-              className="w-7 h-7 sm:w-8 sm:h-8 bg-[#94a3b8] hover:bg-[#64748b] active:bg-[#475569] text-white rounded flex items-center justify-center shadow-sm transition cursor-pointer"
-              title="Recolher gerações ou diminuir zoom"
-              aria-label="Diminuir zoom ou gerações"
+              onClick={handleRemoveLevel}
+              disabled={levels <= 1}
+              className="w-7 h-7 sm:w-8 sm:h-8 bg-[#94a3b8] hover:bg-[#64748b] active:bg-[#475569] disabled:opacity-40 text-white rounded flex items-center justify-center shadow-sm transition cursor-pointer"
+              title="Remover a última geração exibida"
+              aria-label="Remover última geração"
             >
               <Minus className="w-4 h-4 stroke-[2.5]" />
             </button>
@@ -748,223 +814,10 @@ export function NovaGenealogiaEnvironment({
         {/* ----------------------------------------------------------------------- */}
         {/* MAIN CANVAS / TREE DIAGRAM AREA                                         */}
         {/* ----------------------------------------------------------------------- */}
-        <div className="bg-white min-h-[460px] sm:min-h-[520px] p-6 sm:p-12 flex flex-col items-center justify-center relative overflow-x-auto select-none">
-          
-          <div 
-            className="flex flex-col items-center transition-transform duration-300"
-            style={{ transform: `scale(${zoomScale})`, transformOrigin: 'top center' }}
-          >
-            
-            {/* 1. ROOT NODE: AVE (TOP CENTER) */}
-            <div className="flex flex-col items-center relative z-10">
-              
-              <div 
-                onClick={() => handleOpenSelector('main')}
-                className={`w-28 sm:w-32 bg-white border rounded-md p-2.5 text-center shadow-xs cursor-pointer hover:border-emerald-500 hover:shadow-sm transition-all group ${
-                  mainBird.name ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300'
-                }`}
-                title="Clique para selecionar ou definir a ave"
-              >
-                {/* Passarinho desenhado no galho (Ave Raiz) */}
-                <div className="flex items-center justify-center text-slate-800 group-hover:text-emerald-600 transition-colors">
-                  <PassarinhoIcon sex="UNKNOWN" className="w-8 h-8" />
-                </div>
-
-                {/* Node Label */}
-                <span className="text-[11px] font-bold text-slate-800 block mt-1">
-                  Ave
-                </span>
-
-                {/* Placeholder or Bird Details */}
-                <span className="text-[10px] text-slate-500 block truncate mt-0.5 font-mono">
-                  {mainBird.name 
-                    ? `${mainBird.name} ${mainBird.ringNumber ? `(${mainBird.ringNumber})` : ''}` 
-                    : '....'}
-                </span>
-              </div>
-
-              {/* Vertical line descending from Ave */}
-              <div className="w-[1.5px] h-8 sm:h-10 bg-gray-300" />
-
-            </div>
-
-            {/* 2. HORIZONTAL BRANCH BAR */}
-            <div className="w-72 sm:w-[420px] relative">
-              
-              {/* Horizontal Crossbar connecting center of Macho to center of Fêmea */}
-              <div className="absolute left-14 sm:left-16 right-14 sm:right-16 top-0 h-[1.5px] bg-gray-300" />
-
-              {/* Left Vertical Drop entering top center of Macho */}
-              <div className="absolute left-14 sm:left-16 top-0 w-[1.5px] h-8 sm:h-10 bg-gray-300" />
-
-              {/* Right Vertical Drop entering top center of Fêmea */}
-              <div className="absolute right-14 sm:right-16 top-0 w-[1.5px] h-8 sm:h-10 bg-gray-300" />
-
-            </div>
-
-            {/* 3. LEVEL 1 NODES: MACHO ♂ (LEFT) & FÊMEA ♀ (RIGHT) */}
-            <div className="w-72 sm:w-[420px] flex items-start justify-between pt-8 sm:pt-10 relative z-10">
-              
-              {/* --- MACHO ♂ (LEFT) --- */}
-              <div className="flex flex-col items-center">
-                <div 
-                  onClick={() => handleOpenSelector('father')}
-                  className={`w-28 sm:w-32 bg-white border rounded-md p-2.5 text-center shadow-xs cursor-pointer hover:border-sky-500 hover:shadow-sm transition-all relative group ${
-                    father.name ? 'border-sky-500 bg-sky-50/20' : 'border-gray-300'
-                  }`}
-                  title="Clique para definir o Pai (Macho)"
-                >
-                  {/* Male Symbol in corner */}
-                  <span className="absolute top-1.5 right-2 text-xs font-bold text-slate-500 group-hover:text-sky-600">
-                    ♂
-                  </span>
-
-                  {/* Passarinho desenhado no galho (Macho) */}
-                  <div className="flex items-center justify-center text-slate-800 group-hover:text-sky-600 transition-colors">
-                    <PassarinhoIcon sex="MALE" className="w-8 h-8" />
-                  </div>
-
-                  {/* Label */}
-                  <span className="text-[11px] font-bold text-slate-800 block mt-1">
-                    Macho
-                  </span>
-
-                  {/* Placeholder / Ring */}
-                  <span className="text-[10px] text-slate-500 block truncate mt-0.5 font-mono">
-                    {father.name 
-                      ? `${father.name} ${father.ringNumber ? `(${father.ringNumber})` : ''}` 
-                      : 'INDEFINIDO'}
-                  </span>
-                </div>
-
-                {/* Sub-tree lines if expanded to 3 generations */}
-                {generations >= 3 && (
-                  <div className="flex flex-col items-center mt-0 w-44">
-                    <div className="w-[1.5px] h-7 bg-gray-300" />
-                    
-                    {/* Crossbar for paternal grandparents */}
-                    <div className="w-40 relative">
-                      <div className="absolute left-9 right-9 top-0 h-[1.5px] bg-gray-300" />
-                      <div className="absolute left-9 top-0 w-[1.5px] h-7 bg-gray-300" />
-                      <div className="absolute right-9 top-0 w-[1.5px] h-7 bg-gray-300" />
-                    </div>
-
-                    {/* Avós Paternos */}
-                    <div className="w-40 flex justify-between pt-7">
-                      {/* Avô Paterno */}
-                      <div
-                        onClick={() => handleOpenSelector('patGF')}
-                        className="w-18 bg-white border border-gray-300 rounded p-1.5 text-center shadow-sm hover:border-sky-500 cursor-pointer relative"
-                        title="Avô Paterno ♂"
-                      >
-                        <span className="absolute top-0.5 right-1 text-[9px] text-sky-600 font-bold">♂</span>
-                        <PassarinhoIcon sex="MALE" className="w-5 h-5 mx-auto text-slate-700" />
-                        <span className="text-[8px] font-bold block mt-0.5">Avô P.</span>
-                        <span className="text-[7.5px] text-slate-500 truncate block font-mono">
-                          {patGrandfather.name || 'INDEFINIDO'}
-                        </span>
-                      </div>
-
-                      {/* Avó Paterna */}
-                      <div
-                        onClick={() => handleOpenSelector('patGM')}
-                        className="w-18 bg-white border border-gray-300 rounded p-1.5 text-center shadow-sm hover:border-rose-500 cursor-pointer relative"
-                        title="Avó Paterna ♀"
-                      >
-                        <span className="absolute top-0.5 right-1 text-[9px] text-rose-500 font-bold">♀</span>
-                        <PassarinhoIcon sex="FEMALE" className="w-5 h-5 mx-auto text-slate-700" />
-                        <span className="text-[8px] font-bold block mt-0.5">Avó P.</span>
-                        <span className="text-[7.5px] text-slate-500 truncate block font-mono">
-                          {patGrandmother.name || 'INDEFINIDA'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* --- FÊMEA ♀ (RIGHT) --- */}
-              <div className="flex flex-col items-center">
-                <div 
-                  onClick={() => handleOpenSelector('mother')}
-                  className={`w-28 sm:w-32 bg-white border rounded-md p-2.5 text-center shadow-xs cursor-pointer hover:border-rose-500 hover:shadow-sm transition-all relative group ${
-                    mother.name ? 'border-rose-500 bg-rose-50/20' : 'border-gray-300'
-                  }`}
-                  title="Clique para definir a Mãe (Fêmea)"
-                >
-                  {/* Female Symbol in corner */}
-                  <span className="absolute top-1.5 right-2 text-xs font-bold text-slate-500 group-hover:text-rose-600">
-                    ♀
-                  </span>
-
-                  {/* Passarinho desenhado no galho (Fêmea) */}
-                  <div className="flex items-center justify-center text-slate-800 group-hover:text-rose-600 transition-colors">
-                    <PassarinhoIcon sex="FEMALE" className="w-8 h-8" />
-                  </div>
-
-                  {/* Label */}
-                  <span className="text-[11px] font-bold text-slate-800 block mt-1">
-                    Fêmea
-                  </span>
-
-                  {/* Placeholder / Ring */}
-                  <span className="text-[10px] text-slate-500 block truncate mt-0.5 font-mono">
-                    {mother.name 
-                      ? `${mother.name} ${mother.ringNumber ? `(${mother.ringNumber})` : ''}` 
-                      : 'INDEFINIDA'}
-                  </span>
-                </div>
-
-                {/* Sub-tree lines if expanded to 3 generations */}
-                {generations >= 3 && (
-                  <div className="flex flex-col items-center mt-0 w-44">
-                    <div className="w-[1.5px] h-7 bg-gray-300" />
-                    
-                    {/* Crossbar for maternal grandparents */}
-                    <div className="w-40 relative">
-                      <div className="absolute left-9 right-9 top-0 h-[1.5px] bg-gray-300" />
-                      <div className="absolute left-9 top-0 w-[1.5px] h-7 bg-gray-300" />
-                      <div className="absolute right-9 top-0 w-[1.5px] h-7 bg-gray-300" />
-                    </div>
-
-                    {/* Avós Maternos */}
-                    <div className="w-40 flex justify-between pt-7">
-                      {/* Avô Materno */}
-                      <div
-                        onClick={() => handleOpenSelector('matGF')}
-                        className="w-18 bg-white border border-gray-300 rounded p-1.5 text-center shadow-sm hover:border-sky-500 cursor-pointer relative"
-                        title="Avô Materno ♂"
-                      >
-                        <span className="absolute top-0.5 right-1 text-[9px] text-sky-600 font-bold">♂</span>
-                        <PassarinhoIcon sex="MALE" className="w-5 h-5 mx-auto text-slate-700" />
-                        <span className="text-[8px] font-bold block mt-0.5">Avô M.</span>
-                        <span className="text-[7.5px] text-slate-500 truncate block font-mono">
-                          {matGrandfather.name || 'INDEFINIDO'}
-                        </span>
-                      </div>
-
-                      {/* Avó Materna */}
-                      <div
-                        onClick={() => handleOpenSelector('matGM')}
-                        className="w-18 bg-white border border-gray-300 rounded p-1.5 text-center shadow-sm hover:border-rose-500 cursor-pointer relative"
-                        title="Avó Materna ♀"
-                      >
-                        <span className="absolute top-0.5 right-1 text-[9px] text-rose-500 font-bold">♀</span>
-                        <PassarinhoIcon sex="FEMALE" className="w-5 h-5 mx-auto text-slate-700" />
-                        <span className="text-[8px] font-bold block mt-0.5">Avó M.</span>
-                        <span className="text-[7.5px] text-slate-500 truncate block font-mono">
-                          {matGrandmother.name || 'INDEFINIDA'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-            </div>
-
+        <div className="bg-white min-h-[460px] sm:min-h-[520px] p-6 sm:p-12 relative overflow-x-auto select-none">
+          <div className="mx-auto w-max">
+            {renderBranch('')}
           </div>
-
         </div>
 
         {/* ----------------------------------------------------------------------- */}
@@ -1023,13 +876,9 @@ export function NovaGenealogiaEnvironment({
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div>
                 <h3 className="font-black text-sm text-slate-900">
-                  {modalTarget === 'main' && 'Selecionar Ave Principal'}
-                  {modalTarget === 'father' && 'Selecionar Pai (Macho ♂)'}
-                  {modalTarget === 'mother' && 'Selecionar Mãe (Fêmea ♀)'}
-                  {modalTarget === 'patGF' && 'Selecionar Avô Paterno ♂'}
-                  {modalTarget === 'patGM' && 'Selecionar Avó Paterna ♀'}
-                  {modalTarget === 'matGF' && 'Selecionar Avô Materno ♂'}
-                  {modalTarget === 'matGM' && 'Selecionar Avó Materna ♀'}
+                  {modalTarget === 'main'
+                    ? 'Selecionar Ave Principal'
+                    : `Selecionar ${ancestorDescription(modalTarget)} ${modalTarget.endsWith('F') ? '♂' : '♀'}`}
                 </h3>
                 <p className="text-[11px] text-slate-500">
                   Escolha uma ave cadastrada no criatório ou preencha manualmente

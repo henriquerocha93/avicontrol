@@ -29,7 +29,8 @@ import {
   ShieldCheck
 } from 'lucide-react'
 import { db } from '@/lib/db'
-import { Tenant, BreederOwner, TenantVisualConfig } from '@/types'
+import { Tenant, BreederOwner, TenantVisualConfig, Bird } from '@/types'
+import { BadgeFrontAndBack } from '@/components/genealogy/badge-front-and-back'
 
 export default function CriatorioConfigPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null)
@@ -69,7 +70,17 @@ export default function CriatorioConfigPage() {
   })
 
   useEffect(() => {
-    const t = db.getTenant()
+    let targetTenantId: string | undefined
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('birdpro_current_user')
+        if (raw) {
+          const u = JSON.parse(raw)
+          if (u?.tenantId) targetTenantId = u.tenantId
+        }
+      } catch {}
+    }
+    const t = db.getTenant(targetTenantId)
     if (t) {
       // Sanitize any legacy demo/mock data if present in state
       const sanitized: Tenant = {
@@ -123,12 +134,50 @@ export default function CriatorioConfigPage() {
   const handleVisualConfigChange = (field: keyof TenantVisualConfig, value: any) => {
     setTenant(prev => {
       if (!prev) return null
+      const currentVc = prev.visualConfig || {}
+      const updatedVc: TenantVisualConfig = {
+        ...currentVc,
+        [field]: value
+      }
+
+      // Sincronizar pares de propriedades legadas e atuais para compatibilidade total
+      const aliasMap: Record<string, string> = {
+        treeTextColor: 'textColorGenealogy',
+        textColorGenealogy: 'treeTextColor',
+        labelFrontTextColor: 'textColorLabelFront',
+        textColorLabelFront: 'labelFrontTextColor',
+        labelBackTextColor: 'textColorLabelBack',
+        textColorLabelBack: 'labelBackTextColor',
+        fieldBgColor: 'colorField',
+        colorField: 'fieldBgColor',
+        fieldTextColor: 'colorTextField',
+        colorTextField: 'fieldTextColor',
+        maleColor: 'colorPaletteMale',
+        colorPaletteMale: 'maleColor',
+        femaleColor: 'colorPaletteFemale',
+        colorPaletteFemale: 'femaleColor',
+        maleTextColor: 'colorTextPaletteMale',
+        colorTextPaletteMale: 'maleTextColor',
+        femaleTextColor: 'colorTextPaletteFemale',
+        colorTextPaletteFemale: 'femaleTextColor',
+        malePaletteDisplay: 'levelDisplayPaletteGenealogy',
+        levelDisplayPaletteGenealogy: 'malePaletteDisplay',
+        femalePaletteDisplay: 'levelDisplayPaletteLabel',
+        levelDisplayPaletteLabel: 'femalePaletteDisplay',
+        printCertificateTitle: 'printTitleCertificate',
+        printTitleCertificate: 'printCertificateTitle',
+        printUpToSixthGeneration: 'printSixthGeneration',
+        printSixthGeneration: 'printUpToSixthGeneration'
+      }
+
+      const alias = aliasMap[field as string]
+      if (alias) {
+        (updatedVc as any)[alias] = value
+      }
+
       return {
         ...prev,
-        visualConfig: {
-          ...prev.visualConfig,
-          [field]: value
-        }
+        visualConfig: updatedVc
       }
     })
   }
@@ -390,13 +439,46 @@ export default function CriatorioConfigPage() {
 
     setTimeout(() => {
       db.saveTenant(tenant)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('birdpro_db_updated'))
+      }
       setIsSaving(false)
       setSavedSuccess(true)
+      showToast('Configurações e cores salvas com sucesso!')
       setTimeout(() => setSavedSuccess(false), 4500)
-    }, 350)
+    }, 150)
   }
 
   const vc = tenant.visualConfig || {}
+  const treeTextColor = vc.treeTextColor || vc.textColorGenealogy || '#000000'
+  const labelFrontTextColor = vc.labelFrontTextColor || vc.textColorLabelFront || '#000000'
+  const labelBackTextColor = vc.labelBackTextColor || vc.textColorLabelBack || '#000000'
+  const fieldBgColor = vc.fieldBgColor || vc.colorField || '#ffffff'
+  const fieldTextColor = vc.fieldTextColor || vc.colorTextField || '#000000'
+  const maleColor = vc.maleColor || vc.colorPaletteMale || '#dbeafe'
+  const femaleColor = vc.femaleColor || vc.colorPaletteFemale || '#fce7f3'
+  const maleTextColor = vc.maleTextColor || vc.colorTextPaletteMale || '#000000'
+  const femaleTextColor = vc.femaleTextColor || vc.colorTextPaletteFemale || '#000000'
+
+  const previewBird: Bird = {
+    id: 'preview-bird-01',
+    tenantId: tenant.id,
+    name: 'CAMPEÃO DE OURO',
+    ringNumber: 'SISPASS 2.8 RS 2026',
+    species: 'Curió (Sporophila angolensis)',
+    sex: 'MALE',
+    birthDate: '2024-10-15',
+    fatherName: 'TROVÃO NEGRO',
+    motherName: 'SERENA DA MATA',
+    paternalGrandfatherId: 'VENTANIA',
+    paternalGrandmotherId: 'HONDA',
+    maternalGrandfatherId: 'PREDADOR',
+    maternalGrandmotherId: 'LADY GAGA',
+    status: 'ACTIVE' as any,
+    entryDate: '2024-10-15',
+    isPublic: true,
+    createdAt: '2024-10-15'
+  }
 
   return (
     <div className="space-y-4 pb-20 w-full font-sans">
@@ -1459,10 +1541,17 @@ export default function CriatorioConfigPage() {
                 <div className="flex items-center space-x-2">
                   <input
                     type="color"
-                    value={vc.treeTextColor || '#000000'}
+                    value={treeTextColor}
                     onChange={(e) => handleVisualConfigChange('treeTextColor', e.target.value)}
                     className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-black"
                   />
+                  <button
+                    type="button"
+                    onClick={() => handleResetColor('treeTextColor', '#000000')}
+                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0 cursor-pointer"
+                  >
+                    Cor Padrão
+                  </button>
                 </div>
               </div>
 
@@ -1471,10 +1560,17 @@ export default function CriatorioConfigPage() {
                 <div className="flex items-center space-x-2">
                   <input
                     type="color"
-                    value={vc.labelFrontTextColor || '#000000'}
+                    value={labelFrontTextColor}
                     onChange={(e) => handleVisualConfigChange('labelFrontTextColor', e.target.value)}
                     className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-black"
                   />
+                  <button
+                    type="button"
+                    onClick={() => handleResetColor('labelFrontTextColor', '#000000')}
+                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0 cursor-pointer"
+                  >
+                    Cor Padrão
+                  </button>
                 </div>
               </div>
 
@@ -1483,14 +1579,14 @@ export default function CriatorioConfigPage() {
                 <div className="flex items-center space-x-2">
                   <input
                     type="color"
-                    value={vc.labelBackTextColor || '#000000'}
+                    value={labelBackTextColor}
                     onChange={(e) => handleVisualConfigChange('labelBackTextColor', e.target.value)}
                     className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-black"
                   />
                   <button
                     type="button"
                     onClick={() => handleResetColor('labelBackTextColor', '#000000')}
-                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0"
+                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0 cursor-pointer"
                   >
                     Cor Padrão
                   </button>
@@ -1502,12 +1598,21 @@ export default function CriatorioConfigPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
               <div>
                 <label className="block text-xs text-slate-600 mb-1">Cor do campo</label>
-                <input
-                  type="color"
-                  value={vc.fieldBgColor || '#ffffff'}
-                  onChange={(e) => handleVisualConfigChange('fieldBgColor', e.target.value)}
-                  className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-white"
-                />
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="color"
+                    value={fieldBgColor}
+                    onChange={(e) => handleVisualConfigChange('fieldBgColor', e.target.value)}
+                    className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleResetColor('fieldBgColor', '#ffffff')}
+                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0 cursor-pointer"
+                  >
+                    Cor Padrão
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -1515,14 +1620,14 @@ export default function CriatorioConfigPage() {
                 <div className="flex items-center space-x-2">
                   <input
                     type="color"
-                    value={vc.fieldTextColor || '#000000'}
+                    value={fieldTextColor}
                     onChange={(e) => handleVisualConfigChange('fieldTextColor', e.target.value)}
                     className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-black"
                   />
                   <button
                     type="button"
                     onClick={() => handleResetColor('fieldTextColor', '#000000')}
-                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0"
+                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0 cursor-pointer"
                   >
                     Cor Padrão
                   </button>
@@ -1534,12 +1639,21 @@ export default function CriatorioConfigPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
               <div>
                 <label className="block text-xs text-slate-600 mb-1">Cor paleta do Macho</label>
-                <input
-                  type="color"
-                  value={vc.maleColor || '#dbeafe'}
-                  onChange={(e) => handleVisualConfigChange('maleColor', e.target.value)}
-                  className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-[#dbeafe]"
-                />
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="color"
+                    value={maleColor}
+                    onChange={(e) => handleVisualConfigChange('maleColor', e.target.value)}
+                    className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-[#dbeafe]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleResetColor('maleColor', '#dbeafe')}
+                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0 cursor-pointer"
+                  >
+                    Cor Padrão
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -1547,14 +1661,14 @@ export default function CriatorioConfigPage() {
                 <div className="flex items-center space-x-2">
                   <input
                     type="color"
-                    value={vc.femaleColor || '#fce7f3'}
+                    value={femaleColor}
                     onChange={(e) => handleVisualConfigChange('femaleColor', e.target.value)}
                     className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-[#fce7f3]"
                   />
                   <button
                     type="button"
                     onClick={() => handleResetColor('femaleColor', '#fce7f3')}
-                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0"
+                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0 cursor-pointer"
                   >
                     Cor Padrão
                   </button>
@@ -1566,12 +1680,21 @@ export default function CriatorioConfigPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
               <div>
                 <label className="block text-xs text-slate-600 mb-1">Cor do texto da paleta do Macho</label>
-                <input
-                  type="color"
-                  value={vc.maleTextColor || '#000000'}
-                  onChange={(e) => handleVisualConfigChange('maleTextColor', e.target.value)}
-                  className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-black"
-                />
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="color"
+                    value={maleTextColor}
+                    onChange={(e) => handleVisualConfigChange('maleTextColor', e.target.value)}
+                    className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-black"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleResetColor('maleTextColor', '#000000')}
+                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0 cursor-pointer"
+                  >
+                    Cor Padrão
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -1579,14 +1702,14 @@ export default function CriatorioConfigPage() {
                 <div className="flex items-center space-x-2">
                   <input
                     type="color"
-                    value={vc.femaleTextColor || '#000000'}
+                    value={femaleTextColor}
                     onChange={(e) => handleVisualConfigChange('femaleTextColor', e.target.value)}
                     className="w-full h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-black"
                   />
                   <button
                     type="button"
                     onClick={() => handleResetColor('femaleTextColor', '#000000')}
-                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0"
+                    className="px-3 py-1.5 border border-[#00c853] text-[#00c853] hover:bg-[#00c853] hover:text-white text-xs rounded transition shrink-0 cursor-pointer"
                   >
                     Cor Padrão
                   </button>
@@ -1655,6 +1778,26 @@ export default function CriatorioConfigPage() {
                 >
                   {(vc.printUpToSixthGeneration ?? true) ? 'SIM' : 'NÃO'}
                 </button>
+              </div>
+            </div>
+
+            {/* PRÉVIA EM TEMPO REAL DA PLACA DE GAIOLA (FRENTE E VERSO) */}
+            <div className="pt-6 border-t border-slate-200 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                    <span>Prévia da Placa de Gaiola (Frente e Verso)</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      Atualização em Tempo Real
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    As cores das placas e dados selecionados acima aparecem aqui e nas etiquetas impressas de todas as aves do criatório
+                  </p>
+                </div>
+              </div>
+              <div className="bg-slate-100 p-3 sm:p-6 rounded-xl border border-slate-200 flex justify-center overflow-x-auto">
+                <BadgeFrontAndBack bird={previewBird} tenant={tenant} />
               </div>
             </div>
 

@@ -328,6 +328,7 @@ export interface Bird {
   fatherRing?: string;
   motherName?: string;
   motherRing?: string;
+  ancestry?: Record<string, { id?: string; name: string; ringNumber: string }>;
   location?: string;
   cageId?: string;
   status: BirdStatus;

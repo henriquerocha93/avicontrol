@@ -258,12 +258,45 @@ export class FirebaseSyncService {
     }
   }
 
+  public subscribeTenantCollection(
+    collectionName: string,
+    tenantId: string,
+    onChanges: (
+      changes: { type: 'added' | 'modified' | 'removed'; id: string; data: any; pending: boolean }[],
+      isFirst: boolean
+    ) => void,
+    onError?: (err: any) => void
+  ): () => void {
+    if (!this.isAvailable() || !dbFirestore) return () => {};
+    let first = true;
+    try {
+      const q = query(collection(dbFirestore, collectionName), where('tenantId', '==', tenantId));
+      return onSnapshot(q, (snap: any) => {
+        const changes = snap.docChanges().map((c: any) => ({
+          type: c.type,
+          id: c.doc.id,
+          data: c.doc.data(),
+          pending: !!c.doc.metadata.hasPendingWrites
+        }));
+        const isFirst = first;
+        first = false;
+        onChanges(changes, isFirst);
+      }, (err: any) => {
+        console.warn(`Subscription error on ${collectionName}:`, err);
+        if (onError) onError(err);
+      });
+    } catch (err) {
+      console.error(`Failed to subscribe to ${collectionName}:`, err);
+      return () => {};
+    }
+  }
+
   // Save document to Firestore
-  public async saveDocument(collectionName: string, id: string, data: any): Promise<boolean> {
+  public async saveDocument(collectionName: string, id: string, data: any, merge = true): Promise<boolean> {
     if (!this.isAvailable() || !dbFirestore) return false;
     try {
       const docRef = doc(dbFirestore, collectionName, id);
-      await setDoc(docRef, JSON.parse(JSON.stringify(data)), { merge: true });
+      await setDoc(docRef, JSON.parse(JSON.stringify(data)), { merge });
       return true;
     } catch (err) {
       console.error(`Error saving document ${id} to ${collectionName} in Firebase:`, err);

@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Bird, Tenant } from '@/types'
 import { formatDate } from '@/lib/utils'
+import { db } from '@/lib/db'
 
 export interface BadgeAncestors {
   fatherName?: string;
@@ -17,7 +18,7 @@ export interface BadgeAncestors {
 
 interface BadgeFrontAndBackProps {
   bird: Bird
-  tenant: Tenant
+  tenant?: Tenant | null
   theme?: 'LIGHT' | 'DARK'
   mode?: 'BOTH' | 'FRONT_ONLY' | 'BACK_ONLY'
   customAncestors?: BadgeAncestors
@@ -103,19 +104,26 @@ export function BadgeFrontAndBack({
   mode = 'BOTH',
   customAncestors
 }: BadgeFrontAndBackProps) {
-  const vc = tenant?.visualConfig || {}
+  const activeTenant = tenant || db.getTenant(bird?.tenantId) || db.getTenant()
+  const vc = activeTenant?.visualConfig || {}
   const publicUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}/ave/${bird.id}` 
     : `https://www.birdpro.com.br/ave/${bird.id}`
 
   // Paletas das caixas
-  const maleBg = vc.maleColor || '#dbeafe'
-  const femaleBg = vc.femaleColor || '#fce7f3'
-  const maleText = vc.maleTextColor || '#0f172a'
-  const femaleText = vc.femaleTextColor || '#0f172a'
+  const maleBg = vc.maleColor || vc.colorPaletteMale || '#dbeafe'
+  const femaleBg = vc.femaleColor || vc.colorPaletteFemale || '#fce7f3'
+  const maleText = vc.maleTextColor || vc.colorTextPaletteMale || '#0f172a'
+  const femaleText = vc.femaleTextColor || vc.colorTextPaletteFemale || '#0f172a'
+
+  // Cores personalizadas de campos e textos da placa
+  const fieldBg = vc.fieldBgColor || vc.colorField || '#ffffff'
+  const fieldText = vc.fieldTextColor || vc.colorTextField || '#0f172a'
+  const labelFrontText = vc.labelFrontTextColor || vc.textColorLabelFront || '#475569'
+  const labelBackText = vc.labelBackTextColor || vc.textColorLabelBack || '#475569'
 
   // Imagens
-  const logoImage = vc.labelLogoUrl || vc.treeLogoUrl || tenant?.logoUrl || ''
+  const logoImage = vc.labelLogoUrl || vc.treeLogoUrl || activeTenant?.logoUrl || ''
   const frontBg = vc.labelFrontBackgroundUrl || ''
   const backBg = vc.labelBackBackgroundUrl || ''
 
@@ -214,15 +222,18 @@ export function BadgeFrontAndBack({
           <div className="flex-1 space-y-1">
             {/* Nome da Ave */}
             <div>
-              <span className="text-[8px] font-bold uppercase text-slate-600 block">Nome da Ave</span>
-              <div className="bg-slate-100 border border-slate-400 px-2 py-0.5 text-center font-black text-xs uppercase text-slate-900 truncate">
+              <span className="text-[8px] font-bold uppercase block" style={{ color: labelFrontText }}>Nome da Ave</span>
+              <div 
+                className="border border-slate-400 px-2 py-0.5 text-center font-black text-xs uppercase truncate"
+                style={{ backgroundColor: fieldBg, color: fieldText }}
+              >
                 {bird.name}
               </div>
             </div>
 
             {/* Pai */}
             <div>
-              <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Pai</span>
+              <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Pai</span>
               <div 
                 className="border border-slate-400 px-2 py-0.5 text-center font-bold text-[10px] uppercase truncate shadow-2xs"
                 style={{ backgroundColor: maleBg, color: maleText }}
@@ -233,7 +244,7 @@ export function BadgeFrontAndBack({
 
             {/* Mãe */}
             <div>
-              <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Mãe</span>
+              <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Mãe</span>
               <div 
                 className="border border-slate-400 px-2 py-0.5 text-center font-bold text-[10px] uppercase truncate shadow-2xs"
                 style={{ backgroundColor: femaleBg, color: femaleText }}
@@ -245,14 +256,20 @@ export function BadgeFrontAndBack({
             {/* Nascimento + Sexo */}
             <div className="grid grid-cols-2 gap-1.5 pt-0.5">
               <div>
-                <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Nascimento</span>
-                <div className="bg-white border border-slate-400 px-1 py-0.5 text-center font-bold text-[9px]">
+                <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Nascimento</span>
+                <div 
+                  className="border border-slate-400 px-1 py-0.5 text-center font-bold text-[9px]"
+                  style={{ backgroundColor: fieldBg, color: fieldText }}
+                >
                   {bird.birthDate ? formatDate(bird.birthDate) : 'Emissão Recente'}
                 </div>
               </div>
               <div>
-                <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Sexo</span>
-                <div className="bg-white border border-slate-400 px-1 py-0.5 text-center font-bold text-[9px]">
+                <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Sexo</span>
+                <div 
+                  className="border border-slate-400 px-1 py-0.5 text-center font-bold text-[9px]"
+                  style={{ backgroundColor: fieldBg, color: fieldText }}
+                >
                   {bird.sex === 'MALE' ? '♂ Macho' : bird.sex === 'FEMALE' ? '♀ Fêmea' : 'Indefinido'}
                 </div>
               </div>
@@ -263,21 +280,30 @@ export function BadgeFrontAndBack({
         {/* Linha 2: Anilha, Espécie e Registro Oficial */}
         <div className="relative z-10 grid grid-cols-12 gap-1.5 pt-1.5">
           <div className="col-span-5">
-            <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Anilha Oficial</span>
-            <div className="bg-white border border-slate-400 px-2 py-0.5 text-center font-mono font-bold text-[10px] truncate text-slate-900">
+            <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Anilha Oficial</span>
+            <div 
+              className="border border-slate-400 px-2 py-0.5 text-center font-mono font-bold text-[10px] truncate"
+              style={{ backgroundColor: fieldBg, color: fieldText }}
+            >
               {bird.ringNumber || 'SIMULAÇÃO 2026'}
             </div>
           </div>
           <div className="col-span-4">
-            <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Espécie</span>
-            <div className="bg-white border border-slate-400 px-1 py-0.5 text-center font-bold text-[9px] truncate text-slate-800">
+            <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Espécie</span>
+            <div 
+              className="border border-slate-400 px-1 py-0.5 text-center font-bold text-[9px] truncate"
+              style={{ backgroundColor: fieldBg, color: fieldText }}
+            >
               {bird.species?.split('(')[0]?.trim() || 'Canário-da-terra'}
             </div>
           </div>
           <div className="col-span-3">
-            <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Registro CTF</span>
-            <div className="bg-white border border-slate-400 px-1 py-0.5 text-center font-mono font-bold text-[9.5px] truncate text-slate-800">
-              {tenant?.registryNumber || '—'}
+            <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Registro CTF</span>
+            <div 
+              className="border border-slate-400 px-1 py-0.5 text-center font-mono font-bold text-[9.5px] truncate"
+              style={{ backgroundColor: fieldBg, color: fieldText }}
+            >
+              {activeTenant?.registryNumber || '—'}
             </div>
           </div>
         </div>
@@ -290,12 +316,18 @@ export function BadgeFrontAndBack({
           </div>
 
           <div className="flex-1">
-            <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Proprietário / Criador Responsável</span>
+            <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Proprietário / Criador Responsável</span>
             <div className="flex border border-slate-400 text-[8.5px] font-bold">
-              <div className="flex-1 px-1.5 py-0.5 bg-white border-r border-slate-400 truncate text-slate-900">
-                {tenant?.name || 'Criatório Autorizado'}
+              <div 
+                className="flex-1 px-1.5 py-0.5 border-r border-slate-400 truncate"
+                style={{ backgroundColor: fieldBg, color: fieldText }}
+              >
+                {activeTenant?.name || 'Criatório Autorizado'}
               </div>
-              <div className="px-2 py-0.5 bg-emerald-50 text-emerald-900 shrink-0 font-mono">
+              <div 
+                className="px-2 py-0.5 shrink-0 font-mono"
+                style={{ backgroundColor: fieldBg, color: fieldText }}
+              >
                 {telefoneContato}
               </div>
             </div>
@@ -336,7 +368,7 @@ export function BadgeFrontAndBack({
             <span className="w-4 h-4 rounded bg-[#00c853] text-white flex items-center justify-center font-black text-[8px]">
               BP
             </span>
-            <span className="font-black tracking-tight text-slate-950">GENEALOGIA &amp; ORIGEM GENÉTICA</span>
+            <span className="font-black tracking-tight" style={{ color: labelBackText }}>GENEALOGIA &amp; ORIGEM GENÉTICA</span>
           </div>
           <span className="text-[#00c853] font-mono text-[8px] font-bold">Autenticação: {bird.ringNumber}</span>
         </div>
@@ -355,27 +387,30 @@ export function BadgeFrontAndBack({
             </div>
 
             {/* MEIO: INFORMAÇÕES DA AVE & VALIDAÇÃO (Exatamente no espaço vago entre pai e mãe) */}
-            <div className="my-auto p-1 bg-white/95 rounded border border-slate-300 shadow-2xs flex flex-col items-center justify-center text-center">
-              <span className="text-[6.5px] font-black uppercase text-slate-800 tracking-wider">
+            <div 
+              className="my-auto p-1 rounded border border-slate-300 shadow-2xs flex flex-col items-center justify-center text-center"
+              style={{ backgroundColor: fieldBg, color: fieldText }}
+            >
+              <span className="text-[6.5px] font-black uppercase tracking-wider" style={{ color: labelBackText }}>
                 Validação:
               </span>
               <div className="w-9 h-9 p-0.5 bg-white border border-slate-400 rounded flex items-center justify-center my-0.5 shadow-2xs">
                 <QRCodeSVG value={publicUrl} size={32} level="M" />
               </div>
-              <div className="w-full text-[6px] font-semibold text-slate-700 leading-tight space-y-0.5 pt-0.5 border-t border-slate-200">
-                <p className="font-black text-slate-900 truncate uppercase text-[6.5px]">
+              <div className="w-full text-[6px] font-semibold leading-tight space-y-0.5 pt-0.5 border-t border-slate-200">
+                <p className="font-black truncate uppercase text-[6.5px]" style={{ color: fieldText }}>
                   {bird.name}
                 </p>
-                <p className="truncate text-slate-600">
-                  <strong className="text-slate-800">Espécie:</strong> {bird.species?.split('(')[0]?.trim() || 'Canário-da-terra'}
+                <p className="truncate" style={{ color: fieldText }}>
+                  <strong style={{ color: fieldText }}>Espécie:</strong> {bird.species?.split('(')[0]?.trim() || 'Canário-da-terra'}
                 </p>
-                <p className="truncate font-mono font-bold text-slate-900">
-                  <strong className="font-sans font-semibold text-slate-800">Anilha:</strong> {bird.ringNumber || 'OFICIAL'}
+                <p className="truncate font-mono font-bold" style={{ color: fieldText }}>
+                  <strong className="font-sans font-semibold" style={{ color: fieldText }}>Anilha:</strong> {bird.ringNumber || 'OFICIAL'}
                 </p>
-                <div className="flex items-center justify-center gap-1 text-[5.5px] text-slate-600">
-                  <span><strong className="text-slate-800">Nasc:</strong> {bird.birthDate ? formatDate(bird.birthDate) : '2026'}</span>
+                <div className="flex items-center justify-center gap-1 text-[5.5px]" style={{ color: fieldText }}>
+                  <span><strong style={{ color: fieldText }}>Nasc:</strong> {bird.birthDate ? formatDate(bird.birthDate) : '2026'}</span>
                   <span>•</span>
-                  <span className="font-bold text-slate-900">{bird.sex === 'MALE' ? '♂ Macho' : bird.sex === 'FEMALE' ? '♀ Fêmea' : 'Indef.'}</span>
+                  <span className="font-bold" style={{ color: fieldText }}>{bird.sex === 'MALE' ? '♂ Macho' : bird.sex === 'FEMALE' ? '♀ Fêmea' : 'Indef.'}</span>
                 </div>
               </div>
             </div>
@@ -473,10 +508,10 @@ export function BadgeFrontAndBack({
         </div>
 
         {/* Rodapé: Coeficiente & Autenticidade Digital */}
-        <div className="relative z-10 border-t border-black/10 pt-1 flex items-center justify-between text-[7.5px] text-slate-600 font-semibold">
+        <div className="relative z-10 border-t border-black/10 pt-1 flex items-center justify-between text-[7.5px] font-semibold" style={{ color: labelBackText }}>
           <div className="flex items-center gap-3">
-            <span>Coef. Consanguinidade: <strong className="text-slate-900 font-mono">0.0%</strong></span>
-            <span>Parentesco: <strong className="text-slate-900 font-mono">0.0%</strong></span>
+            <span>Coef. Consanguinidade: <strong className="font-mono" style={{ color: labelBackText }}>0.0%</strong></span>
+            <span>Parentesco: <strong className="font-mono" style={{ color: labelBackText }}>0.0%</strong></span>
           </div>
           <span className="font-mono text-emerald-800 font-bold">Documento gerado eletronicamente pela plataforma BirdPro</span>
         </div>

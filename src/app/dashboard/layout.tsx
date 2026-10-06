@@ -13,6 +13,14 @@ function DashboardProtectedArea({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [syncVersion, setSyncVersion] = useState(0);
+
+  // Quando a primeira sincronização com a nuvem traz dados novos, remonta o conteúdo da página
+  useEffect(() => {
+    const onInitialSync = () => setSyncVersion((v) => v + 1);
+    window.addEventListener('birdpro_initial_sync_done', onInitialSync);
+    return () => window.removeEventListener('birdpro_initial_sync_done', onInitialSync);
+  }, []);
 
   // Global hotkey handler (Ctrl+K or Cmd+K)
   useEffect(() => {
@@ -67,7 +75,7 @@ function DashboardProtectedArea({ children }: { children: React.ReactNode }) {
         {/* Page Container - Full Width with PlanGuard Protection */}
         <main className="flex-1 px-4 py-3 w-full animate-in fade-in duration-200">
           <PlanGuard>
-            {children}
+            <React.Fragment key={syncVersion}>{children}</React.Fragment>
           </PlanGuard>
         </main>
       </div>

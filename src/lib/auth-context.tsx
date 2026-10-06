@@ -84,6 +84,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  useEffect(() => {
+    if (user?.tenantId && user.role !== 'SELLER') {
+      db.startTenantSync(user.tenantId);
+    }
+  }, [user?.tenantId, user?.role]);
+
   const refreshTenant = () => {
     if (user?.tenantId) {
       const activeTenant = db.getTenant(user.tenantId);

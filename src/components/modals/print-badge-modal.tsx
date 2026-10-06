@@ -5,12 +5,13 @@ import { QRCodeSVG } from 'qrcode.react'
 import { Printer, X } from 'lucide-react'
 import { Bird, Tenant } from '@/types'
 import { formatDate } from '@/lib/utils'
+import { db } from '@/lib/db'
 
 interface PrintBadgeModalProps {
   isOpen: boolean
   onClose: () => void
   bird: Bird
-  tenant: Tenant
+  tenant?: Tenant | null
 }
 
 export function PrintBadgeModal({
@@ -21,7 +22,8 @@ export function PrintBadgeModal({
 }: PrintBadgeModalProps) {
   if (!isOpen) return null
 
-  const vc = tenant.visualConfig || {}
+  const activeTenant = tenant || db.getTenant(bird?.tenantId) || db.getTenant()
+  const vc = activeTenant?.visualConfig || {}
   const publicUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}/ave/${bird.id}` 
     : `https://birdpro.com.br/ave/${bird.id}`
@@ -31,13 +33,19 @@ export function PrintBadgeModal({
   }
 
   // Palettes from Visual Config or Default
-  const maleBg = vc.maleColor || '#dbeafe'
-  const femaleBg = vc.femaleColor || '#fce7f3'
-  const maleText = vc.maleTextColor || '#000000'
-  const femaleText = vc.femaleTextColor || '#000000'
+  const maleBg = vc.maleColor || vc.colorPaletteMale || '#dbeafe'
+  const femaleBg = vc.femaleColor || vc.colorPaletteFemale || '#fce7f3'
+  const maleText = vc.maleTextColor || vc.colorTextPaletteMale || '#000000'
+  const femaleText = vc.femaleTextColor || vc.colorTextPaletteFemale || '#000000'
+
+  // Cores personalizadas de campos e textos da placa
+  const fieldBg = vc.fieldBgColor || vc.colorField || '#ffffff'
+  const fieldText = vc.fieldTextColor || vc.colorTextField || '#000000'
+  const labelFrontText = vc.labelFrontTextColor || vc.textColorLabelFront || '#475569'
+  const labelBackText = vc.labelBackTextColor || vc.textColorLabelBack || '#475569'
 
   // Image configurations from Criatório
-  const logoImage = vc.labelLogoUrl || vc.treeLogoUrl || tenant.logoUrl || ''
+  const logoImage = vc.labelLogoUrl || vc.treeLogoUrl || activeTenant?.logoUrl || ''
   const frontBg = vc.labelFrontBackgroundUrl || ''
   const backBg = vc.labelBackBackgroundUrl || ''
 
@@ -145,7 +153,7 @@ export function PrintBadgeModal({
                     </div>
                   )}
                   <span className="text-[9px] font-black uppercase tracking-wider block mt-1 text-slate-900">
-                    {tenant.name?.split(' ')[0] || 'CRIATÓRIO'}
+                    {activeTenant?.name?.split(' ')[0] || 'CRIATÓRIO'}
                   </span>
                 </div>
 
@@ -153,15 +161,18 @@ export function PrintBadgeModal({
                 <div className="flex-1 space-y-1">
                   {/* Nome da Ave */}
                   <div>
-                    <span className="text-[8px] font-bold uppercase text-slate-600 block">Nome da Ave</span>
-                    <div className="bg-slate-100 border border-slate-400 px-2 py-0.5 text-center font-bold text-xs uppercase text-slate-900 truncate">
+                    <span className="text-[8px] font-bold uppercase block" style={{ color: labelFrontText }}>Nome da Ave</span>
+                    <div 
+                      className="border border-slate-400 px-2 py-0.5 text-center font-bold text-xs uppercase truncate"
+                      style={{ backgroundColor: fieldBg, color: fieldText }}
+                    >
                       {bird.name}
                     </div>
                   </div>
 
                   {/* Pai */}
                   <div>
-                    <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Pai</span>
+                    <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Pai</span>
                     <div 
                       className="border border-slate-400 px-2 py-0.5 text-center font-bold text-[10px] uppercase truncate"
                       style={{ backgroundColor: maleBg, color: maleText }}
@@ -172,7 +183,7 @@ export function PrintBadgeModal({
 
                   {/* Mãe */}
                   <div>
-                    <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Mãe</span>
+                    <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Mãe</span>
                     <div 
                       className="border border-slate-400 px-2 py-0.5 text-center font-bold text-[10px] uppercase truncate"
                       style={{ backgroundColor: femaleBg, color: femaleText }}
@@ -184,14 +195,20 @@ export function PrintBadgeModal({
                   {/* Nascimento + Sexo */}
                   <div className="grid grid-cols-2 gap-1.5 pt-0.5">
                     <div>
-                      <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Nascimento</span>
-                      <div className="bg-white border border-slate-400 px-1 py-0.5 text-center font-bold text-[9px]">
+                      <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Nascimento</span>
+                      <div 
+                        className="border border-slate-400 px-1 py-0.5 text-center font-bold text-[9px]"
+                        style={{ backgroundColor: fieldBg, color: fieldText }}
+                      >
                         {bird.birthDate ? formatDate(bird.birthDate) : '04/11/2021'}
                       </div>
                     </div>
                     <div>
-                      <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Sexo</span>
-                      <div className="bg-white border border-slate-400 px-1 py-0.5 text-center font-bold text-[9px]">
+                      <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Sexo</span>
+                      <div 
+                        className="border border-slate-400 px-1 py-0.5 text-center font-bold text-[9px]"
+                        style={{ backgroundColor: fieldBg, color: fieldText }}
+                      >
                         {bird.sex === 'MALE' ? 'Macho' : bird.sex === 'FEMALE' ? 'Fêmea' : 'Indefinido'}
                       </div>
                     </div>
@@ -202,15 +219,21 @@ export function PrintBadgeModal({
               {/* Middle Row: Anilha e Registro */}
               <div className="relative z-10 grid grid-cols-12 gap-1.5 pt-1">
                 <div className="col-span-8">
-                  <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Anilha</span>
-                  <div className="bg-white border border-slate-400 px-2 py-0.5 text-center font-mono font-bold text-[10px] truncate">
+                  <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Anilha</span>
+                  <div 
+                    className="border border-slate-400 px-2 py-0.5 text-center font-mono font-bold text-[10px] truncate"
+                    style={{ backgroundColor: fieldBg, color: fieldText }}
+                  >
                     {bird.ringNumber || 'SISPASS 2.8 RS/A 036460'}
                   </div>
                 </div>
                 <div className="col-span-4">
-                  <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Registro</span>
-                  <div className="bg-white border border-slate-400 px-1 py-0.5 text-center font-mono font-bold text-[10px] truncate">
-                    {tenant.registryNumber || tenant.registrationNumber || '—'}
+                  <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Registro</span>
+                  <div 
+                    className="border border-slate-400 px-1 py-0.5 text-center font-mono font-bold text-[10px] truncate"
+                    style={{ backgroundColor: fieldBg, color: fieldText }}
+                  >
+                    {activeTenant?.registryNumber || activeTenant?.registrationNumber || '—'}
                   </div>
                 </div>
               </div>
@@ -218,13 +241,19 @@ export function PrintBadgeModal({
               {/* Bottom Row: Proprietário, Telefone + BirdPro Watermark */}
               <div className="relative z-10 pt-1 border-t border-slate-300 flex items-center justify-between">
                 <div className="flex-1 mr-2">
-                  <span className="text-[7.5px] font-bold uppercase text-slate-600 block">Proprietário</span>
+                  <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Proprietário</span>
                   <div className="flex border border-slate-400 text-[8.5px] font-bold">
-                    <div className="flex-1 px-1.5 py-0.5 bg-white border-r border-slate-400 truncate">
-                      {tenant.name || '—'}
+                    <div 
+                      className="flex-1 px-1.5 py-0.5 border-r border-slate-400 truncate"
+                      style={{ backgroundColor: fieldBg, color: fieldText }}
+                    >
+                      {activeTenant?.name || '—'}
                     </div>
-                    <div className="px-2 py-0.5 bg-white shrink-0">
-                      {tenant.phone || tenant.cellphone || '—'}
+                    <div 
+                      className="px-2 py-0.5 shrink-0"
+                      style={{ backgroundColor: fieldBg, color: fieldText }}
+                    >
+                      {activeTenant?.phone || activeTenant?.cellphone || '—'}
                     </div>
                   </div>
                 </div>
@@ -260,7 +289,7 @@ export function PrintBadgeModal({
                   <span className="w-4 h-4 rounded bg-[#00c853] text-white flex items-center justify-center font-black text-[8px]">
                     BP
                   </span>
-                  <span className="font-black tracking-tight text-slate-950">BIRDPRO</span>
+                  <span className="font-black tracking-tight" style={{ color: labelBackText }}>BIRDPRO</span>
                 </div>
                 <span className="text-[#00c853] font-mono text-[8px] font-bold">www.birdpro.com.br</span>
               </div>
@@ -367,7 +396,7 @@ export function PrintBadgeModal({
               </div>
 
               {/* Bottom Footer: QR Code + Species and Bird Name + BirdPro Stamp */}
-              <div className="relative z-10 flex items-center justify-between border-t border-black/10 pt-1 text-[7.5px] text-slate-700">
+              <div className="relative z-10 flex items-center justify-between border-t border-black/10 pt-1 text-[7.5px]" style={{ color: labelBackText }}>
                 <div className="flex items-center space-x-2">
                   <div className="p-0.5 bg-white border border-slate-400 rounded shrink-0">
                     <QRCodeSVG value={publicUrl} size={34} level="M" />

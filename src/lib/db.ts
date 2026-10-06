@@ -54,6 +54,20 @@ class DataService {
   private isBrowser: boolean;
   private hasInitializedCloud: boolean = false;
 
+  // --- Sincronização em nuvem dos dados do criatório (aves, genealogia, gaiolas...) ---
+  private static SYNC_COLLECTIONS = [
+    'birds', 'cages', 'rings', 'pairs', 'clutches', 'eggs', 'medications', 'treatments',
+    'diseases', 'sexings', 'genotyping', 'timeline', 'notifications', 'documents',
+    'photos', 'events', 'notes'
+  ];
+  private syncTenantId: string | null = null;
+  private syncReady = false;
+  private syncUnsubs: (() => void)[] = [];
+  private syncIndex: Record<string, Record<string, string>> = {};
+  private pushTimer: any = null;
+  private pushing = false;
+  private pushAgain = false;
+
   constructor() {
     this.isBrowser = typeof window !== 'undefined';
     this.state = this.getInitialState();
@@ -203,12 +217,201 @@ class DataService {
     }
   }
 
-  private saveToStorage() {
+  private persist() {
     if (!this.isBrowser) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+      window.dispatchEvent(new Event('birdpro_db_updated'));
     } catch (e) {
       console.error('Failed to persist db to storage', e);
+    }
+  }
+
+  private saveToStorage() {
+    this.persist();
+    this.schedulePush();
+  }
+
+  // ===================== SYNC DE DADOS DO CRIATÓRIO (NUVEM) =====================
+  private stableStringify(v: any): string {
+    if (v === null || typeof v !== 'object') return JSON.stringify(v) ?? 'null';
+    if (Array.isArray(v)) return '[' + v.map(x => this.stableStringify(x)).join(',') + ']';
+    return '{' + Object.keys(v).sort()
+      .filter(k => v[k] !== undefined)
+      .map(k => JSON.stringify(k) + ':' + this.stableStringify(v[k])).join(',') + '}';
+  }
+
+  private hashItem(v: any): string {
+    const s = this.stableStringify(v);
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return `${s.length}:${h}`;
+  }
+
+  private indexKey(tenantId: string) {
+    return `birdpro_sync_index_${tenantId}`;
+  }
+
+  private loadSyncIndex(tenantId: string) {
+    try {
+      const raw = localStorage.getItem(this.indexKey(tenantId));
+      this.syncIndex = raw ? JSON.parse(raw) : {};
+    } catch {
+      this.syncIndex = {};
+    }
+  }
+
+  private saveSyncIndex() {
+    if (!this.syncTenantId) return;
+    try {
+      localStorage.setItem(this.indexKey(this.syncTenantId), JSON.stringify(this.syncIndex));
+    } catch {}
+  }
+
+  public startTenantSync(tenantId: string): void {
+    if (!this.isBrowser || !tenantId || !firebaseSync.isAvailable()) return;
+    if (this.syncTenantId === tenantId) return;
+
+    this.syncUnsubs.forEach(u => { try { u(); } catch {} });
+    this.syncUnsubs = [];
+    this.syncTenantId = tenantId;
+    this.syncReady = false;
+    this.loadSyncIndex(tenantId);
+
+    const pending = new Set<string>(DataService.SYNC_COLLECTIONS);
+    let anyChange = false;
+
+    DataService.SYNC_COLLECTIONS.forEach(coll => {
+      const unsub = firebaseSync.subscribeTenantCollection(coll, tenantId, (changes, isFirst) => {
+        if (this.syncTenantId !== tenantId) return;
+        const changed = this.applyRemoteChanges(coll, tenantId, changes, isFirst);
+        if (changed) {
+          this.persist();
+          this.saveSyncIndex();
+        }
+        if (isFirst) {
+          anyChange = anyChange || changed;
+          pending.delete(coll);
+          if (pending.size === 0) {
+            this.syncReady = true;
+            if (anyChange && typeof window !== 'undefined') {
+              window.dispatchEvent(new Event('birdpro_initial_sync_done'));
+            }
+            // Envia o que só existe localmente (migração) e quaisquer alterações pendentes
+            this.schedulePush(100);
+          }
+        } else if (changed && typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('birdpro_db_updated'));
+        }
+      });
+      this.syncUnsubs.push(unsub);
+    });
+  }
+
+  private applyRemoteChanges(
+    coll: string,
+    tenantId: string,
+    changes: { type: 'added' | 'modified' | 'removed'; id: string; data: any; pending: boolean }[],
+    isFirst: boolean
+  ): boolean {
+    const st: any = this.state;
+    if (!st[coll]) st[coll] = [];
+    const arr: any[] = st[coll];
+    const idx = (this.syncIndex[coll] = this.syncIndex[coll] || {});
+    let changed = false;
+    const cloudIds = new Set<string>(changes.map(c => c.id));
+
+    for (const ch of changes) {
+      if (ch.pending) continue; // eco de uma gravação local
+      if (ch.type === 'removed') {
+        const before = arr.length;
+        st[coll] = st[coll].filter((x: any) => !(String(x.id) === ch.id && x.tenantId === tenantId));
+        if (st[coll].length !== before) changed = true;
+        delete idx[ch.id];
+        continue;
+      }
+      const data = { ...ch.data, id: ch.data?.id ?? ch.id };
+      const h = this.hashItem(data);
+      const i = st[coll].findIndex((x: any) => String(x.id) === ch.id);
+      if (i >= 0) {
+        if (this.hashItem(st[coll][i]) !== h) {
+          st[coll][i] = data;
+          changed = true;
+        }
+      } else {
+        st[coll].push(data);
+        changed = true;
+      }
+      idx[ch.id] = h;
+    }
+
+    if (isFirst) {
+      // Item que já esteve sincronizado e sumiu da nuvem = foi excluído em outro aparelho
+      const before = st[coll].length;
+      st[coll] = st[coll].filter((x: any) => {
+        if (x.tenantId !== tenantId) return true;
+        const id = String(x.id);
+        if (!cloudIds.has(id) && idx[id]) {
+          delete idx[id];
+          return false;
+        }
+        return true;
+      });
+      if (st[coll].length !== before) changed = true;
+    }
+    return changed;
+  }
+
+  private schedulePush(delay = 1000) {
+    if (!this.isBrowser || !this.syncReady || !this.syncTenantId) return;
+    if (this.pushTimer) clearTimeout(this.pushTimer);
+    this.pushTimer = setTimeout(() => {
+      this.pushChanges().catch(e => console.warn('Cloud push error:', e));
+    }, delay);
+  }
+
+  private async pushChanges(): Promise<void> {
+    if (this.pushing) {
+      this.pushAgain = true;
+      return;
+    }
+    const tid = this.syncTenantId;
+    if (!tid || !this.syncReady || !firebaseSync.isAvailable()) return;
+    this.pushing = true;
+    try {
+      const st: any = this.state;
+      for (const coll of DataService.SYNC_COLLECTIONS) {
+        const items: any[] = (st[coll] || []).filter((x: any) => x && x.id && x.tenantId === tid);
+        const idx = (this.syncIndex[coll] = this.syncIndex[coll] || {});
+        const currentIds = new Set<string>();
+
+        for (const it of items) {
+          const id = String(it.id);
+          currentIds.add(id);
+          const h = this.hashItem(it);
+          if (idx[id] === h) continue;
+          if (JSON.stringify(it).length > 900000) {
+            console.warn(`Item ${coll}/${id} excede o limite do Firestore (1MB) e não foi sincronizado.`);
+            continue;
+          }
+          const ok = await firebaseSync.saveDocument(coll, id, it, false);
+          if (ok) idx[id] = h;
+        }
+
+        for (const id of Object.keys(idx)) {
+          if (!currentIds.has(id)) {
+            const ok = await firebaseSync.removeDocument(coll, id);
+            if (ok) delete idx[id];
+          }
+        }
+      }
+      this.saveSyncIndex();
+    } finally {
+      this.pushing = false;
+      if (this.pushAgain) {
+        this.pushAgain = false;
+        this.schedulePush(200);
+      }
     }
   }
 
@@ -394,16 +597,64 @@ class DataService {
     return this.state.tenants || [];
   }
 
-  getTenant(id = 'tenant-demo-01'): Tenant {
-    return this.state.tenants.find(t => t.id === id) || this.state.tenants[0] || INITIAL_TENANT;
+  getTenant(id?: string): Tenant {
+    let targetId = id;
+    if (!targetId || targetId === 'tenant-demo-01') {
+      if (this.isBrowser) {
+        try {
+          const raw = localStorage.getItem('birdpro_current_user');
+          if (raw) {
+            const u = JSON.parse(raw);
+            if (u?.tenantId) targetId = u.tenantId;
+          }
+        } catch {}
+      }
+    }
+    targetId = targetId || 'tenant-demo-01';
+    return (
+      this.state.tenants.find(t => t.id === targetId) ||
+      this.state.tenants[0] ||
+      INITIAL_TENANT
+    );
   }
 
-  updateTenant(tenant: Partial<Tenant>, id = 'tenant-demo-01'): Tenant {
-    const idx = this.state.tenants.findIndex(t => t.id === id);
+  updateTenant(tenant: Partial<Tenant>, id?: string): Tenant {
+    let targetId = id || tenant.id;
+    if (!targetId || targetId === 'tenant-demo-01') {
+      if (this.isBrowser) {
+        try {
+          const raw = localStorage.getItem('birdpro_current_user');
+          if (raw) {
+            const u = JSON.parse(raw);
+            if (u?.tenantId) targetId = u.tenantId;
+          }
+        } catch {}
+      }
+    }
+    targetId = targetId || 'tenant-demo-01';
+
+    let idx = this.state.tenants.findIndex(t => t.id === targetId);
+    if (idx < 0 && tenant.id) {
+      idx = this.state.tenants.findIndex(t => t.id === tenant.id);
+    }
+    if (idx < 0 && this.state.tenants.length > 0) {
+      idx = 0;
+    }
+
     if (idx >= 0) {
-      this.state.tenants[idx] = { ...this.state.tenants[idx], ...tenant };
-      this.logAction(id, 'UPDATE_TENANT', 'CONFIGURACOES', `Dados do criatório atualizados`);
+      this.state.tenants[idx] = {
+        ...this.state.tenants[idx],
+        ...tenant,
+        visualConfig: {
+          ...(this.state.tenants[idx].visualConfig || {}),
+          ...(tenant.visualConfig || {})
+        }
+      };
+      this.logAction(this.state.tenants[idx].id, 'UPDATE_TENANT', 'CONFIGURACOES', `Dados do criatório atualizados`);
       this.saveToStorage();
+      if (this.isBrowser) {
+        window.dispatchEvent(new Event('birdpro_db_updated'));
+      }
       if (this.isBrowser && firebaseSync.isAvailable()) {
         firebaseSync.saveTenant(this.state.tenants[idx]).catch(e => console.error('Cloud save tenant error:', e));
       }
@@ -413,7 +664,7 @@ class DataService {
   }
 
   saveTenant(tenant: Tenant): Tenant {
-    return this.updateTenant(tenant, tenant.id || 'tenant-demo-01');
+    return this.updateTenant(tenant, tenant.id);
   }
 
   getAllUsers(): User[] {
