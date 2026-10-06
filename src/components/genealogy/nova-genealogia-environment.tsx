@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { 
   Edit3, 
@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Award,
   Sparkles,
+  Maximize2,
   Bird as BirdIcon
 } from 'lucide-react'
 import { db } from '@/lib/db'
@@ -151,6 +152,56 @@ export function NovaGenealogiaEnvironment({
 
   // Quantidade de gerações de parentes exibidas (controlada pelos botões + e -)
   const [levels, setLevels] = useState<number>(1)
+
+  // Auto-fit / Enquadramento automático para caber 100% na tela sem rolagem
+  const containerRef = useRef<HTMLDivElement>(null)
+  const treeRef = useRef<HTMLDivElement>(null)
+  const [autoFit, setAutoFit] = useState<boolean>(true)
+  const [scale, setScale] = useState<number>(1)
+  const [treeDimensions, setTreeDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 })
+
+  const updateScale = useCallback(() => {
+    if (!containerRef.current || !treeRef.current) return
+    const containerWidth = containerRef.current.clientWidth - 24 // margem de respiro
+    const treeWidth = treeRef.current.scrollWidth
+    const treeHeight = treeRef.current.scrollHeight
+
+    setTreeDimensions({ width: treeWidth, height: treeHeight })
+
+    if (autoFit && treeWidth > 0 && containerWidth > 0) {
+      if (treeWidth > containerWidth) {
+        const calculatedScale = Math.max(0.18, containerWidth / treeWidth)
+        setScale(Number(calculatedScale.toFixed(3)))
+      } else {
+        setScale(1)
+      }
+    } else if (!autoFit) {
+      setScale(1)
+    }
+  }, [autoFit])
+
+  // Recalcula a escala automaticamente ao mudar níveis, redimensionar tela ou alterar nós
+  useEffect(() => {
+    updateScale()
+    const t1 = setTimeout(updateScale, 40)
+    const t2 = setTimeout(updateScale, 180)
+
+    const handleResize = () => updateScale()
+    window.addEventListener('resize', handleResize)
+
+    let ro: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      ro = new ResizeObserver(() => updateScale())
+      ro.observe(containerRef.current)
+    }
+
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+      window.removeEventListener('resize', handleResize)
+      if (ro) ro.disconnect()
+    }
+  }, [levels, autoFit, updateScale])
 
   // Nodes State
   const [mainBird, setMainBird] = useState<NodeData>({ name: '', ringNumber: '', sex: 'UNKNOWN' })
@@ -437,21 +488,25 @@ export function NovaGenealogiaEnvironment({
   const handleAddLevel = () => setLevels(l => Math.min(l + 1, MAX_LEVELS))
   const handleRemoveLevel = () => setLevels(l => Math.max(1, l - 1))
 
-  // Renderiza recursivamente um card e seus ancestrais
+  // Renderiza recursivamente um card e seus ancestrais com dimensionamento adaptativo
   const renderCard = (path: string) => {
+    const isHighGen = levels >= 4
+    const isMedGen = levels === 3
+
     if (path === '') {
+      const cardWidth = isHighGen ? 'w-24 sm:w-28 p-2' : isMedGen ? 'w-26 sm:w-30 p-2' : 'w-28 sm:w-32 p-2.5'
       return (
         <div
           onClick={() => handleOpenSelector('main')}
-          className={`w-28 sm:w-32 bg-white border rounded-md p-2.5 text-center shadow-xs cursor-pointer hover:border-emerald-500 hover:shadow-sm transition-all group ${
+          className={`${cardWidth} bg-white border rounded-md text-center shadow-xs cursor-pointer hover:border-emerald-500 hover:shadow-sm transition-all group ${
             mainBird.name ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-300'
           }`}
           title="Clique para selecionar ou definir a ave"
         >
           <div className="flex items-center justify-center text-slate-800 group-hover:text-emerald-600 transition-colors">
-            <PassarinhoIcon sex="UNKNOWN" className="w-8 h-8" />
+            <PassarinhoIcon sex="UNKNOWN" className={isHighGen ? 'w-6 h-6' : 'w-8 h-8'} />
           </div>
-          <span className="text-[11px] font-bold text-slate-800 block mt-1">Ave</span>
+          <span className="text-[11px] font-bold text-slate-800 block mt-0.5">Ave</span>
           <span className="text-[10px] text-slate-500 block truncate mt-0.5 font-mono">
             {mainBird.name
               ? `${mainBird.name} ${mainBird.ringNumber ? `(${mainBird.ringNumber})` : ''}`
@@ -467,58 +522,89 @@ export function NovaGenealogiaEnvironment({
     const full = node?.name ? `${node.name}${node.ringNumber ? ` (${node.ringNumber})` : ''}` : (male ? 'INDEFINIDO' : 'INDEFINIDA')
 
     if (path.length === 1) {
+      const cardWidth = isHighGen ? 'w-24 sm:w-28 p-2' : isMedGen ? 'w-26 sm:w-30 p-2' : 'w-28 sm:w-32 p-2.5'
       return (
         <div
           onClick={() => handleOpenSelector(path)}
-          className={`w-28 sm:w-32 bg-white border rounded-md p-2.5 text-center shadow-xs cursor-pointer hover:shadow-sm transition-all relative group ${
+          className={`${cardWidth} bg-white border rounded-md text-center shadow-xs cursor-pointer hover:shadow-sm transition-all relative group ${
             male ? 'hover:border-sky-500' : 'hover:border-rose-500'
           } ${
             node?.name ? (male ? 'border-sky-500 bg-sky-50/20' : 'border-rose-500 bg-rose-50/20') : 'border-gray-300'
           }`}
           title={male ? 'Clique para definir o Pai (Macho)' : 'Clique para definir a Mãe (Fêmea)'}
         >
-          <span className={`absolute top-1.5 right-2 text-xs font-bold text-slate-500 ${male ? 'group-hover:text-sky-600' : 'group-hover:text-rose-600'}`}>
+          <span className={`absolute top-1 right-1.5 text-xs font-bold text-slate-500 ${male ? 'group-hover:text-sky-600' : 'group-hover:text-rose-600'}`}>
             {male ? '♂' : '♀'}
           </span>
           <div className={`flex items-center justify-center text-slate-800 transition-colors ${male ? 'group-hover:text-sky-600' : 'group-hover:text-rose-600'}`}>
-            <PassarinhoIcon sex={male ? 'MALE' : 'FEMALE'} className="w-8 h-8" />
+            <PassarinhoIcon sex={male ? 'MALE' : 'FEMALE'} className={isHighGen ? 'w-6 h-6' : 'w-8 h-8'} />
           </div>
-          <span className="text-[11px] font-bold text-slate-800 block mt-1">{label}</span>
+          <span className="text-[11px] font-bold text-slate-800 block mt-0.5">{label}</span>
           <span className="text-[10px] text-slate-500 block truncate mt-0.5 font-mono">{full}</span>
         </div>
       )
     }
 
+    // Nível 2 (Avós)
+    if (path.length === 2) {
+      const cardWidth = isHighGen ? 'w-18 sm:w-20 p-1 sm:p-1.5' : isMedGen ? 'w-20 p-1.5' : 'w-22 p-2'
+      return (
+        <div
+          onClick={() => handleOpenSelector(path)}
+          className={`${cardWidth} bg-white border rounded text-center shadow-xs cursor-pointer hover:shadow-sm transition-all relative ${
+            male ? 'hover:border-sky-500' : 'hover:border-rose-500'
+          } ${node?.name ? (male ? 'border-sky-400 bg-sky-50/15' : 'border-rose-400 bg-rose-50/15') : 'border-gray-300'}`}
+          title={`${ancestorDescription(path)} ${male ? '♂' : '♀'}: ${full}`}
+        >
+          <span className={`absolute top-0.5 right-1 text-[9px] font-bold ${male ? 'text-sky-600' : 'text-rose-500'}`}>
+            {male ? '♂' : '♀'}
+          </span>
+          <PassarinhoIcon sex={male ? 'MALE' : 'FEMALE'} className="w-5 h-5 mx-auto text-slate-700" />
+          <span className="text-[8.5px] font-bold block mt-0.5 truncate">{label}</span>
+          <span className="text-[7.5px] text-slate-500 truncate block font-mono">{node?.name || (male ? 'INDEFINIDO' : 'INDEFINIDA')}</span>
+        </div>
+      )
+    }
+
+    // Nível 3+ (Bisavós, Trisavós, ...)
+    const isVeryDeep = path.length >= 4
+    const cardWidth = isVeryDeep ? 'w-13 sm:w-15 p-1' : 'w-16 sm:w-18 p-1.5'
     return (
       <div
         onClick={() => handleOpenSelector(path)}
-        className={`w-20 bg-white border rounded p-1.5 text-center shadow-sm cursor-pointer relative ${
+        className={`${cardWidth} bg-white border rounded text-center shadow-2xs cursor-pointer hover:shadow-sm transition-all relative ${
           male ? 'hover:border-sky-500' : 'hover:border-rose-500'
-        } ${node?.name ? (male ? 'border-sky-400' : 'border-rose-400') : 'border-gray-300'}`}
+        } ${node?.name ? (male ? 'border-sky-400 bg-sky-50/15' : 'border-rose-400 bg-rose-50/15') : 'border-gray-300'}`}
         title={`${ancestorDescription(path)} ${male ? '♂' : '♀'}: ${full}`}
       >
-        <span className={`absolute top-0.5 right-1 text-[9px] font-bold ${male ? 'text-sky-600' : 'text-rose-500'}`}>
+        <span className={`absolute top-0.5 right-0.5 text-[8px] font-bold ${male ? 'text-sky-600' : 'text-rose-500'}`}>
           {male ? '♂' : '♀'}
         </span>
-        <PassarinhoIcon sex={male ? 'MALE' : 'FEMALE'} className="w-5 h-5 mx-auto text-slate-700" />
-        <span className="text-[8px] font-bold block mt-0.5 truncate">{label}</span>
-        <span className="text-[7.5px] text-slate-500 truncate block font-mono">{node?.name || (male ? 'INDEFINIDO' : 'INDEFINIDA')}</span>
+        <PassarinhoIcon sex={male ? 'MALE' : 'FEMALE'} className={`${isVeryDeep ? 'w-3.5 h-3.5' : 'w-4 h-4'} mx-auto text-slate-700`} />
+        <span className={`${isVeryDeep ? 'text-[7px]' : 'text-[7.5px]'} font-bold block mt-0.5 truncate`}>{label}</span>
+        <span className={`${isVeryDeep ? 'text-[6.5px]' : 'text-[7px]'} text-slate-500 truncate block font-mono`}>{node?.name || (male ? 'INDEF.' : 'INDEF.')}</span>
       </div>
     )
   }
 
   const renderBranch = (path: string): React.ReactNode => {
     const hasChildren = path.length < levels
+    const depth = path.length
+    const isDeepTree = levels >= 4
+    const verticalLineHeight = isDeepTree ? 'h-4' : levels === 3 ? 'h-5' : 'h-6'
+    const verticalPadding = isDeepTree ? 'pt-4' : levels === 3 ? 'pt-5' : 'pt-6'
+    const branchPadding = isDeepTree ? 'px-0.5' : levels === 3 ? 'px-0.5 sm:px-1' : 'px-1 sm:px-1.5'
+
     return (
       <div className="flex flex-col items-center">
         {renderCard(path)}
         {hasChildren && (
           <>
-            <div className="w-[1.5px] h-6 bg-gray-300" />
+            <div className={`w-[1.5px] ${verticalLineHeight} bg-gray-300`} />
             <div className="flex items-start">
               {(['F', 'M'] as const).map(letter => (
-                <div key={letter} className="relative flex flex-col items-center pt-6 px-1">
-                  <div className="absolute top-0 left-1/2 w-[1.5px] h-6 bg-gray-300" />
+                <div key={letter} className={`relative flex flex-col items-center ${verticalPadding} ${branchPadding}`}>
+                  <div className={`absolute top-0 left-1/2 w-[1.5px] ${verticalLineHeight} bg-gray-300`} />
                   <div className={`absolute top-0 h-[1.5px] bg-gray-300 ${letter === 'F' ? 'left-1/2 right-0' : 'left-0 right-1/2'}`} />
                   {renderBranch(path + letter)}
                 </div>
@@ -771,7 +857,7 @@ export function NovaGenealogiaEnvironment({
         {/* ----------------------------------------------------------------------- */}
         {/* TOP BAR / HEADER (Matching Screenshot: [Edit Icon] Genealogia ... [+][-])*/}
         {/* ----------------------------------------------------------------------- */}
-        <div className="bg-[#f8fafc] border-b border-gray-200 px-4 py-2.5 flex items-center justify-between select-none">
+        <div className="bg-[#f8fafc] border-b border-gray-200 px-3 sm:px-4 py-2 flex items-center justify-between select-none gap-2 flex-wrap">
           
           {/* Left Title with Edit Icon */}
           <div className="flex items-center gap-2 text-slate-800">
@@ -779,44 +865,97 @@ export function NovaGenealogiaEnvironment({
             <span className="text-sm font-semibold text-slate-800">
               Genealogia
             </span>
+            {scale < 0.99 && autoFit && (
+              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Enquadrado {Math.round(scale * 100)}%
+              </span>
+            )}
           </div>
 
-          {/* Right Controls: [ + ] adiciona geração de parentes, [ - ] remove */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-semibold text-slate-500 mr-1 tabular-nums">
-              {levels} {levels === 1 ? 'geração' : 'gerações'}
-            </span>
+          {/* Right Controls: Auto-Fit Toggle + [ + ] / [ - ] gerações */}
+          <div className="flex items-center gap-2">
+            {/* Toggle de Enquadramento Inteligente na Tela */}
             <button
               type="button"
-              onClick={handleAddLevel}
-              disabled={levels >= MAX_LEVELS}
-              className="w-7 h-7 sm:w-8 sm:h-8 bg-[#94a3b8] hover:bg-[#64748b] active:bg-[#475569] disabled:opacity-40 text-white rounded flex items-center justify-center shadow-sm transition cursor-pointer"
-              title="Adicionar mais uma geração de parentes"
-              aria-label="Adicionar geração de parentes"
+              onClick={() => {
+                setAutoFit(prev => !prev)
+                if (autoFit) setScale(1)
+              }}
+              className={`px-2 py-1 text-xs font-semibold rounded flex items-center gap-1.5 border transition cursor-pointer ${
+                autoFit 
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100' 
+                  : 'bg-white border-gray-300 text-slate-600 hover:bg-gray-50'
+              }`}
+              title={autoFit ? 'Desativar enquadramento (ver em tamanho real com rolagem)' : 'Enquadrar tudo na tela sem precisar rolar'}
             >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <Maximize2 className="w-3.5 h-3.5" />
+              <span className="hidden xs:inline">
+                {autoFit ? 'Enquadrado' : 'Ajustar tela'}
+              </span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleRemoveLevel}
-              disabled={levels <= 1}
-              className="w-7 h-7 sm:w-8 sm:h-8 bg-[#94a3b8] hover:bg-[#64748b] active:bg-[#475569] disabled:opacity-40 text-white rounded flex items-center justify-center shadow-sm transition cursor-pointer"
-              title="Remover a última geração exibida"
-              aria-label="Remover última geração"
-            >
-              <Minus className="w-4 h-4 stroke-[2.5]" />
-            </button>
+            <div className="h-4 w-[1px] bg-gray-300 hidden sm:block" />
+
+            {/* Quantidade de gerações e botões + / - */}
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-semibold text-slate-600 mr-1 tabular-nums whitespace-nowrap">
+                {levels} {levels === 1 ? 'geração' : 'gerações'}
+              </span>
+              <button
+                type="button"
+                onClick={handleAddLevel}
+                disabled={levels >= MAX_LEVELS}
+                className="w-7 h-7 sm:w-8 sm:h-8 bg-[#94a3b8] hover:bg-[#64748b] active:bg-[#475569] disabled:opacity-40 text-white rounded flex items-center justify-center shadow-sm transition cursor-pointer"
+                title="Adicionar mais uma geração de parentes"
+                aria-label="Adicionar geração de parentes"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRemoveLevel}
+                disabled={levels <= 1}
+                className="w-7 h-7 sm:w-8 sm:h-8 bg-[#94a3b8] hover:bg-[#64748b] active:bg-[#475569] disabled:opacity-40 text-white rounded flex items-center justify-center shadow-sm transition cursor-pointer"
+                title="Remover a última geração exibida"
+                aria-label="Remover última geração"
+              >
+                <Minus className="w-4 h-4 stroke-[2.5]" />
+              </button>
+            </div>
           </div>
 
         </div>
 
         {/* ----------------------------------------------------------------------- */}
-        {/* MAIN CANVAS / TREE DIAGRAM AREA                                         */}
+        {/* MAIN CANVAS / TREE DIAGRAM AREA (Auto-Fit sem rolagem ou corte)         */}
         {/* ----------------------------------------------------------------------- */}
-        <div className="bg-white min-h-[460px] sm:min-h-[520px] p-6 sm:p-12 relative overflow-x-auto select-none">
-          <div className="mx-auto w-max">
-            {renderBranch('')}
+        <div 
+          ref={containerRef}
+          className={`bg-white min-h-[460px] sm:min-h-[520px] p-3 sm:p-8 relative select-none flex flex-col items-center justify-start ${
+            autoFit ? 'overflow-hidden' : 'overflow-x-auto'
+          }`}
+        >
+          <div
+            style={{
+              width: scale < 1 && treeDimensions.width > 0 ? `${Math.ceil(treeDimensions.width * scale)}px` : 'auto',
+              height: scale < 1 && treeDimensions.height > 0 ? `${Math.ceil(treeDimensions.height * scale)}px` : 'auto',
+              minHeight: '360px',
+              transition: 'width 0.15s ease-out, height 0.15s ease-out',
+            }}
+            className="flex items-start justify-center relative mx-auto"
+          >
+            <div
+              ref={treeRef}
+              style={{
+                transform: scale < 1 ? `scale(${scale})` : undefined,
+                transformOrigin: 'top center',
+                transition: 'transform 0.15s ease-out',
+              }}
+              className="w-max mx-auto shrink-0"
+            >
+              {renderBranch('')}
+            </div>
           </div>
         </div>
 
