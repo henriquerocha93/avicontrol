@@ -15,6 +15,7 @@ import {
   INITIAL_SELLERS, INITIAL_COMMISSIONS, INITIAL_PAYOUTS, INITIAL_GLOBAL_CONFIG, INITIAL_CALENDAR_EVENTS, INITIAL_NOTES,
   INITIAL_USER_REFERRALS
 } from './seed-data';
+import { firebaseSync } from './firebase-service';
 
 interface DatabaseState {
   tenants: Tenant[];
@@ -51,12 +52,18 @@ const STORAGE_KEY = 'birdpro_production_db_v2';
 class DataService {
   private state: DatabaseState;
   private isBrowser: boolean;
+  private hasInitializedCloud: boolean = false;
 
   constructor() {
     this.isBrowser = typeof window !== 'undefined';
     this.state = this.getInitialState();
     if (this.isBrowser) {
       this.loadFromStorage();
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          this.syncCloudData().catch(e => console.warn('Cloud sync init error:', e));
+        }, 50);
+      }
     }
   }
 
@@ -220,6 +227,168 @@ class DataService {
     this.saveToStorage();
   }
 
+  // --- CLOUD FIRESTORE SYNCHRONIZATION ---
+  public async syncCloudData(): Promise<void> {
+    if (!this.isBrowser || !firebaseSync.isAvailable()) return;
+    try {
+      // 1. Fetch remote tenants & users from Firestore
+      const [cloudTenants, cloudUsers] = await Promise.all([
+        firebaseSync.fetchAllTenants(),
+        firebaseSync.fetchAllUsers()
+      ]);
+
+      let stateChanged = false;
+
+      // 2. Merge cloud tenants into local state
+      if (cloudTenants && cloudTenants.length > 0) {
+        if (!this.state.tenants) this.state.tenants = [];
+        cloudTenants.forEach(ct => {
+          const idx = this.state.tenants.findIndex(t => t.id === ct.id);
+          if (idx >= 0) {
+            this.state.tenants[idx] = { ...this.state.tenants[idx], ...ct };
+          } else {
+            this.state.tenants.unshift(ct);
+          }
+          stateChanged = true;
+        });
+      }
+
+      // 3. Merge cloud users into local state
+      if (cloudUsers && cloudUsers.length > 0) {
+        if (!this.state.users) this.state.users = [];
+        cloudUsers.forEach(cu => {
+          const cleanCuEmail = (cu.email || '').toLowerCase().trim();
+          const idx = this.state.users.findIndex(u => 
+            u.id === cu.id || (u.email && u.email.toLowerCase().trim() === cleanCuEmail)
+          );
+          if (idx >= 0) {
+            this.state.users[idx] = { ...this.state.users[idx], ...cu };
+          } else {
+            this.state.users.unshift(cu);
+          }
+          stateChanged = true;
+        });
+      }
+
+      // 4. AUTOMATIC MIGRATION: Push any local tenants that are NOT in Firestore to Firestore!
+      if (this.state.tenants && this.state.tenants.length > 0) {
+        for (const localTenant of this.state.tenants) {
+          if (localTenant.id !== 'tenant-demo-01' || (localTenant.name && localTenant.name.trim())) {
+            const existsInCloud = cloudTenants.some(ct => ct.id === localTenant.id);
+            if (!existsInCloud) {
+              await firebaseSync.saveTenant(localTenant);
+            }
+          }
+        }
+      }
+
+      // 5. AUTOMATIC MIGRATION: Push any local users that are NOT in Firestore to Firestore!
+      if (this.state.users && this.state.users.length > 0) {
+        for (const localUser of this.state.users) {
+          if (localUser.email && localUser.email.trim()) {
+            const cleanEmail = localUser.email.toLowerCase().trim();
+            const existsInCloud = cloudUsers.some(cu => 
+              cu.id === localUser.id || (cu.email && cu.email.toLowerCase().trim() === cleanEmail)
+            );
+            if (!existsInCloud) {
+              await firebaseSync.saveUser(localUser);
+            }
+          }
+        }
+      }
+
+      if (stateChanged) {
+        this.saveToStorage();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('birdpro_db_updated'));
+        }
+      }
+
+      // 6. Set up real-time subscriptions if not already initialized
+      if (!this.hasInitializedCloud) {
+        this.hasInitializedCloud = true;
+
+        firebaseSync.subscribeToTenants((liveTenants) => {
+          if (!liveTenants || liveTenants.length === 0) return;
+          if (!this.state.tenants) this.state.tenants = [];
+          let changed = false;
+          liveTenants.forEach(lt => {
+            const idx = this.state.tenants.findIndex(t => t.id === lt.id);
+            if (idx >= 0) {
+              this.state.tenants[idx] = { ...this.state.tenants[idx], ...lt };
+            } else {
+              this.state.tenants.unshift(lt);
+            }
+            changed = true;
+          });
+          if (changed) {
+            this.saveToStorage();
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new Event('birdpro_db_updated'));
+            }
+          }
+        });
+
+        firebaseSync.subscribeToUsers((liveUsers) => {
+          if (!liveUsers || liveUsers.length === 0) return;
+          if (!this.state.users) this.state.users = [];
+          let changed = false;
+          liveUsers.forEach(lu => {
+            const cleanEmail = (lu.email || '').toLowerCase().trim();
+            const idx = this.state.users.findIndex(u => 
+              u.id === lu.id || (u.email && u.email.toLowerCase().trim() === cleanEmail)
+            );
+            if (idx >= 0) {
+              this.state.users[idx] = { ...this.state.users[idx], ...lu };
+            } else {
+              this.state.users.unshift(lu);
+            }
+            changed = true;
+          });
+          if (changed) {
+            this.saveToStorage();
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new Event('birdpro_db_updated'));
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Error syncing cloud data with Firestore:', e);
+    }
+  }
+
+  public mergeCloudUser(user: User): void {
+    if (!this.state.users) this.state.users = [];
+    const cleanEmail = (user.email || '').toLowerCase().trim();
+    const idx = this.state.users.findIndex(u => 
+      u.id === user.id || (u.email && u.email.toLowerCase().trim() === cleanEmail)
+    );
+    if (idx >= 0) {
+      this.state.users[idx] = { ...this.state.users[idx], ...user };
+    } else {
+      this.state.users.unshift(user);
+    }
+    this.saveToStorage();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('birdpro_db_updated'));
+    }
+  }
+
+  public mergeCloudTenant(tenant: Tenant): void {
+    if (!this.state.tenants) this.state.tenants = [];
+    const idx = this.state.tenants.findIndex(t => t.id === tenant.id);
+    if (idx >= 0) {
+      this.state.tenants[idx] = { ...this.state.tenants[idx], ...tenant };
+    } else {
+      this.state.tenants.unshift(tenant);
+    }
+    this.saveToStorage();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('birdpro_db_updated'));
+    }
+  }
+
   // --- TENANTS & USERS ---
   getAllTenants(): Tenant[] {
     return this.state.tenants || [];
@@ -235,6 +404,9 @@ class DataService {
       this.state.tenants[idx] = { ...this.state.tenants[idx], ...tenant };
       this.logAction(id, 'UPDATE_TENANT', 'CONFIGURACOES', `Dados do criatório atualizados`);
       this.saveToStorage();
+      if (this.isBrowser && firebaseSync.isAvailable()) {
+        firebaseSync.saveTenant(this.state.tenants[idx]).catch(e => console.error('Cloud save tenant error:', e));
+      }
       return this.state.tenants[idx];
     }
     return INITIAL_TENANT;
@@ -258,6 +430,9 @@ class DataService {
     if (idx >= 0) {
       this.state.users[idx] = { ...this.state.users[idx], ...updates };
       this.saveToStorage();
+      if (this.isBrowser && firebaseSync.isAvailable()) {
+        firebaseSync.saveUser(this.state.users[idx]).catch(e => console.error('Cloud save user error:', e));
+      }
       return this.state.users[idx];
     }
     return null;
@@ -323,6 +498,13 @@ class DataService {
     }
 
     this.saveToStorage();
+    if (this.isBrowser && firebaseSync.isAvailable()) {
+      firebaseSync.saveUser(user).catch(e => console.error('Cloud save user error:', e));
+      const linkedTenant = (this.state.tenants || []).find(t => t.id === user!.tenantId);
+      if (linkedTenant) {
+        firebaseSync.saveTenant(linkedTenant).catch(e => console.error('Cloud save tenant error:', e));
+      }
+    }
 
     // 4. Update session
     if (this.isBrowser) {
@@ -579,6 +761,9 @@ class DataService {
     this.state.users.push(newUser);
     this.logAction(user.tenantId, 'CREATE_USER', 'USUARIOS', `Novo membro adicionado: ${user.name}`);
     this.saveToStorage();
+    if (this.isBrowser && firebaseSync.isAvailable()) {
+      firebaseSync.saveUser(newUser).catch(e => console.error('Cloud save user error:', e));
+    }
     return newUser;
   }
 
@@ -1850,6 +2035,10 @@ class DataService {
     this.state.users.unshift(newUser);
     this.logAction('tenant-demo-01', 'CREATE_TENANT_MANUAL', 'ADMIN_TENANTS', `Criatório ${newTenant.name} (${newTenant.billingCycle} - ${newTenant.plan}) cadastrado manualmente com valor final R$ ${finalPrice.toFixed(2)}`);
     this.saveToStorage();
+    if (this.isBrowser && firebaseSync.isAvailable()) {
+      firebaseSync.saveTenant(newTenant).catch(e => console.error('Cloud save tenant error:', e));
+      firebaseSync.saveUser(newUser).catch(e => console.error('Cloud save user error:', e));
+    }
     return { tenant: newTenant, user: newUser };
   }
 
@@ -1917,6 +2106,11 @@ class DataService {
 
     this.logAction(tenantId, 'UPDATE_CREDENTIALS', 'ADMIN_TENANTS', `Dados e credenciais de acesso do criatório ${t?.name || tenantId} atualizados`);
     this.saveToStorage();
+    if (this.isBrowser && firebaseSync.isAvailable()) {
+      if (t) firebaseSync.saveTenant(t).catch(e => console.error('Cloud save tenant error:', e));
+      const finalUser = user || (this.state.users || []).find(u => u.tenantId === tenantId);
+      if (finalUser) firebaseSync.saveUser(finalUser).catch(e => console.error('Cloud save user error:', e));
+    }
   }
 
   updateTenantPlan(
@@ -1948,6 +2142,9 @@ class DataService {
       t.lastPaymentDate = new Date().toISOString();
       this.logAction(tenantId, 'RENEW_PLAN', 'FINANCEIRO', `Plano renovado por +${monthsToAdd} mês(es) via PIX. Novo vencimento: ${t.expiresAt}`);
       this.saveToStorage();
+      if (this.isBrowser && firebaseSync.isAvailable()) {
+        firebaseSync.saveTenant(t).catch(e => console.error('Cloud save tenant error:', e));
+      }
       return t;
     }
     return undefined;
@@ -1967,6 +2164,9 @@ class DataService {
     this.state.notes = (this.state.notes || []).filter(n => n.tenantId !== tenantId);
     if (this.state.tenants.length < initialLen) {
       this.saveToStorage();
+      if (this.isBrowser && firebaseSync.isAvailable()) {
+        firebaseSync.deleteTenant(tenantId).catch(e => console.error('Cloud delete tenant error:', e));
+      }
       return true;
     }
     return false;

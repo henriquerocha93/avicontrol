@@ -78,10 +78,10 @@ export default function ConfiguracoesPage() {
 
     db.addUser({
       tenantId: tenant?.id || 'tenant-demo-01',
-      name: newUserForm.name,
-      email: newUserForm.email,
+      name: newUserForm.name.trim(),
+      email: newUserForm.email.toLowerCase().trim(),
       role: newUserForm.role,
-      phone: newUserForm.phone,
+      phone: newUserForm.phone.trim(),
       active: true
     });
 

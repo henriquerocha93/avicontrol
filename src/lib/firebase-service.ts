@@ -8,9 +8,9 @@ import {
   setDoc, 
   deleteDoc, 
   query, 
-  where 
+  where,
+  onSnapshot 
 } from './firebase';
-import { db } from './db';
 import { 
   Bird, Cage, Ring, BreedingPair, Clutch, Egg, DiseaseRecord, Medication, 
   Treatment, SexingRecord, GenotypingRecord, BirdTimelineEvent, 
@@ -29,6 +29,212 @@ export class FirebaseSyncService {
 
   public isAvailable(): boolean {
     return isFirebaseConfigured() && !!dbFirestore;
+  }
+
+  // --- TENANTS CLOUD CRUD ---
+  public async saveTenant(tenant: Tenant): Promise<boolean> {
+    if (!this.isAvailable() || !dbFirestore) return false;
+    try {
+      const clean = JSON.parse(JSON.stringify(tenant));
+      const docRef = doc(dbFirestore, 'tenants', tenant.id);
+      await setDoc(docRef, clean, { merge: true });
+      return true;
+    } catch (err) {
+      console.error(`Error saving tenant ${tenant.id} to Firebase:`, err);
+      return false;
+    }
+  }
+
+  public async fetchTenantById(tenantId: string): Promise<Tenant | null> {
+    if (!this.isAvailable() || !dbFirestore) return null;
+    try {
+      const docRef = doc(dbFirestore, 'tenants', tenantId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        return { id: snap.id, ...snap.data() } as Tenant;
+      }
+      return null;
+    } catch (err) {
+      console.error(`Error fetching tenant ${tenantId} from Firebase:`, err);
+      return null;
+    }
+  }
+
+  public async fetchTenantByEmail(email: string): Promise<Tenant | null> {
+    if (!this.isAvailable() || !dbFirestore || !email) return null;
+    const clean = email.toLowerCase().trim();
+    try {
+      const colRef = collection(dbFirestore, 'tenants');
+      const q = query(colRef, where('email', '==', clean));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const docSnap = snap.docs[0];
+        return { id: docSnap.id, ...docSnap.data() } as Tenant;
+      }
+      // Fallback: check all if casing differed
+      const allSnap = await getDocs(colRef);
+      for (const d of allSnap.docs) {
+        const data = d.data();
+        if (data.email && String(data.email).toLowerCase().trim() === clean) {
+          return { id: d.id, ...data } as Tenant;
+        }
+      }
+      return null;
+    } catch (err) {
+      console.error(`Error fetching tenant by email ${email} from Firebase:`, err);
+      return null;
+    }
+  }
+
+  public async fetchAllTenants(): Promise<Tenant[]> {
+    if (!this.isAvailable() || !dbFirestore) return [];
+    try {
+      const colRef = collection(dbFirestore, 'tenants');
+      const snap = await getDocs(colRef);
+      const list: Tenant[] = [];
+      snap.forEach(d => {
+        list.push({ id: d.id, ...d.data() } as Tenant);
+      });
+      return list;
+    } catch (err) {
+      console.error('Error fetching all tenants from Firebase:', err);
+      return [];
+    }
+  }
+
+  public async deleteTenant(tenantId: string): Promise<boolean> {
+    if (!this.isAvailable() || !dbFirestore) return false;
+    try {
+      const docRef = doc(dbFirestore, 'tenants', tenantId);
+      await deleteDoc(docRef);
+      
+      // Also delete any users associated with this tenant
+      const usersRef = collection(dbFirestore, 'users');
+      const q = query(usersRef, where('tenantId', '==', tenantId));
+      const snap = await getDocs(q);
+      for (const d of snap.docs) {
+        await deleteDoc(doc(dbFirestore, 'users', d.id));
+      }
+      return true;
+    } catch (err) {
+      console.error(`Error deleting tenant ${tenantId} from Firebase:`, err);
+      return false;
+    }
+  }
+
+  // --- USERS CLOUD CRUD ---
+  public async saveUser(user: User): Promise<boolean> {
+    if (!this.isAvailable() || !dbFirestore) return false;
+    try {
+      const clean = JSON.parse(JSON.stringify(user));
+      // Ensure email is trimmed
+      if (clean.email) {
+        clean.email = String(clean.email).trim();
+      }
+      const docRef = doc(dbFirestore, 'users', user.id);
+      await setDoc(docRef, clean, { merge: true });
+      return true;
+    } catch (err) {
+      console.error(`Error saving user ${user.id} to Firebase:`, err);
+      return false;
+    }
+  }
+
+  public async fetchUserByEmail(email: string): Promise<User | null> {
+    if (!this.isAvailable() || !dbFirestore || !email) return null;
+    const clean = email.toLowerCase().trim();
+    try {
+      const colRef = collection(dbFirestore, 'users');
+      // Direct exact query
+      const q = query(colRef, where('email', '==', clean));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const docSnap = snap.docs[0];
+        return { id: docSnap.id, ...docSnap.data() } as User;
+      }
+      
+      // Case-insensitive fallback across all users in cloud
+      const allSnap = await getDocs(colRef);
+      for (const d of allSnap.docs) {
+        const data = d.data();
+        if (data.email && String(data.email).toLowerCase().trim() === clean) {
+          return { id: d.id, ...data } as User;
+        }
+      }
+      return null;
+    } catch (err) {
+      console.error(`Error fetching user by email ${email} from Firebase:`, err);
+      return null;
+    }
+  }
+
+  public async fetchAllUsers(): Promise<User[]> {
+    if (!this.isAvailable() || !dbFirestore) return [];
+    try {
+      const colRef = collection(dbFirestore, 'users');
+      const snap = await getDocs(colRef);
+      const list: User[] = [];
+      snap.forEach(d => {
+        list.push({ id: d.id, ...d.data() } as User);
+      });
+      return list;
+    } catch (err) {
+      console.error('Error fetching all users from Firebase:', err);
+      return [];
+    }
+  }
+
+  public async deleteUser(userId: string): Promise<boolean> {
+    if (!this.isAvailable() || !dbFirestore) return false;
+    try {
+      const docRef = doc(dbFirestore, 'users', userId);
+      await deleteDoc(docRef);
+      return true;
+    } catch (err) {
+      console.error(`Error deleting user ${userId} from Firebase:`, err);
+      return false;
+    }
+  }
+
+  // --- REAL-TIME LISTENERS ---
+  public subscribeToTenants(callback: (tenants: Tenant[]) => void): () => void {
+    if (!this.isAvailable() || !dbFirestore) return () => {};
+    try {
+      const colRef = collection(dbFirestore, 'tenants');
+      const unsubscribe = onSnapshot(colRef, (snapshot: any) => {
+        const list: Tenant[] = [];
+        snapshot.forEach((d: any) => {
+          list.push({ id: d.id, ...d.data() } as Tenant);
+        });
+        callback(list);
+      }, (err: any) => {
+        console.warn('Real-time tenants subscription note:', err);
+      });
+      return unsubscribe;
+    } catch (err) {
+      console.error('Failed to subscribe to tenants:', err);
+      return () => {};
+    }
+  }
+
+  public subscribeToUsers(callback: (users: User[]) => void): () => void {
+    if (!this.isAvailable() || !dbFirestore) return () => {};
+    try {
+      const colRef = collection(dbFirestore, 'users');
+      const unsubscribe = onSnapshot(colRef, (snapshot: any) => {
+        const list: User[] = [];
+        snapshot.forEach((d: any) => {
+          list.push({ id: d.id, ...d.data() } as User);
+        });
+        callback(list);
+      }, (err: any) => {
+        console.warn('Real-time users subscription note:', err);
+      });
+      return unsubscribe;
+    } catch (err) {
+      console.error('Failed to subscribe to users:', err);
+      return () => {};
+    }
   }
 
   // Generic collection loader from Firestore
@@ -75,104 +281,6 @@ export class FirebaseSyncService {
     } catch (err) {
       console.error(`Error deleting document ${id} from ${collectionName} in Firebase:`, err);
       return false;
-    }
-  }
-
-  // Sync entire local Database to Firestore (Cloud Push / Migration)
-  public async pushAllToFirebase(): Promise<{ success: boolean; message: string; count: number }> {
-    if (!this.isAvailable() || !dbFirestore) {
-      return { 
-        success: false, 
-        message: 'Firebase não está configurado. Preencha as credenciais no .env.local ou nas variáveis da Vercel.', 
-        count: 0 
-      };
-    }
-
-    try {
-      let count = 0;
-      const tenants = db.getAllTenants();
-      for (const t of tenants) {
-        await this.saveDocument('tenants', t.id, t);
-        count++;
-      }
-
-      const birds = db.getBirds();
-      for (const b of birds) {
-        await this.saveDocument('birds', b.id, b);
-        count++;
-      }
-
-      const cages = db.getCages();
-      for (const c of cages) {
-        await this.saveDocument('cages', c.id, c);
-        count++;
-      }
-
-      const rings = db.getRings();
-      for (const r of rings) {
-        await this.saveDocument('rings', r.id, r);
-        count++;
-      }
-
-      const pairs = db.getPairs();
-      for (const p of pairs) {
-        await this.saveDocument('pairs', p.id, p);
-        count++;
-      }
-
-      const clutches = db.getClutches();
-      for (const cl of clutches) {
-        await this.saveDocument('clutches', cl.id, cl);
-        count++;
-      }
-
-      const eggs = db.getEggs();
-      for (const eg of eggs) {
-        await this.saveDocument('eggs', eg.id, eg);
-        count++;
-      }
-
-      return { 
-        success: true, 
-        message: `Sincronização concluída com sucesso! ${count} registros exportados para o Firestore.`, 
-        count 
-      };
-    } catch (err: any) {
-      console.error('Push to Firebase error:', err);
-      return { 
-        success: false, 
-        message: `Erro na sincronização com Firebase: ${err?.message || err}`, 
-        count: 0 
-      };
-    }
-  }
-
-  // Sync from Firestore to Local DataService
-  public async pullAllFromFirebase(tenantId: string = 'tenant-demo-01'): Promise<{ success: boolean; message: string }> {
-    if (!this.isAvailable() || !dbFirestore) {
-      return { success: false, message: 'Firebase não está configurado.' };
-    }
-
-    try {
-      const remoteBirds = await this.fetchCollection<Bird>('birds', tenantId);
-      const remoteCages = await this.fetchCollection<Cage>('cages', tenantId);
-      const remoteRings = await this.fetchCollection<Ring>('rings', tenantId);
-      const remotePairs = await this.fetchCollection<BreedingPair>('pairs', tenantId);
-      const remoteClutches = await this.fetchCollection<Clutch>('clutches', tenantId);
-      const remoteEggs = await this.fetchCollection<Egg>('eggs', tenantId);
-
-      if (remoteBirds.length > 0 || remoteCages.length > 0) {
-        // Update local items if present
-        remoteBirds.forEach(b => {
-          if (!db.getBirdById(b.id)) {
-            db.addBird(b);
-          }
-        });
-      }
-
-      return { success: true, message: 'Dados baixados do Firestore com sucesso!' };
-    } catch (err: any) {
-      return { success: false, message: `Erro ao baixar dados: ${err?.message || err}` };
     }
   }
 }

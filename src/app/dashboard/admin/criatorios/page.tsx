@@ -33,6 +33,7 @@ import {
   Percent
 } from 'lucide-react'
 import { db } from '@/lib/db'
+import { firebaseSync } from '@/lib/firebase-service'
 import { Tenant, PlanType } from '@/types'
 import { formatDate } from '@/lib/utils'
 
@@ -44,6 +45,8 @@ export default function AdminCriatoriosPage() {
   // Modals
   const [isNewModalOpen, setIsNewModalOpen] = useState(false)
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null)
+  const [isSubmittingNew, setIsSubmittingNew] = useState(false)
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false)
 
   // New Tenant Form States
   const [formName, setFormName] = useState('')
@@ -80,6 +83,11 @@ export default function AdminCriatoriosPage() {
 
   useEffect(() => {
     refresh()
+    const handleDbUpdated = () => refresh()
+    window.addEventListener('birdpro_db_updated', handleDbUpdated)
+    return () => {
+      window.removeEventListener('birdpro_db_updated', handleDbUpdated)
+    }
   }, [])
 
   const refresh = () => {
@@ -134,40 +142,72 @@ export default function AdminCriatoriosPage() {
     setIsNewModalOpen(true)
   }
 
-  const handleSaveNew = () => {
-    if (!formName.trim() || !formEmail.trim()) {
-      alert('Nome do criatório e e-mail são obrigatórios.')
-      return
+  const handleSaveNew = async () => {
+    const cleanName = formName.trim();
+    const cleanEmail = formEmail.trim().toLowerCase();
+
+    if (!cleanName || !cleanEmail) {
+      alert('Nome do criatório e e-mail são obrigatórios.');
+      return;
     }
 
-    let calculatedExpires = formCustomExpires ? new Date(formCustomExpires).toISOString() : undefined;
-    const originalPrice = getStandardPrice(formBillingCycle);
-    const finalPrice = calculateFinalPrice(formBillingCycle, formDiscountType, formDiscountValue);
-    const numDiscountValue = formDiscountValue ? parseFloat(formDiscountValue) : undefined;
+    setIsSubmittingNew(true);
+    try {
+      let calculatedExpires: string | undefined = undefined;
+      if (formCustomExpires) {
+        try {
+          const d = new Date(formCustomExpires);
+          if (!isNaN(d.getTime())) {
+            calculatedExpires = d.toISOString();
+          }
+        } catch {
+          calculatedExpires = undefined;
+        }
+      }
 
-    db.createTenantManual({
-      name: formName.trim(),
-      responsibleName: formResponsible.trim() || undefined,
-      email: formEmail.trim(),
-      password: formPassword.trim() || '123456',
-      phone: formPhone.trim() || undefined,
-      document: formDocument.trim() || undefined,
-      plan: 'PREMIUM',
-      billingCycle: formBillingCycle,
-      maxBirds: parseInt(formMaxBirds, 10) || 9999,
-      expiresAt: calculatedExpires,
-      planStatus: formPlanStatus,
-      customDiscountType: formDiscountType,
-      customDiscountValue: numDiscountValue,
-      customDiscountReason: formDiscountReason.trim() || undefined,
-      originalPrice,
-      finalPrice
-    })
+      const originalPrice = getStandardPrice(formBillingCycle);
+      const cleanDiscountStr = formDiscountValue.replace(',', '.').trim();
+      const finalPrice = calculateFinalPrice(formBillingCycle, formDiscountType, cleanDiscountStr);
+      const numDiscountValue = cleanDiscountStr ? parseFloat(cleanDiscountStr) : undefined;
+      const initialPassword = formPassword.trim() || '123456';
 
-    refresh()
-    setIsNewModalOpen(false)
-    resetNewForm()
-    alert('✅ Criatório e usuário cadastrados com sucesso! O criador já pode fazer login com o e-mail e senha cadastrados.')
+      const result = db.createTenantManual({
+        name: cleanName,
+        responsibleName: formResponsible.trim() || undefined,
+        email: cleanEmail,
+        password: initialPassword,
+        phone: formPhone.trim() || undefined,
+        document: formDocument.trim() || undefined,
+        plan: 'PREMIUM',
+        billingCycle: formBillingCycle,
+        maxBirds: parseInt(formMaxBirds, 10) || 9999,
+        expiresAt: calculatedExpires,
+        planStatus: formPlanStatus,
+        customDiscountType: formDiscountType,
+        customDiscountValue: isNaN(numDiscountValue as any) ? undefined : numDiscountValue,
+        customDiscountReason: formDiscountReason.trim() || undefined,
+        originalPrice,
+        finalPrice
+      });
+
+      // Explicitly await cloud save to guarantee instant availability across all devices
+      if (firebaseSync.isAvailable()) {
+        await Promise.allSettled([
+          firebaseSync.saveTenant(result.tenant),
+          firebaseSync.saveUser(result.user)
+        ]);
+      }
+
+      refresh();
+      setIsNewModalOpen(false);
+      resetNewForm();
+      alert(`✅ Criatório e usuário cadastrados com sucesso!\n\nDados de Acesso:\n• E-mail: ${cleanEmail}\n• Senha: ${initialPassword}\n\nO acesso já está ativo e sincronizado com a nuvem, liberado para entrar pelo celular ou pelo computador!`);
+    } catch (err: any) {
+      console.error('Erro ao cadastrar criatório:', err);
+      alert(`Erro ao cadastrar criatório: ${err?.message || 'Verifique os dados e tente novamente.'}`);
+    } finally {
+      setIsSubmittingNew(false);
+    }
   }
 
   const handleOpenEdit = (t: Tenant) => {
@@ -190,40 +230,60 @@ export default function AdminCriatoriosPage() {
     setShowEditPassword(false)
   }
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingTenant) return
-    if (!editEmail.trim()) {
+    const cleanEmail = editEmail.trim().toLowerCase();
+    if (!cleanEmail) {
       alert('O e-mail de login é obrigatório.')
       return
     }
 
-    let expDate = editExpiresAt ? new Date(editExpiresAt).toISOString() : editingTenant.expiresAt
-    if (editBillingCycle === 'ISENTO') {
-      expDate = '2099-12-31T23:59:59Z'
+    setIsSubmittingEdit(true);
+    try {
+      let expDate = editingTenant.expiresAt;
+      if (editExpiresAt) {
+        try {
+          const d = new Date(editExpiresAt);
+          if (!isNaN(d.getTime())) {
+            expDate = d.toISOString();
+          }
+        } catch {
+          // keep existing
+        }
+      }
+      if (editBillingCycle === 'ISENTO') {
+        expDate = '2099-12-31T23:59:59Z'
+      }
+
+      const originalPrice = getStandardPrice(editBillingCycle);
+      const cleanDiscountStr = editDiscountValue.replace(',', '.').trim();
+      const finalPrice = calculateFinalPrice(editBillingCycle, editDiscountType, cleanDiscountStr);
+      const numDiscountValue = cleanDiscountStr ? parseFloat(cleanDiscountStr) : undefined;
+
+      db.updateTenantAndCredentials(editingTenant.id, {
+        email: cleanEmail,
+        password: editPassword.trim() || undefined,
+        plan: 'PREMIUM',
+        billingCycle: editBillingCycle,
+        planStatus: editPlanStatus,
+        expiresAt: expDate,
+        maxBirds: editMaxBirds,
+        customDiscountType: editDiscountType,
+        customDiscountValue: isNaN(numDiscountValue as any) ? undefined : numDiscountValue,
+        customDiscountReason: editDiscountReason.trim() || undefined,
+        originalPrice,
+        finalPrice
+      });
+
+      refresh();
+      setEditingTenant(null);
+      alert('✅ Alterações e credenciais salvas e sincronizadas na nuvem com sucesso!');
+    } catch (err: any) {
+      console.error('Erro ao salvar alterações:', err);
+      alert(`Erro ao salvar alterações: ${err?.message || 'Tente novamente.'}`);
+    } finally {
+      setIsSubmittingEdit(false);
     }
-
-    const originalPrice = getStandardPrice(editBillingCycle);
-    const finalPrice = calculateFinalPrice(editBillingCycle, editDiscountType, editDiscountValue);
-    const numDiscountValue = editDiscountValue ? parseFloat(editDiscountValue) : undefined;
-
-    db.updateTenantAndCredentials(editingTenant.id, {
-      email: editEmail.trim(),
-      password: editPassword.trim() || undefined,
-      plan: 'PREMIUM',
-      billingCycle: editBillingCycle,
-      planStatus: editPlanStatus,
-      expiresAt: expDate,
-      maxBirds: editMaxBirds,
-      customDiscountType: editDiscountType,
-      customDiscountValue: numDiscountValue,
-      customDiscountReason: editDiscountReason.trim() || undefined,
-      originalPrice,
-      finalPrice
-    })
-
-    refresh()
-    setEditingTenant(null)
-    alert('✅ Alterações e credenciais salvas com sucesso!')
   }
 
   const handleQuickRenew = (t: Tenant, months = 1) => {
@@ -548,19 +608,19 @@ export default function AdminCriatoriosPage() {
       {/* MODAL: CADASTRAR CRIATÓRIO & USUÁRIO MANUALMENTE                     */}
       {/* ==================================================================== */}
       {isNewModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 bg-[#171b21] text-white flex items-center justify-between">
-              <span className="font-bold text-sm uppercase tracking-wider flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-[#00c853]" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-slate-200 flex flex-col max-h-[92dvh] sm:max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-5 py-3.5 sm:px-6 sm:py-4 bg-[#171b21] text-white flex items-center justify-between shrink-0">
+              <span className="font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center gap-2">
+                <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-[#00c853]" />
                 <span>Cadastrar Criatório &amp; Usuário Manualmente</span>
               </span>
-              <button onClick={() => setIsNewModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
+              <button onClick={() => !isSubmittingNew && setIsNewModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer p-1">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+            <div className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto overscroll-contain">
               
               {/* Type of Billing Cycle Selector */}
               <div>
@@ -875,20 +935,29 @@ export default function AdminCriatoriosPage() {
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end space-x-2">
+            <div className="px-5 py-3 sm:px-6 sm:py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end space-x-2 shrink-0 z-10">
               <button
                 type="button"
+                disabled={isSubmittingNew}
                 onClick={() => setIsNewModalOpen(false)}
-                className="px-4 py-2 text-xs text-slate-600 hover:text-slate-900 cursor-pointer font-medium"
+                className="px-4 py-2 text-xs text-slate-600 hover:text-slate-900 cursor-pointer font-bold rounded-lg disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 type="button"
+                disabled={isSubmittingNew}
                 onClick={handleSaveNew}
-                className="px-5 py-2 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-black rounded-lg transition shadow-xs cursor-pointer"
+                className="px-5 py-2.5 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-black rounded-lg transition shadow-md shadow-emerald-500/20 cursor-pointer disabled:opacity-50 flex items-center gap-2"
               >
-                Cadastrar Criatório
+                {isSubmittingNew ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Salvando &amp; Sincronizando...</span>
+                  </>
+                ) : (
+                  <span>Cadastrar Criatório</span>
+                )}
               </button>
             </div>
           </div>
@@ -899,19 +968,19 @@ export default function AdminCriatoriosPage() {
       {/* MODAL: EDITAR / GERENCIAR CRIATÓRIO EXISTENTE                         */}
       {/* ==================================================================== */}
       {editingTenant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 bg-[#171b21] text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 flex flex-col max-h-[92dvh] sm:max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-5 py-3.5 sm:px-6 sm:py-4 bg-[#171b21] text-white flex items-center justify-between shrink-0">
               <span className="font-bold text-xs uppercase tracking-wider flex items-center gap-2">
                 <Edit2 className="w-4 h-4 text-[#00c853]" />
                 <span>Configurar Licença do Criatório</span>
               </span>
-              <button onClick={() => setEditingTenant(null)} className="text-slate-400 hover:text-white cursor-pointer">
+              <button onClick={() => !isSubmittingEdit && setEditingTenant(null)} className="text-slate-400 hover:text-white cursor-pointer p-1">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+            <div className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto overscroll-contain">
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1">
                 <div>Criatório: <strong>{editingTenant.name}</strong></div>
                 <div className="text-slate-500">ID: {editingTenant.id}</div>
@@ -1194,20 +1263,29 @@ export default function AdminCriatoriosPage() {
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end space-x-2">
+            <div className="px-5 py-3 sm:px-6 sm:py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end space-x-2 shrink-0 z-10">
               <button
                 type="button"
+                disabled={isSubmittingEdit}
                 onClick={() => setEditingTenant(null)}
-                className="px-4 py-2 text-xs text-slate-600 hover:text-slate-900 cursor-pointer font-medium"
+                className="px-4 py-2 text-xs text-slate-600 hover:text-slate-900 cursor-pointer font-bold rounded-lg disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 type="button"
+                disabled={isSubmittingEdit}
                 onClick={handleSaveEdit}
-                className="px-5 py-2 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-black rounded-lg transition shadow-xs cursor-pointer"
+                className="px-5 py-2.5 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-black rounded-lg transition shadow-md shadow-emerald-500/20 cursor-pointer disabled:opacity-50 flex items-center gap-2"
               >
-                Salvar Alterações
+                {isSubmittingEdit ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Salvando...</span>
+                  </>
+                ) : (
+                  <span>Salvar Alterações</span>
+                )}
               </button>
             </div>
           </div>

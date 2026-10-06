@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Tenant, UserRole } from '@/types';
 import { db } from '@/lib/db';
+import { firebaseSync } from '@/lib/firebase-service';
 
 interface AuthContextType {
   user: User | null;
@@ -58,6 +59,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setTenant(null);
     setIsLoading(false);
+
+    // Background cloud sync & live updates
+    if (typeof window !== 'undefined') {
+      db.syncCloudData().catch(e => console.warn('Cloud sync error:', e));
+
+      const handleDbUpdate = () => {
+        const raw = localStorage.getItem('birdpro_current_user');
+        if (raw) {
+          try {
+            const current = JSON.parse(raw);
+            if (current?.tenantId) {
+              const freshTenant = db.getTenant(current.tenantId);
+              if (freshTenant) setTenant({ ...freshTenant });
+            }
+          } catch {}
+        }
+      };
+
+      window.addEventListener('birdpro_db_updated', handleDbUpdate);
+      return () => {
+        window.removeEventListener('birdpro_db_updated', handleDbUpdate);
+      };
+    }
   }, []);
 
   const refreshTenant = () => {
@@ -133,7 +157,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Standard user login: search by email
-    const found = db.getUserByEmail(cleanEmail);
+    let found = db.getUserByEmail(cleanEmail);
+
+    // If not found in local state, fetch directly from Cloud Firestore!
+    if (!found && typeof window !== 'undefined' && firebaseSync.isAvailable()) {
+      try {
+        const cloudUser = await firebaseSync.fetchUserByEmail(cleanEmail);
+        if (cloudUser) {
+          db.mergeCloudUser(cloudUser);
+          found = cloudUser;
+
+          // Also fetch cloud tenant
+          const cloudTenant = await firebaseSync.fetchTenantById(cloudUser.tenantId);
+          if (cloudTenant) {
+            db.mergeCloudTenant(cloudTenant);
+          }
+        }
+      } catch (err) {
+        console.warn('Error fetching cloud user on login:', err);
+      }
+    }
+
     if (found) {
       if (found.password && pass && found.password !== pass) {
         setIsLoading(false);
@@ -145,7 +189,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: userRole
       };
       setUser(normalUser);
-      const t = db.getTenant(normalUser.tenantId);
+      let t = db.getTenant(normalUser.tenantId);
+      if (!t || (t.id === 'tenant-demo-01' && normalUser.tenantId !== 'tenant-demo-01')) {
+        try {
+          const cloudTenant = await firebaseSync.fetchTenantById(normalUser.tenantId);
+          if (cloudTenant) {
+            db.mergeCloudTenant(cloudTenant);
+            t = cloudTenant;
+          }
+        } catch {}
+      }
       setTenant(t);
       if (typeof window !== 'undefined') {
         localStorage.setItem('birdpro_current_user', JSON.stringify(normalUser));
@@ -155,11 +208,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Tenant fallback login
-    const tenantOwner = (db.getAllTenants() || []).find(t => t.email?.toLowerCase().trim() === cleanEmail);
+    let tenantOwner = (db.getAllTenants() || []).find(t => t.email?.toLowerCase().trim() === cleanEmail);
+    if (!tenantOwner && typeof window !== 'undefined' && firebaseSync.isAvailable()) {
+      try {
+        const cloudTenant = await firebaseSync.fetchTenantByEmail(cleanEmail);
+        if (cloudTenant) {
+          db.mergeCloudTenant(cloudTenant);
+          tenantOwner = cloudTenant;
+        }
+      } catch (err) {
+        console.warn('Error fetching cloud tenant on login fallback:', err);
+      }
+    }
+
     if (tenantOwner) {
+      const linkedUser = (db.getAllUsers() || []).find(u => u.tenantId === tenantOwner.id);
+      if (linkedUser?.password && pass && linkedUser.password !== pass) {
+        setIsLoading(false);
+        return false;
+      }
+
       const normalUser: User = {
-        id: `user-tenant-${tenantOwner.id}`,
-        name: tenantOwner.name,
+        id: linkedUser?.id || `user-tenant-${tenantOwner.id}`,
+        name: linkedUser?.name || tenantOwner.name,
         email: tenantOwner.email,
         role: 'OWNER',
         tenantId: tenantOwner.id,
