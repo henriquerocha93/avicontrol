@@ -95,10 +95,8 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AuthProvider>
-      <DashboardProtectedArea>
-        {children}
-      </DashboardProtectedArea>
-    </AuthProvider>
+    <DashboardProtectedArea>
+      {children}
+    </DashboardProtectedArea>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { 
   Bird, 
@@ -38,20 +38,40 @@ import { AdminCommercialDashboard } from '@/components/admin/admin-commercial-da
 
 export default function DashboardPage() {
   const { tenant, user } = useAuth();
+  const [isMounted, setIsMounted] = useState(false);
+  const [dbTick, setDbTick] = useState(0);
+
+  useEffect(() => {
+    setIsMounted(true);
+    const handleDbUpdate = () => {
+      setDbTick(prev => prev + 1);
+    };
+    window.addEventListener('birdpro_db_updated', handleDbUpdate);
+    return () => window.removeEventListener('birdpro_db_updated', handleDbUpdate);
+  }, []);
 
   // If logged in as Super Admin, render 100% Commercial Dashboard!
   if (user?.role === 'SUPER_ADMIN') {
     return <AdminCommercialDashboard />;
   }
   
-  const birds = db.getBirds(tenant?.id);
-  const rings = db.getRings(tenant?.id);
-  const cages = db.getCages(tenant?.id);
-  const pairs = db.getPairs(tenant?.id);
-  const eggs = db.getEggs(tenant?.id);
-  const clutches = db.getClutches(tenant?.id);
-  const treatments = db.getTreatments(tenant?.id);
-  const notifications = db.getNotifications(tenant?.id);
+  // Stable data fetches tied to tenant and db updates
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const birds = useMemo(() => db.getBirds(tenant?.id), [tenant?.id, dbTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const rings = useMemo(() => db.getRings(tenant?.id), [tenant?.id, dbTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const cages = useMemo(() => db.getCages(tenant?.id), [tenant?.id, dbTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const pairs = useMemo(() => db.getPairs(tenant?.id), [tenant?.id, dbTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const eggs = useMemo(() => db.getEggs(tenant?.id), [tenant?.id, dbTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const clutches = useMemo(() => db.getClutches(tenant?.id), [tenant?.id, dbTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const treatments = useMemo(() => db.getTreatments(tenant?.id), [tenant?.id, dbTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const notifications = useMemo(() => db.getNotifications(tenant?.id), [tenant?.id, dbTick]);
 
   // Computed Metrics
   const totalBirds = birds.length;
@@ -140,25 +160,34 @@ export default function DashboardPage() {
     return monthsData;
   }, [birds]);
 
-  // Species distribution data
-  const speciesCount: Record<string, number> = {};
-  birds.forEach(b => {
-    const sp = b.species.split('(')[0].trim();
-    speciesCount[sp] = (speciesCount[sp] || 0) + 1;
-  });
+  // Max value for Y Axis domain precalculated statically to eliminate infinite Recharts loops
+  const yDomainMax = useMemo(() => {
+    const vals = evolutionData.map(d => Math.max(d.total || 0, d.nascimentos || 0));
+    const highest = Math.max(...vals, 0);
+    return Math.max(5, Math.ceil(highest * 1.2));
+  }, [evolutionData]);
 
-  const speciesChartData = Object.entries(speciesCount).map(([name, value]) => ({
-    name,
-    value
-  }));
+  // Species distribution data memoized
+  const speciesChartData = useMemo(() => {
+    const speciesCount: Record<string, number> = {};
+    birds.forEach(b => {
+      const sp = (b.species || 'Canário').split('(')[0].trim();
+      speciesCount[sp] = (speciesCount[sp] || 0) + 1;
+    });
+
+    return Object.entries(speciesCount).map(([name, value]) => ({
+      name,
+      value
+    }));
+  }, [birds]);
 
   const COLORS = ['#059669', '#3B82F6', '#F59E0B', '#8B5CF6', '#EC4899', '#14B8A6'];
 
-  const sexPieData = [
+  const sexPieData = useMemo(() => [
     { name: 'Machos (♂)', value: males, color: '#3B82F6' },
     { name: 'Fêmeas (♀)', value: females, color: '#EC4899' },
     { name: 'Indefinidos (?)', value: unknownSex, color: '#94A3B8' },
-  ];
+  ], [males, females, unknownSex]);
 
   return (
     <div className="space-y-8">
@@ -486,30 +515,36 @@ export default function DashboardPage() {
           )}
 
           <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={evolutionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="totalColor" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#059669" stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor="#059669" stopOpacity={0.0}/>
-                  </linearGradient>
-                  <linearGradient id="nascColor" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748B' }} />
-                <YAxis allowDecimals={false} domain={[0, (dataMax: number) => Math.max(5, Math.ceil(dataMax * 1.1))]} tick={{ fontSize: 12, fill: '#64748B' }} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#0F172A', borderRadius: '12px', border: 'none', color: '#fff' }}
-                  itemStyle={{ fontSize: 12, padding: '2px 0' }}
-                />
-                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-                <Area type="monotone" dataKey="total" name="Total Plantel" stroke="#059669" strokeWidth={3} fillOpacity={1} fill="url(#totalColor)" />
-                <Area type="monotone" dataKey="nascimentos" name="Nascimentos" stroke="#3B82F6" strokeWidth={2} fillOpacity={1} fill="url(#nascColor)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {isMounted ? (
+              <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                <AreaChart data={evolutionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="totalColor" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#059669" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#059669" stopOpacity={0.0}/>
+                    </linearGradient>
+                    <linearGradient id="nascColor" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748B' }} />
+                  <YAxis allowDecimals={false} domain={[0, yDomainMax]} tick={{ fontSize: 12, fill: '#64748B' }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0F172A', borderRadius: '12px', border: 'none', color: '#fff' }}
+                    itemStyle={{ fontSize: 12, padding: '2px 0' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                  <Area type="monotone" dataKey="total" name="Total Plantel" stroke="#059669" strokeWidth={3} fillOpacity={1} fill="url(#totalColor)" />
+                  <Area type="monotone" dataKey="nascimentos" name="Nascimentos" stroke="#3B82F6" strokeWidth={2} fillOpacity={1} fill="url(#nascColor)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full w-full flex items-center justify-center bg-slate-50/50 rounded-xl text-slate-400 text-xs">
+                Carregando evolução...
+              </div>
+            )}
           </div>
         </div>
 
@@ -531,27 +566,33 @@ export default function DashboardPage() {
           ) : (
             <>
               <div className="h-60 w-full flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={speciesChartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
-                      paddingAngle={4}
-                      dataKey="value"
-                    >
-                      {speciesChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#0F172A', borderRadius: '12px', border: 'none', color: '#fff' }}
-                      itemStyle={{ fontSize: 12 }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                {isMounted ? (
+                  <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                    <PieChart>
+                      <Pie
+                        data={speciesChartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {speciesChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#0F172A', borderRadius: '12px', border: 'none', color: '#fff' }}
+                        itemStyle={{ fontSize: 12 }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center bg-slate-50/50 rounded-xl text-slate-400 text-xs">
+                    Carregando espécies...
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5 max-h-28 overflow-y-auto custom-scrollbar">
