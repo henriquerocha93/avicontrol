@@ -47,6 +47,7 @@ export default function AdminCriatoriosPage() {
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null)
   const [isSubmittingNew, setIsSubmittingNew] = useState(false)
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false)
+  const [deletingTenantId, setDeletingTenantId] = useState<string | null>(null)
 
   // New Tenant Form States
   const [formName, setFormName] = useState('')
@@ -327,10 +328,18 @@ export default function AdminCriatoriosPage() {
     }
   }
 
-  const handleDeleteTenant = (id: string, name: string) => {
-    if (confirm(`Tem certeza que deseja excluir o criatório "${name}" e todos os seus dados?`)) {
-      db.deleteTenant(id)
-      refresh()
+  const handleDeleteTenant = async (id: string, name: string) => {
+    if (confirm(`Tem certeza que deseja excluir permanentemente o criatório "${name || id}" e todos os seus dados na nuvem?`)) {
+      setDeletingTenantId(id)
+      try {
+        await db.deleteTenantAsync(id)
+        refresh()
+      } catch (err) {
+        console.error('Erro ao excluir criatório:', err)
+        alert('Erro ao excluir criatório. Tente novamente.')
+      } finally {
+        setDeletingTenantId(null)
+      }
     }
   }
 
@@ -640,10 +649,15 @@ export default function AdminCriatoriosPage() {
 
                           <button
                             onClick={() => handleDeleteTenant(t.id, t.name)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                            disabled={deletingTenantId === t.id}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer disabled:opacity-50"
                             title="Excluir criatório"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            {deletingTenantId === t.id ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin text-red-500" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
                           </button>
                         </div>
                       </td>

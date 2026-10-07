@@ -67,11 +67,33 @@ class DataService {
   private pushTimer: any = null;
   private pushing = false;
   private pushAgain = false;
+  private deletedTenantIds: Set<string> = new Set();
+
+  private loadDeletedTenantIds() {
+    if (!this.isBrowser) return;
+    try {
+      const raw = localStorage.getItem('birdpro_deleted_tenants');
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          this.deletedTenantIds = new Set(arr);
+        }
+      }
+    } catch {}
+  }
+
+  private saveDeletedTenantIds() {
+    if (!this.isBrowser) return;
+    try {
+      localStorage.setItem('birdpro_deleted_tenants', JSON.stringify(Array.from(this.deletedTenantIds)));
+    } catch {}
+  }
 
   constructor() {
     this.isBrowser = typeof window !== 'undefined';
     this.state = this.getInitialState();
     if (this.isBrowser) {
+      this.loadDeletedTenantIds();
       this.loadFromStorage();
       if (typeof window !== 'undefined') {
         setTimeout(() => {
@@ -208,6 +230,16 @@ class DataService {
             }
             return u;
           });
+        }
+
+        // Filter out any tombstoned/deleted tenants
+        if (this.deletedTenantIds.size > 0) {
+          if (this.state.tenants) {
+            this.state.tenants = this.state.tenants.filter(t => !this.deletedTenantIds.has(t.id));
+          }
+          if (this.state.users) {
+            this.state.users = this.state.users.filter(u => !this.deletedTenantIds.has(u.tenantId));
+          }
         }
       } else {
         this.saveToStorage();
@@ -446,6 +478,10 @@ class DataService {
       if (cloudTenants && cloudTenants.length > 0) {
         if (!this.state.tenants) this.state.tenants = [];
         cloudTenants.forEach(ct => {
+          if (this.deletedTenantIds.has(ct.id)) {
+            firebaseSync.deleteTenant(ct.id).catch(() => {});
+            return;
+          }
           const idx = this.state.tenants.findIndex(t => t.id === ct.id);
           if (idx >= 0) {
             const merged = { ...this.state.tenants[idx], ...ct };
@@ -464,6 +500,10 @@ class DataService {
       if (cloudUsers && cloudUsers.length > 0) {
         if (!this.state.users) this.state.users = [];
         cloudUsers.forEach(cu => {
+          if (cu.tenantId && this.deletedTenantIds.has(cu.tenantId)) {
+            firebaseSync.deleteUser(cu.id).catch(() => {});
+            return;
+          }
           const cleanCuEmail = (cu.email || '').toLowerCase().trim();
           const idx = this.state.users.findIndex(u => 
             u.id === cu.id || (u.email && u.email.toLowerCase().trim() === cleanCuEmail)
@@ -484,6 +524,7 @@ class DataService {
       // 4. AUTOMATIC MIGRATION: Push any local tenants that are NOT in Firestore to Firestore!
       if (this.state.tenants && this.state.tenants.length > 0) {
         for (const localTenant of this.state.tenants) {
+          if (this.deletedTenantIds.has(localTenant.id)) continue;
           if (localTenant.id !== 'tenant-demo-01' || (localTenant.name && localTenant.name.trim())) {
             const existsInCloud = cloudTenants.some(ct => ct.id === localTenant.id);
             if (!existsInCloud) {
@@ -496,6 +537,7 @@ class DataService {
       // 5. AUTOMATIC MIGRATION: Push any local users that are NOT in Firestore to Firestore!
       if (this.state.users && this.state.users.length > 0) {
         for (const localUser of this.state.users) {
+          if (localUser.tenantId && this.deletedTenantIds.has(localUser.tenantId)) continue;
           if (localUser.email && localUser.email.trim()) {
             const cleanEmail = localUser.email.toLowerCase().trim();
             const existsInCloud = cloudUsers.some(cu => 
@@ -517,10 +559,30 @@ class DataService {
         this.hasInitializedCloud = true;
 
         firebaseSync.subscribeToTenants((liveTenants) => {
-          if (!liveTenants || liveTenants.length === 0) return;
+          if (!liveTenants) return;
           if (!this.state.tenants) this.state.tenants = [];
           let changed = false;
-          liveTenants.forEach(lt => {
+
+          const validLive = liveTenants.filter(lt => {
+            if (this.deletedTenantIds.has(lt.id)) {
+              firebaseSync.deleteTenant(lt.id).catch(() => {});
+              return false;
+            }
+            return true;
+          });
+
+          const liveIds = new Set(validLive.map(t => t.id));
+          const prevCount = this.state.tenants.length;
+          this.state.tenants = this.state.tenants.filter(t => {
+            if (this.deletedTenantIds.has(t.id)) return false;
+            if (t.id === 'tenant-demo-01') return true;
+            return liveIds.has(t.id);
+          });
+          if (this.state.tenants.length !== prevCount) {
+            changed = true;
+          }
+
+          validLive.forEach(lt => {
             const idx = this.state.tenants.findIndex(t => t.id === lt.id);
             if (idx >= 0) {
               const merged = { ...this.state.tenants[idx], ...lt };
@@ -539,10 +601,30 @@ class DataService {
         });
 
         firebaseSync.subscribeToUsers((liveUsers) => {
-          if (!liveUsers || liveUsers.length === 0) return;
+          if (!liveUsers) return;
           if (!this.state.users) this.state.users = [];
           let changed = false;
-          liveUsers.forEach(lu => {
+
+          const validLive = liveUsers.filter(lu => {
+            if (lu.tenantId && this.deletedTenantIds.has(lu.tenantId)) {
+              firebaseSync.deleteUser(lu.id).catch(() => {});
+              return false;
+            }
+            return true;
+          });
+
+          const liveIds = new Set(validLive.map(u => u.id));
+          const prevCount = this.state.users.length;
+          this.state.users = this.state.users.filter(u => {
+            if (u.tenantId && this.deletedTenantIds.has(u.tenantId)) return false;
+            if (u.id === 'user-master-admin-01' || u.id === 'user-01' || u.id === 'user-admin-official') return true;
+            return liveIds.has(u.id);
+          });
+          if (this.state.users.length !== prevCount) {
+            changed = true;
+          }
+
+          validLive.forEach(lu => {
             const cleanEmail = (lu.email || '').toLowerCase().trim();
             const idx = this.state.users.findIndex(u => 
               u.id === lu.id || (u.email && u.email.toLowerCase().trim() === cleanEmail)
@@ -2407,6 +2489,8 @@ class DataService {
   }
 
   deleteTenant(tenantId: string): boolean {
+    this.deletedTenantIds.add(tenantId);
+    this.saveDeletedTenantIds();
     const initialLen = this.state.tenants.length;
     this.state.tenants = this.state.tenants.filter(t => t.id !== tenantId);
     this.state.users = this.state.users.filter(u => u.tenantId !== tenantId);
@@ -2426,6 +2510,30 @@ class DataService {
       return true;
     }
     return false;
+  }
+
+  async deleteTenantAsync(tenantId: string): Promise<boolean> {
+    this.deletedTenantIds.add(tenantId);
+    this.saveDeletedTenantIds();
+    this.state.tenants = this.state.tenants.filter(t => t.id !== tenantId);
+    this.state.users = this.state.users.filter(u => u.tenantId !== tenantId);
+    this.state.birds = this.state.birds.filter(b => b.tenantId !== tenantId);
+    this.state.cages = this.state.cages.filter(c => c.tenantId !== tenantId);
+    this.state.rings = this.state.rings.filter(r => r.tenantId !== tenantId);
+    this.state.pairs = this.state.pairs.filter(p => p.tenantId !== tenantId);
+    this.state.clutches = this.state.clutches.filter(c => c.tenantId !== tenantId);
+    this.state.eggs = this.state.eggs.filter(e => e.tenantId !== tenantId);
+    this.state.events = (this.state.events || []).filter(e => e.tenantId !== tenantId);
+    this.state.notes = (this.state.notes || []).filter(n => n.tenantId !== tenantId);
+    this.saveToStorage();
+    if (this.isBrowser && firebaseSync.isAvailable()) {
+      try {
+        await firebaseSync.deleteTenant(tenantId);
+      } catch (e) {
+        console.error('Cloud delete tenant error:', e);
+      }
+    }
+    return true;
   }
 
   // --- AUDIT LOGS ---
