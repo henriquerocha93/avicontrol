@@ -448,11 +448,15 @@ class DataService {
         cloudTenants.forEach(ct => {
           const idx = this.state.tenants.findIndex(t => t.id === ct.id);
           if (idx >= 0) {
-            this.state.tenants[idx] = { ...this.state.tenants[idx], ...ct };
+            const merged = { ...this.state.tenants[idx], ...ct };
+            if (this.hashItem(this.state.tenants[idx]) !== this.hashItem(merged)) {
+              this.state.tenants[idx] = merged;
+              stateChanged = true;
+            }
           } else {
             this.state.tenants.unshift(ct);
+            stateChanged = true;
           }
-          stateChanged = true;
         });
       }
 
@@ -465,11 +469,15 @@ class DataService {
             u.id === cu.id || (u.email && u.email.toLowerCase().trim() === cleanCuEmail)
           );
           if (idx >= 0) {
-            this.state.users[idx] = { ...this.state.users[idx], ...cu };
+            const merged = { ...this.state.users[idx], ...cu };
+            if (this.hashItem(this.state.users[idx]) !== this.hashItem(merged)) {
+              this.state.users[idx] = merged;
+              stateChanged = true;
+            }
           } else {
             this.state.users.unshift(cu);
+            stateChanged = true;
           }
-          stateChanged = true;
         });
       }
 
@@ -502,9 +510,6 @@ class DataService {
 
       if (stateChanged) {
         this.saveToStorage();
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('birdpro_db_updated'));
-        }
       }
 
       // 6. Set up real-time subscriptions if not already initialized
@@ -518,17 +523,18 @@ class DataService {
           liveTenants.forEach(lt => {
             const idx = this.state.tenants.findIndex(t => t.id === lt.id);
             if (idx >= 0) {
-              this.state.tenants[idx] = { ...this.state.tenants[idx], ...lt };
+              const merged = { ...this.state.tenants[idx], ...lt };
+              if (this.hashItem(this.state.tenants[idx]) !== this.hashItem(merged)) {
+                this.state.tenants[idx] = merged;
+                changed = true;
+              }
             } else {
               this.state.tenants.unshift(lt);
+              changed = true;
             }
-            changed = true;
           });
           if (changed) {
             this.saveToStorage();
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new Event('birdpro_db_updated'));
-            }
           }
         });
 
@@ -542,17 +548,18 @@ class DataService {
               u.id === lu.id || (u.email && u.email.toLowerCase().trim() === cleanEmail)
             );
             if (idx >= 0) {
-              this.state.users[idx] = { ...this.state.users[idx], ...lu };
+              const merged = { ...this.state.users[idx], ...lu };
+              if (this.hashItem(this.state.users[idx]) !== this.hashItem(merged)) {
+                this.state.users[idx] = merged;
+                changed = true;
+              }
             } else {
               this.state.users.unshift(lu);
+              changed = true;
             }
-            changed = true;
           });
           if (changed) {
             this.saveToStorage();
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new Event('birdpro_db_updated'));
-            }
           }
         });
       }
@@ -568,28 +575,26 @@ class DataService {
       u.id === user.id || (u.email && u.email.toLowerCase().trim() === cleanEmail)
     );
     if (idx >= 0) {
-      this.state.users[idx] = { ...this.state.users[idx], ...user };
+      const merged = { ...this.state.users[idx], ...user };
+      if (this.hashItem(this.state.users[idx]) === this.hashItem(merged)) return;
+      this.state.users[idx] = merged;
     } else {
       this.state.users.unshift(user);
     }
     this.saveToStorage();
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('birdpro_db_updated'));
-    }
   }
 
   public mergeCloudTenant(tenant: Tenant): void {
     if (!this.state.tenants) this.state.tenants = [];
     const idx = this.state.tenants.findIndex(t => t.id === tenant.id);
     if (idx >= 0) {
-      this.state.tenants[idx] = { ...this.state.tenants[idx], ...tenant };
+      const merged = { ...this.state.tenants[idx], ...tenant };
+      if (this.hashItem(this.state.tenants[idx]) === this.hashItem(merged)) return;
+      this.state.tenants[idx] = merged;
     } else {
       this.state.tenants.unshift(tenant);
     }
     this.saveToStorage();
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('birdpro_db_updated'));
-    }
   }
 
   // --- TENANTS & USERS ---

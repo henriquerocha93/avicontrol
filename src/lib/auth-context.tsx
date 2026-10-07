@@ -70,7 +70,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const current = JSON.parse(raw);
             if (current?.tenantId) {
               const freshTenant = db.getTenant(current.tenantId);
-              if (freshTenant) setTenant({ ...freshTenant });
+              if (freshTenant) {
+                setTenant(prev => {
+                  if (!prev) return freshTenant;
+                  if (JSON.stringify(prev) === JSON.stringify(freshTenant)) {
+                    return prev;
+                  }
+                  return freshTenant;
+                });
+              }
             }
           } catch {}
         }

@@ -83,15 +83,28 @@ export default function AdminCriatoriosPage() {
 
   useEffect(() => {
     refresh()
-    const handleDbUpdated = () => refresh()
+    let timer: any = null
+    const handleDbUpdated = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        refresh()
+      }, 150)
+    }
     window.addEventListener('birdpro_db_updated', handleDbUpdated)
     return () => {
+      if (timer) clearTimeout(timer)
       window.removeEventListener('birdpro_db_updated', handleDbUpdated)
     }
   }, [])
 
   const refresh = () => {
-    setTenants([...db.getAllTenants()])
+    setTenants(prev => {
+      const fresh = db.getAllTenants()
+      if (prev.length === fresh.length && JSON.stringify(prev) === JSON.stringify(fresh)) {
+        return prev
+      }
+      return [...fresh]
+    })
   }
 
   const getStandardPrice = (cycle: 'MENSAL' | 'ANUAL' | 'ISENTO') => {
