@@ -164,7 +164,7 @@ export default function AdminFinanceiroPage() {
                     </div>
 
                     <div className="text-base font-black text-white px-2">
-                      R$ {p.amount.toFixed(2)}
+                      R$ {(Number(p.amount) || 0).toFixed(2)}
                     </div>
 
                     <button
@@ -353,7 +353,7 @@ export default function AdminFinanceiroPage() {
                       </td>
 
                       <td className="px-4 py-3.5 text-right font-black text-slate-900 text-sm">
-                        R$ {p.amount.toFixed(2)}
+                        R$ {(Number(p.amount) || 0).toFixed(2)}
                       </td>
 
                       <td className="px-4 py-3.5 text-center">

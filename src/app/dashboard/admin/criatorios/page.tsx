@@ -211,12 +211,25 @@ export default function AdminCriatoriosPage() {
   }
 
   const handleOpenEdit = (t: Tenant) => {
+    if (!t) return
     setEditingTenant(t)
-    setEditPlan(t.plan)
+    setEditPlan(t.plan || 'PREMIUM')
     setEditBillingCycle(t.billingCycle || 'ANUAL')
     setEditPlanStatus(t.planStatus || 'ACTIVE')
-    setEditExpiresAt(t.expiresAt ? t.expiresAt.split('T')[0] : '')
-    setEditMaxBirds(t.maxBirds || 9999)
+    let expStr = ''
+    if (t.expiresAt) {
+      if (typeof t.expiresAt === 'string') {
+        expStr = t.expiresAt.split('T')[0]
+      } else {
+        try {
+          expStr = new Date(t.expiresAt).toISOString().split('T')[0]
+        } catch {
+          expStr = ''
+        }
+      }
+    }
+    setEditExpiresAt(expStr)
+    setEditMaxBirds(Number(t.maxBirds) || 9999)
 
     // Load discount states
     setEditDiscountType(t.customDiscountType || 'NONE')
@@ -287,10 +300,17 @@ export default function AdminCriatoriosPage() {
   }
 
   const handleQuickRenew = (t: Tenant, months = 1) => {
+    if (!t) return
     const updated = db.renewTenantPlan(t.id, months)
     if (updated) {
       refresh()
-      alert(`🎉 Plano renovado por +${months} mês(es)! Novo vencimento: ${new Date(updated.expiresAt).toLocaleDateString('pt-BR')}`)
+      let expStr = '-'
+      try {
+        expStr = new Date(updated.expiresAt).toLocaleDateString('pt-BR')
+      } catch {
+        expStr = String(updated.expiresAt || '-')
+      }
+      alert(`🎉 Plano renovado por +${months} mês(es)! Novo vencimento: ${expStr}`)
     }
   }
 
@@ -301,20 +321,22 @@ export default function AdminCriatoriosPage() {
     }
   }
 
-  const filteredTenants = tenants.filter(t => {
+  const safeTenants = (tenants || []).filter(Boolean)
+
+  const filteredTenants = safeTenants.filter(t => {
     if (filterBilling !== 'ALL' && (t.billingCycle || 'ANUAL') !== filterBilling) return false
     if (!searchQuery.trim()) return true
-    const q = searchQuery.toLowerCase()
-    return t.name.toLowerCase().includes(q) || 
-           (t.document && t.document.includes(q)) || 
-           (t.email && t.email.toLowerCase().includes(q))
+    const q = searchQuery.toLowerCase().trim()
+    return ((t.name || '').toLowerCase().includes(q)) || 
+           (t.document && String(t.document).toLowerCase().includes(q)) || 
+           (t.email && String(t.email).toLowerCase().includes(q))
   })
 
   // Summary counts
-  const totalTenants = tenants.length
-  const totalMensal = tenants.filter(t => (t.billingCycle || 'ANUAL') === 'MENSAL').length
-  const totalAnual = tenants.filter(t => (t.billingCycle || 'ANUAL') === 'ANUAL').length
-  const totalIsento = tenants.filter(t => t.billingCycle === 'ISENTO').length
+  const totalTenants = safeTenants.length
+  const totalMensal = safeTenants.filter(t => (t.billingCycle || 'ANUAL') === 'MENSAL').length
+  const totalAnual = safeTenants.filter(t => (t.billingCycle || 'ANUAL') === 'ANUAL').length
+  const totalIsento = safeTenants.filter(t => t.billingCycle === 'ISENTO').length
 
   return (
     <div className="space-y-6 pb-16 w-full font-sans">
@@ -441,10 +463,19 @@ export default function AdminCriatoriosPage() {
                   </td>
                 </tr>
               ) : (
-                filteredTenants.map((t) => {
-                  const isIsento = t.billingCycle === 'ISENTO';
-                  const expiresDate = t.expiresAt ? new Date(t.expiresAt) : new Date();
-                  const diffDays = Math.ceil((expiresDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                filteredTenants.map((t, idx) => {
+                  const isIsento = (t.billingCycle || 'ANUAL') === 'ISENTO';
+                  let diffDays = 999;
+                  if (!isIsento) {
+                    try {
+                      const expiresDate = t.expiresAt ? new Date(t.expiresAt) : new Date();
+                      if (!isNaN(expiresDate.getTime())) {
+                        diffDays = Math.ceil((expiresDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                      }
+                    } catch {
+                      diffDays = 999;
+                    }
+                  }
                   
                   // Status calculation
                   const isBlocked = !isIsento && diffDays < -10;
@@ -452,16 +483,24 @@ export default function AdminCriatoriosPage() {
                   const isExpiringSoon = !isIsento && diffDays > 0 && diffDays <= 10;
                   const isNormal = isIsento || diffDays > 10;
 
+                  const mensalVal = Number(t.finalPrice ?? 14.99);
+                  const displayMensal = isNaN(mensalVal) ? 14.99 : mensalVal;
+
+                  const anualVal = Number(t.finalPrice ?? 169.99);
+                  const displayAnual = isNaN(anualVal) ? 169.99 : anualVal;
+
+                  const maxBirdsNum = Number(t.maxBirds) || 0;
+
                   return (
-                    <tr key={t.id} className="hover:bg-slate-50/80 transition">
+                    <tr key={t.id || `tenant-${idx}`} className="hover:bg-slate-50/80 transition">
                       <td className="px-5 py-3.5">
-                        <span className="font-bold text-slate-900 block">{t.name}</span>
+                        <span className="font-bold text-slate-900 block">{t.name || 'Sem nome'}</span>
                         <span className="text-[10px] text-slate-400 font-mono">ID: {t.id}</span>
                       </td>
 
                       <td className="px-4 py-3.5 text-slate-600">
                         <div className="font-medium text-slate-800">{t.document || 'Sem documento'}</div>
-                        <div className="text-[11px] text-slate-400">{t.email}</div>
+                        <div className="text-[11px] text-slate-400">{t.email || '-'}</div>
                         {t.phone && <div className="text-[10px] text-slate-400">{t.phone}</div>}
                       </td>
 
@@ -471,7 +510,7 @@ export default function AdminCriatoriosPage() {
                           t.plan === 'PRO' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
                           'bg-slate-100 text-slate-600'
                         }`}>
-                          {t.plan}
+                          {t.plan || 'PREMIUM'}
                         </span>
                       </td>
 
@@ -487,7 +526,7 @@ export default function AdminCriatoriosPage() {
                             </span>
                             {t.customDiscountType && t.customDiscountType !== 'NONE' ? (
                               <div className="text-[11px] font-black text-emerald-700 flex items-center justify-center gap-1" title={t.customDiscountReason || 'Desconto manual aplicado'}>
-                                <span>R$ {(t.finalPrice ?? 14.99).toFixed(2)}</span>
+                                <span>R$ {displayMensal.toFixed(2)}</span>
                                 <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded border border-emerald-200">
                                   {t.customDiscountType === 'PERCENT' ? `-${t.customDiscountValue}%` : `R$ ${t.customDiscountValue} OFF`}
                                 </span>
@@ -503,7 +542,7 @@ export default function AdminCriatoriosPage() {
                             </span>
                             {t.customDiscountType && t.customDiscountType !== 'NONE' ? (
                               <div className="text-[11px] font-black text-emerald-700 flex items-center justify-center gap-1" title={t.customDiscountReason || 'Desconto manual aplicado'}>
-                                <span>R$ {(t.finalPrice ?? 169.99).toFixed(2)}</span>
+                                <span>R$ {displayAnual.toFixed(2)}</span>
                                 <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded border border-emerald-200">
                                   {t.customDiscountType === 'PERCENT' ? `-${t.customDiscountValue}%` : `R$ ${t.customDiscountValue} OFF`}
                                 </span>
@@ -516,7 +555,7 @@ export default function AdminCriatoriosPage() {
                       </td>
 
                       <td className="px-4 py-3.5 text-center font-bold text-slate-700 font-mono">
-                        {t.maxBirds >= 9999 ? 'Ilimitado' : `${t.maxBirds} aves`}
+                        {maxBirdsNum >= 9999 ? 'Ilimitado' : `${maxBirdsNum} aves`}
                       </td>
 
                       {/* Expiration & Expiration Warnings */}
@@ -537,14 +576,14 @@ export default function AdminCriatoriosPage() {
                             {isBlocked && (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-100 text-red-700 border border-red-200 flex items-center justify-center gap-1">
                                 <Lock className="w-3 h-3" />
-                                <span>BLOQUEADO ({Math.abs(diffDays)}d atraso)</span>
+                                <span>BLOQUEADO ({isNaN(diffDays) ? '?' : Math.abs(diffDays)}d atraso)</span>
                               </span>
                             )}
 
                             {isPastDueGrace && (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800 border border-orange-200 flex items-center justify-center gap-1">
                                 <AlertTriangle className="w-3 h-3" />
-                                <span>Atrasado ({Math.abs(diffDays)}d)</span>
+                                <span>Atrasado ({isNaN(diffDays) ? '?' : Math.abs(diffDays)}d)</span>
                               </span>
                             )}
 
@@ -904,13 +943,13 @@ export default function AdminCriatoriosPage() {
                       <div>
                         <span className="text-slate-500 block text-[10px]">Preço Original de Tabela:</span>
                         <span className="font-semibold text-slate-600 line-through">
-                          R$ {getStandardPrice(formBillingCycle).toFixed(2)}
+                          R$ {(Number(getStandardPrice(formBillingCycle)) || 0).toFixed(2)}
                         </span>
                       </div>
                       <div className="text-right">
                         <span className="text-emerald-700 block text-[10px] font-bold">Valor Final a Cobrar:</span>
                         <span className="font-black text-emerald-700 text-sm">
-                          R$ {calculateFinalPrice(formBillingCycle, formDiscountType, formDiscountValue).toFixed(2)}
+                          R$ {(Number(calculateFinalPrice(formBillingCycle, formDiscountType, formDiscountValue)) || 0).toFixed(2)}
                           <span className="text-[10px] font-normal text-slate-500 ml-1">
                             /{formBillingCycle === 'MENSAL' ? 'mês' : formBillingCycle === 'ANUAL' ? 'ano' : 'cortesia'}
                           </span>
@@ -1232,13 +1271,13 @@ export default function AdminCriatoriosPage() {
                       <div>
                         <span className="text-slate-500 block text-[10px]">Preço Original de Tabela:</span>
                         <span className="font-semibold text-slate-600 line-through">
-                          R$ {getStandardPrice(editBillingCycle).toFixed(2)}
+                          R$ {(Number(getStandardPrice(editBillingCycle)) || 0).toFixed(2)}
                         </span>
                       </div>
                       <div className="text-right">
                         <span className="text-emerald-700 block text-[10px] font-bold">Valor Final a Cobrar:</span>
                         <span className="font-black text-emerald-700 text-sm">
-                          R$ {calculateFinalPrice(editBillingCycle, editDiscountType, editDiscountValue).toFixed(2)}
+                          R$ {(Number(calculateFinalPrice(editBillingCycle, editDiscountType, editDiscountValue)) || 0).toFixed(2)}
                           <span className="text-[10px] font-normal text-slate-500 ml-1">
                             /{editBillingCycle === 'MENSAL' ? 'mês' : editBillingCycle === 'ANUAL' ? 'ano' : 'cortesia'}
                           </span>

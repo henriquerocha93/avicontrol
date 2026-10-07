@@ -55,7 +55,13 @@ export function PlanGuard({ children }: PlanGuardProps) {
     return <>{children}</>;
   }
 
-  const expiresDate = currentTenant.expiresAt ? new Date(currentTenant.expiresAt) : new Date(Date.now() + 365*24*60*60*1000);
+  let expiresDate = new Date(Date.now() + 365*24*60*60*1000);
+  if (currentTenant.expiresAt) {
+    const d = new Date(currentTenant.expiresAt);
+    if (!isNaN(d.getTime())) {
+      expiresDate = d;
+    }
+  }
   const now = new Date();
   const diffTime = expiresDate.getTime() - now.getTime();
   const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -80,7 +86,7 @@ export function PlanGuard({ children }: PlanGuardProps) {
         setCurrentTenant({ ...updated });
         setIsRenewModalOpen(false);
         setIsProcessing(false);
-        alert(`🎉 Pagamento confirmado com sucesso! Seu plano foi renovado até ${new Date(updated.expiresAt).toLocaleDateString('pt-BR')}.`);
+        alert(`🎉 Pagamento confirmado com sucesso! Seu plano foi renovado até ${formatDate(updated.expiresAt)}.`);
         window.location.reload();
       }
     }, 800);

@@ -14,17 +14,32 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export function formatDate(dateStr?: string): string {
-  if (!dateStr) return '-';
+export function formatDate(dateInput?: any): string {
+  if (!dateInput) return '-';
   try {
-    const parts = dateStr.split('T')[0].split('-');
-    if (parts.length === 3) {
+    if (typeof dateInput === 'object') {
+      if (typeof dateInput.toDate === 'function') {
+        return dateInput.toDate().toLocaleDateString('pt-BR');
+      }
+      if (typeof dateInput.seconds === 'number') {
+        return new Date(dateInput.seconds * 1000).toLocaleDateString('pt-BR');
+      }
+      if (dateInput instanceof Date) {
+        return isNaN(dateInput.getTime()) ? '-' : dateInput.toLocaleDateString('pt-BR');
+      }
+    }
+    const str = String(dateInput);
+    const parts = str.split('T')[0].split('-');
+    if (parts.length === 3 && parts[0].length === 4) {
       return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('pt-BR');
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('pt-BR');
+    }
+    return str;
   } catch {
-    return dateStr;
+    return '-';
   }
 }
 
