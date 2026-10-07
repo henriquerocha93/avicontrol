@@ -26,6 +26,21 @@ import { SpeciesCombobox } from '@/components/ui/species-combobox';
 
 export default function CriarCrachaPage() {
   const { tenant } = useAuth();
+  const [activeTenant, setActiveTenant] = useState<Tenant | null>(null);
+
+  React.useEffect(() => {
+    const syncTenant = () => {
+      const t = db.getTenant(tenant?.id);
+      if (t) setActiveTenant(t);
+    };
+    syncTenant();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('birdpro_db_updated', syncTenant);
+      return () => window.removeEventListener('birdpro_db_updated', syncTenant);
+    }
+  }, [tenant?.id]);
+
+  const currentTenant = activeTenant || tenant || ({} as any);
 
   // Modo de exibição: Apenas Frente ou Frente e Verso
   const [badgeMode, setBadgeMode] = useState<'BOTH' | 'FRONT_ONLY'>('BOTH');
@@ -33,8 +48,8 @@ export default function CriarCrachaPage() {
   const [savedBirdRecord, setSavedBirdRecord] = useState<Bird | null>(null);
 
   const plantelBirds = useMemo(() => {
-    return db.getBirds(tenant?.id);
-  }, [tenant?.id, isSaved]);
+    return db.getBirds(currentTenant?.id);
+  }, [currentTenant?.id, isSaved]);
 
   // 1. Dados da Ave Principal (de fácil preenchimento para o usuário leigo)
   const [birdData, setBirdData] = useState({
@@ -521,7 +536,7 @@ export default function CriarCrachaPage() {
           <div className="w-full flex justify-center items-center">
             <BadgeFrontAndBack
               bird={previewBird}
-              tenant={tenant || ({} as any)}
+              tenant={currentTenant}
               mode={badgeMode}
               customAncestors={customAncestors}
             />

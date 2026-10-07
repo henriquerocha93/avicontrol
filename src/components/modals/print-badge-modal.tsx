@@ -22,7 +22,15 @@ export function PrintBadgeModal({
 }: PrintBadgeModalProps) {
   if (!isOpen) return null
 
-  const activeTenant = tenant || db.getTenant(bird?.tenantId) || db.getTenant()
+  const dbTenant = db.getTenant(tenant?.id || bird?.tenantId) || db.getTenant()
+  const activeTenant = {
+    ...dbTenant,
+    ...(tenant && tenant.id ? tenant : {}),
+    visualConfig: {
+      ...(dbTenant?.visualConfig || {}),
+      ...(tenant?.visualConfig || {})
+    }
+  }
   const vc = activeTenant?.visualConfig || {}
   const publicUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}/ave/${bird.id}` 
@@ -44,10 +52,10 @@ export function PrintBadgeModal({
   const labelFrontText = vc.labelFrontTextColor || vc.textColorLabelFront || '#475569'
   const labelBackText = vc.labelBackTextColor || vc.textColorLabelBack || '#475569'
 
-  // Image configurations from Criatório
+  // Image configurations from Criatório com resolução inteligente de fallback
   const logoImage = vc.labelLogoUrl || vc.treeLogoUrl || activeTenant?.logoUrl || ''
-  const frontBg = vc.labelFrontBackgroundUrl || ''
-  const backBg = vc.labelBackBackgroundUrl || ''
+  const frontBg = vc.labelFrontBackgroundUrl || vc.treeBackgroundUrl || ''
+  const backBg = vc.labelBackBackgroundUrl || vc.labelFrontBackgroundUrl || vc.treeBackgroundUrl || ''
 
   // Genealogia resumida para o verso
   const trisavos = [
@@ -134,8 +142,11 @@ export function PrintBadgeModal({
               {/* Background from Criatório Config */}
               {frontBg && (
                 <div 
-                  className="absolute inset-0 pointer-events-none opacity-25 bg-center bg-no-repeat bg-cover"
-                  style={{ backgroundImage: `url(${frontBg})` }}
+                  className="absolute inset-0 pointer-events-none opacity-30 bg-center bg-no-repeat bg-cover z-0"
+                  style={{ 
+                    backgroundImage: `url("${frontBg}")`,
+                    transform: vc.labelFrontScale && vc.labelFrontScale !== 1 ? `scale(${vc.labelFrontScale})` : undefined
+                  }}
                 />
               )}
 
@@ -145,11 +156,16 @@ export function PrintBadgeModal({
                 <div className="w-28 shrink-0 flex flex-col items-center justify-center text-center">
                   {logoImage ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={logoImage} alt="Brasão" className="w-20 h-20 object-contain mx-auto" />
+                    <img 
+                      src={logoImage} 
+                      alt="Brasão" 
+                      className="w-20 h-20 object-contain mx-auto transition-transform" 
+                      style={{ transform: vc.labelLogoScale && vc.labelLogoScale !== 1 ? `scale(${vc.labelLogoScale})` : undefined }}
+                    />
                   ) : (
                     <div className="w-20 h-20 bg-amber-400/20 border border-amber-500 rounded flex flex-col items-center justify-center p-1 text-[9px] font-black text-amber-800">
                       <span>CRIATÓRIO</span>
-                      <span className="text-[11px]">{tenant.name?.slice(0, 8)}</span>
+                      <span className="text-[11px]">{activeTenant?.name?.slice(0, 8) || 'ROCHA'}</span>
                     </div>
                   )}
                   <span className="text-[9px] font-black uppercase tracking-wider block mt-1 text-slate-900">
@@ -278,8 +294,11 @@ export function PrintBadgeModal({
               {/* Background from Criatório Config */}
               {backBg && (
                 <div 
-                  className="absolute inset-0 pointer-events-none opacity-25 bg-center bg-no-repeat bg-cover"
-                  style={{ backgroundImage: `url(${backBg})` }}
+                  className="absolute inset-0 pointer-events-none opacity-30 bg-center bg-no-repeat bg-cover z-0"
+                  style={{ 
+                    backgroundImage: `url("${backBg}")`,
+                    transform: vc.labelBackScale && vc.labelBackScale !== 1 ? `scale(${vc.labelBackScale})` : undefined
+                  }}
                 />
               )}
 

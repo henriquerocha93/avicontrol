@@ -104,7 +104,15 @@ export function BadgeFrontAndBack({
   mode = 'BOTH',
   customAncestors
 }: BadgeFrontAndBackProps) {
-  const activeTenant = tenant || db.getTenant(bird?.tenantId) || db.getTenant()
+  const dbTenant = db.getTenant(tenant?.id || bird?.tenantId) || db.getTenant()
+  const activeTenant = {
+    ...dbTenant,
+    ...(tenant && tenant.id ? tenant : {}),
+    visualConfig: {
+      ...(dbTenant?.visualConfig || {}),
+      ...(tenant?.visualConfig || {})
+    }
+  }
   const vc = activeTenant?.visualConfig || {}
   const publicUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}/ave/${bird.id}` 
@@ -122,10 +130,10 @@ export function BadgeFrontAndBack({
   const labelFrontText = vc.labelFrontTextColor || vc.textColorLabelFront || '#475569'
   const labelBackText = vc.labelBackTextColor || vc.textColorLabelBack || '#475569'
 
-  // Imagens
+  // Imagens com resolução inteligente de fallback entre todos os campos de imagem do criatório
   const logoImage = vc.labelLogoUrl || vc.treeLogoUrl || activeTenant?.logoUrl || ''
-  const frontBg = vc.labelFrontBackgroundUrl || ''
-  const backBg = vc.labelBackBackgroundUrl || ''
+  const frontBg = vc.labelFrontBackgroundUrl || vc.treeBackgroundUrl || ''
+  const backBg = vc.labelBackBackgroundUrl || vc.labelFrontBackgroundUrl || vc.treeBackgroundUrl || ''
 
   // Genealogia completa com padrão INDEFINIDO / INDEFINIDA caso algum parentesco não seja informado
   const formatAncestorName = (name?: string | null, isMale = true) => {
@@ -195,8 +203,11 @@ export function BadgeFrontAndBack({
         {/* Background marca d'água */}
         {frontBg && (
           <div 
-            className="absolute inset-0 pointer-events-none opacity-20 bg-center bg-no-repeat bg-cover"
-            style={{ backgroundImage: `url(${frontBg})` }}
+            className="absolute inset-0 pointer-events-none opacity-30 bg-center bg-no-repeat bg-cover z-0"
+            style={{ 
+              backgroundImage: `url("${frontBg}")`,
+              transform: vc.labelFrontScale && vc.labelFrontScale !== 1 ? `scale(${vc.labelFrontScale})` : undefined
+            }}
           />
         )}
 
@@ -206,15 +217,20 @@ export function BadgeFrontAndBack({
           <div className="w-28 shrink-0 flex flex-col items-center justify-center text-center">
             {logoImage ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoImage} alt="Brasão" className="w-20 h-20 object-contain mx-auto drop-shadow-xs" />
+              <img 
+                src={logoImage} 
+                alt="Brasão" 
+                className="w-20 h-20 object-contain mx-auto drop-shadow-xs transition-transform" 
+                style={{ transform: vc.labelLogoScale && vc.labelLogoScale !== 1 ? `scale(${vc.labelLogoScale})` : undefined }}
+              />
             ) : (
               <div className="w-20 h-20 bg-amber-400/20 border-2 border-amber-500 rounded-xl flex flex-col items-center justify-center p-1 text-[9px] font-black text-amber-800 shadow-inner">
                 <span className="text-[10px]">CRIATÓRIO</span>
-                <span className="text-[12px] font-black">{tenant?.name?.slice(0, 10) || 'ROCHA'}</span>
+                <span className="text-[12px] font-black">{activeTenant?.name?.slice(0, 10) || 'ROCHA'}</span>
               </div>
             )}
             <span className="text-[9.5px] font-black uppercase tracking-wider block mt-1.5 text-slate-900">
-              {tenant?.name?.split(' ')[0] || 'CRIATÓRIO'}
+              {activeTenant?.name?.split(' ')[0] || 'CRIATÓRIO'}
             </span>
           </div>
 
@@ -357,8 +373,11 @@ export function BadgeFrontAndBack({
         {/* Background marca d'água */}
         {backBg && (
           <div 
-            className="absolute inset-0 pointer-events-none opacity-20 bg-center bg-no-repeat bg-cover"
-            style={{ backgroundImage: `url(${backBg})` }}
+            className="absolute inset-0 pointer-events-none opacity-30 bg-center bg-no-repeat bg-cover z-0"
+            style={{ 
+              backgroundImage: `url("${backBg}")`,
+              transform: vc.labelBackScale && vc.labelBackScale !== 1 ? `scale(${vc.labelBackScale})` : undefined
+            }}
           />
         )}
 
