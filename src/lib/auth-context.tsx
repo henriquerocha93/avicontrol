@@ -35,6 +35,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Initial load from storage if present
+    let initialUser: User | null = null;
+    let initialTenant: Tenant | null = null;
+
     const rawStored = typeof window !== 'undefined' ? localStorage.getItem('birdpro_current_user') : null;
     if (rawStored) {
       try {
@@ -44,20 +47,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             parsed.role = 'OWNER';
             localStorage.setItem('birdpro_current_user', JSON.stringify(parsed));
           }
-          setUser(parsed);
-          const t = db.getTenant(parsed.tenantId || 'tenant-demo-01');
-          setTenant(t);
-          setIsLoading(false);
-          return;
+          initialUser = parsed;
+          initialTenant = db.getTenant(parsed.tenantId || 'tenant-demo-01');
         }
       } catch (e) {
         console.error('Error parsing stored user:', e);
       }
     }
 
-    // If not logged in, remain unauthenticated
-    setUser(null);
-    setTenant(null);
+    setUser(initialUser);
+    setTenant(initialTenant);
     setIsLoading(false);
 
     // Background cloud sync & live updates

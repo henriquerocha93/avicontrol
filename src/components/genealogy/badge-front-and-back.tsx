@@ -104,15 +104,46 @@ export function BadgeFrontAndBack({
   mode = 'BOTH',
   customAncestors
 }: BadgeFrontAndBackProps) {
-  const dbTenant = db.getTenant(tenant?.id || bird?.tenantId) || db.getTenant()
-  const activeTenant = {
-    ...dbTenant,
-    ...(tenant && tenant.id ? tenant : {}),
-    visualConfig: {
-      ...(dbTenant?.visualConfig || {}),
+  const getLatestTenant = () => {
+    const fromDb = db.getTenant(tenant?.id || bird?.tenantId) || db.getTenant()
+    const mergedVc = {
+      ...(fromDb?.visualConfig || {}),
       ...(tenant?.visualConfig || {})
     }
+    const vcKeys = [
+      'labelLogoUrl', 'treeLogoUrl',
+      'labelFrontBackgroundUrl', 'labelBackBackgroundUrl', 'treeBackgroundUrl',
+      'fieldBgColor', 'colorField', 'fieldTextColor', 'colorTextField',
+      'maleColor', 'colorPaletteMale', 'femaleColor', 'colorPaletteFemale',
+      'maleTextColor', 'colorTextPaletteMale', 'femaleTextColor', 'colorTextPaletteFemale',
+      'labelFrontTextColor', 'textColorLabelFront', 'labelBackTextColor', 'textColorLabelBack',
+      'labelFrontScale', 'labelBackScale', 'labelLogoScale', 'treeLogoScale', 'treeBackgroundScale'
+    ] as const
+    for (const k of vcKeys) {
+      if (fromDb?.visualConfig?.[k]) {
+        (mergedVc as any)[k] = fromDb.visualConfig[k]
+      }
+    }
+    return {
+      ...fromDb,
+      ...(tenant && tenant.id ? tenant : {}),
+      visualConfig: mergedVc
+    }
   }
+
+  const [activeTenant, setActiveTenant] = useState<Tenant>(getLatestTenant)
+
+  useEffect(() => {
+    setActiveTenant(getLatestTenant())
+    const handleUpdate = () => {
+      setActiveTenant(getLatestTenant())
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('birdpro_db_updated', handleUpdate)
+      return () => window.removeEventListener('birdpro_db_updated', handleUpdate)
+    }
+  }, [tenant, bird?.tenantId])
+
   const vc = activeTenant?.visualConfig || {}
   const publicUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}/ave/${bird.id}` 
@@ -145,49 +176,39 @@ export function BadgeFrontAndBack({
   const maeNome = formatAncestorName(customAncestors?.motherName || bird.motherName, false)
 
   const avos = [
-    { name: formatAncestorName(customAncestors?.paternalGrandfather || bird.paternalGrandfatherId, true), male: true },
-    { name: formatAncestorName(customAncestors?.paternalGrandmother || bird.paternalGrandmotherId, false), male: false },
-    { name: formatAncestorName(customAncestors?.maternalGrandfather || bird.maternalGrandfatherId, true), male: true },
-    { name: formatAncestorName(customAncestors?.maternalGrandmother || bird.maternalGrandmotherId, false), male: false }
+    { name: formatAncestorName(customAncestors?.paternalGrandfather || bird.paternalGrandfatherId || bird.ancestry?.['FF']?.name, true), male: true },
+    { name: formatAncestorName(customAncestors?.paternalGrandmother || bird.paternalGrandmotherId || bird.ancestry?.['FM']?.name, false), male: false },
+    { name: formatAncestorName(customAncestors?.maternalGrandfather || bird.maternalGrandfatherId || bird.ancestry?.['MF']?.name, true), male: true },
+    { name: formatAncestorName(customAncestors?.maternalGrandmother || bird.maternalGrandmotherId || bird.ancestry?.['MM']?.name, false), male: false }
   ]
 
-  const bisavos = (customAncestors?.greatGrandparents && customAncestors.greatGrandparents.length === 8
-    ? customAncestors.greatGrandparents
-    : [
-        { name: 'Soberano Campeão', male: true },
-        { name: 'Dourada Matriarca', male: false },
-        { name: 'Ventania Puro', male: true },
-        { name: 'Serena Campeã', male: false },
-        { name: 'Rei do Canto', male: true },
-        { name: 'Rainha Matrizes', male: false },
-        { name: 'Monte Negro Fibra', male: true },
-        { name: 'Estrela Guia Ouro', male: false }
-      ]
-  ).map((bis, idx) => ({
-    name: formatAncestorName(bis.name, bis.male ?? (idx % 2 === 0)),
-    male: bis.male ?? (idx % 2 === 0)
-  }))
+  const bisavoKeys = ['FFF', 'FFM', 'FMF', 'FMM', 'MFF', 'MFM', 'MMF', 'MMM']
+  const bisavos = bisavoKeys.map((key, idx) => {
+    const isMale = key.endsWith('F')
+    const custom = customAncestors?.greatGrandparents?.[idx]?.name
+    const realName = custom || bird.ancestry?.[key]?.name
+    return {
+      name: formatAncestorName(realName, isMale),
+      male: isMale
+    }
+  })
 
-  const trisavos = [
-    { name: 'Indefinido', male: true },
-    { name: 'Indefinida', male: false },
-    { name: 'Indefinido', male: true },
-    { name: 'Indefinida', male: false },
-    { name: 'VENTENA', male: true },
-    { name: 'GOIANA', male: false },
-    { name: 'PANCADA', male: true },
-    { name: 'Indefinida', male: false },
-    { name: 'PREDADOR CMA', male: true },
-    { name: 'SERENA CMA', male: false },
-    { name: 'MONTE NEGRO CMA', male: true },
-    { name: 'VIDA CMA', male: false },
-    { name: 'Indefinido', male: true },
-    { name: 'Indefinida', male: false },
-    { name: 'Indefinido', male: true },
-    { name: 'Indefinida', male: false }
+  const trisavoKeys = [
+    'FFFF', 'FFFM', 'FFMF', 'FFMM',
+    'FMFF', 'FMFM', 'FMMF', 'FMMM',
+    'MFFF', 'MFFM', 'MFMF', 'MFMM',
+    'MMFF', 'MMFM', 'MMMF', 'MMMM'
   ]
+  const trisavos = trisavoKeys.map((key) => {
+    const isMale = key.endsWith('F')
+    const realName = bird.ancestry?.[key]?.name
+    return {
+      name: formatAncestorName(realName, isMale),
+      male: isMale
+    }
+  })
 
-  const telefoneContato = tenant?.phone || '(51) 98225-1103'
+  const telefoneContato = activeTenant?.phone || activeTenant?.cellphone || tenant?.phone || ''
 
   return (
     <div 

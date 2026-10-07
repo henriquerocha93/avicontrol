@@ -554,6 +554,14 @@ html.dark .shadow-xl {
     display: none !important;
   }
 
+  #pedigree-certificate,
+  #printable-badge {
+    box-shadow: none !important;
+    border: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   #pedigree-certificate {
     position: fixed !important;
     top: 0 !important;
@@ -562,9 +570,5 @@ html.dark .shadow-xl {
     height: 100vh !important;
     margin: 0 !important;
     padding: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
   }
 }

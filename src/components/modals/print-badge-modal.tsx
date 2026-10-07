@@ -1,8 +1,8 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { Printer, X } from 'lucide-react'
+import { Printer, X, Eye } from 'lucide-react'
 import { Bird, Tenant } from '@/types'
 import { formatDate } from '@/lib/utils'
 import { db } from '@/lib/db'
@@ -20,17 +20,50 @@ export function PrintBadgeModal({
   bird,
   tenant
 }: PrintBadgeModalProps) {
-  if (!isOpen) return null
+  const [printMode, setPrintMode] = useState<'BOTH' | 'FRONT_ONLY' | 'BACK_ONLY'>('BOTH')
 
-  const dbTenant = db.getTenant(tenant?.id || bird?.tenantId) || db.getTenant()
-  const activeTenant = {
-    ...dbTenant,
-    ...(tenant && tenant.id ? tenant : {}),
-    visualConfig: {
-      ...(dbTenant?.visualConfig || {}),
+  const getLatestTenant = () => {
+    const fromDb = db.getTenant(tenant?.id || bird?.tenantId) || db.getTenant()
+    const mergedVc = {
+      ...(fromDb?.visualConfig || {}),
       ...(tenant?.visualConfig || {})
     }
+    const vcKeys = [
+      'labelLogoUrl', 'treeLogoUrl',
+      'labelFrontBackgroundUrl', 'labelBackBackgroundUrl', 'treeBackgroundUrl',
+      'fieldBgColor', 'colorField', 'fieldTextColor', 'colorTextField',
+      'maleColor', 'colorPaletteMale', 'femaleColor', 'colorPaletteFemale',
+      'maleTextColor', 'colorTextPaletteMale', 'femaleTextColor', 'colorTextPaletteFemale',
+      'labelFrontTextColor', 'textColorLabelFront', 'labelBackTextColor', 'textColorLabelBack',
+      'labelFrontScale', 'labelBackScale', 'labelLogoScale', 'treeLogoScale', 'treeBackgroundScale'
+    ] as const
+    for (const k of vcKeys) {
+      if (fromDb?.visualConfig?.[k]) {
+        (mergedVc as any)[k] = fromDb.visualConfig[k]
+      }
+    }
+    return {
+      ...fromDb,
+      ...(tenant && tenant.id ? tenant : {}),
+      visualConfig: mergedVc
+    }
   }
+
+  const [activeTenant, setActiveTenant] = useState<Tenant>(getLatestTenant)
+
+  useEffect(() => {
+    setActiveTenant(getLatestTenant())
+    const handleUpdate = () => {
+      setActiveTenant(getLatestTenant())
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('birdpro_db_updated', handleUpdate)
+      return () => window.removeEventListener('birdpro_db_updated', handleUpdate)
+    }
+  }, [tenant, bird?.tenantId, isOpen])
+
+  if (!isOpen) return null
+
   const vc = activeTenant?.visualConfig || {}
   const publicUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}/ave/${bird.id}` 
@@ -57,43 +90,46 @@ export function PrintBadgeModal({
   const frontBg = vc.labelFrontBackgroundUrl || vc.treeBackgroundUrl || ''
   const backBg = vc.labelBackBackgroundUrl || vc.labelFrontBackgroundUrl || vc.treeBackgroundUrl || ''
 
-  // Genealogia resumida para o verso
-  const trisavos = [
-    { name: 'Indefinido', male: true },
-    { name: 'Indefinida', male: false },
-    { name: 'Indefinido', male: true },
-    { name: 'Indefinida', male: false },
-    { name: 'VENTENA', male: true },
-    { name: 'GOIANA', male: false },
-    { name: 'PANCADA', male: true },
-    { name: 'Indefinida', male: false },
-    { name: 'PREDADOR CMA', male: true },
-    { name: 'SERENA CMA', male: false },
-    { name: 'MONTE NEGRO CMA', male: true },
-    { name: 'VIDA CMA', male: false },
-    { name: 'Indefinido', male: true },
-    { name: 'Indefinida', male: false },
-    { name: 'Indefinido', male: true },
-    { name: 'Indefinida', male: false }
-  ]
+  // Padrão obrigatório: Sempre INDEFINIDO / INDEFINIDA quando o parentesco não for preenchido
+  const formatName = (val?: string | null, isMale = true) => {
+    if (!val || !val.trim()) return isMale ? 'INDEFINIDO' : 'INDEFINIDA'
+    return val.trim().toUpperCase()
+  }
 
-  const bisavos = [
-    { name: 'Indefinido', male: true },
-    { name: 'Indefinida', male: false },
-    { name: 'VENTANIA', male: true },
-    { name: 'HONDA', male: false },
-    { name: 'SERENO CMA', male: true },
-    { name: 'BELEZOCA CMA', male: false },
-    { name: 'Indefinido', male: true },
-    { name: 'Indefinida', male: false }
-  ]
+  const paiNome = formatName(bird.fatherName, true)
+  const maeNome = formatName(bird.motherName, false)
 
   const avos = [
-    { name: bird.paternalGrandfatherId || 'CARCAÇA', male: true },
-    { name: bird.paternalGrandmotherId || 'Indefinida', male: false },
-    { name: bird.maternalGrandfatherId || 'ZEUS CMA', male: true },
-    { name: bird.maternalGrandmotherId || 'LADY GAGA CM999', male: false }
+    { name: formatName(bird.paternalGrandfatherId || bird.ancestry?.['FF']?.name, true), male: true },
+    { name: formatName(bird.paternalGrandmotherId || bird.ancestry?.['FM']?.name, false), male: false },
+    { name: formatName(bird.maternalGrandfatherId || bird.ancestry?.['MF']?.name, true), male: true },
+    { name: formatName(bird.maternalGrandmotherId || bird.ancestry?.['MM']?.name, false), male: false }
   ]
+
+  const bisavoKeys = ['FFF', 'FFM', 'FMF', 'FMM', 'MFF', 'MFM', 'MMF', 'MMM']
+  const bisavos = bisavoKeys.map((key) => {
+    const isMale = key.endsWith('F')
+    const realName = bird.ancestry?.[key]?.name
+    return {
+      name: formatName(realName, isMale),
+      male: isMale
+    }
+  })
+
+  const trisavoKeys = [
+    'FFFF', 'FFFM', 'FFMF', 'FFMM',
+    'FMFF', 'FMFM', 'FMMF', 'FMMM',
+    'MFFF', 'MFFM', 'MFMF', 'MFMM',
+    'MMFF', 'MMFM', 'MMMF', 'MMMM'
+  ]
+  const trisavos = trisavoKeys.map((key) => {
+    const isMale = key.endsWith('F')
+    const realName = bird.ancestry?.[key]?.name
+    return {
+      name: formatName(realName, isMale),
+      male: isMale
+    }
+  })
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
@@ -101,13 +137,50 @@ export function PrintBadgeModal({
       <div className="bg-slate-900 rounded-lg shadow-2xl w-full max-w-[1240px] border border-slate-700 overflow-hidden flex flex-col my-auto animate-scale-in">
         
         {/* Top Actions Bar (Hidden on print) */}
-        <div className="bg-slate-800 px-5 py-3 border-b border-slate-700 flex items-center justify-between text-white print:hidden">
+        <div className="bg-slate-800 px-5 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-3 text-white print:hidden">
           <div className="flex items-center space-x-2">
             <div className="w-5 h-5 rounded bg-[#00c853] flex items-center justify-center text-white font-black text-[9px] shadow">
               BP
             </div>
-            <span className="font-bold text-sm">Etiqueta de Gaiola Oficial (Frente e Verso)</span>
+            <span className="font-bold text-sm">Etiqueta de Gaiola Oficial</span>
             <span className="text-xs text-slate-400">| {bird.name} ({bird.ringNumber})</span>
+          </div>
+
+          {/* Opções de Impressão: Frente e Verso / Somente Frente / Somente Verso */}
+          <div className="flex items-center bg-slate-900/90 p-0.5 rounded-lg border border-slate-700 text-xs">
+            <button
+              type="button"
+              onClick={() => setPrintMode('BOTH')}
+              className={`px-3 py-1.5 rounded-md font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+                printMode === 'BOTH'
+                  ? 'bg-[#00c853] text-white shadow'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <span>Frente e Verso</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrintMode('FRONT_ONLY')}
+              className={`px-3 py-1.5 rounded-md font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+                printMode === 'FRONT_ONLY'
+                  ? 'bg-[#00c853] text-white shadow'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <span>Somente Frente</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrintMode('BACK_ONLY')}
+              className={`px-3 py-1.5 rounded-md font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+                printMode === 'BACK_ONLY'
+                  ? 'bg-[#00c853] text-white shadow'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <span>Somente Verso</span>
+            </button>
           </div>
 
           <div className="flex items-center space-x-3">
@@ -116,7 +189,13 @@ export function PrintBadgeModal({
               className="px-4 py-1.5 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-bold rounded flex items-center space-x-1.5 transition shadow cursor-pointer"
             >
               <Printer className="w-4 h-4" />
-              <span>Imprimir / Salvar PDF</span>
+              <span>
+                {printMode === 'FRONT_ONLY' 
+                  ? 'Imprimir Somente Frente (PDF)' 
+                  : printMode === 'BACK_ONLY' 
+                    ? 'Imprimir Somente Verso (PDF)' 
+                    : 'Imprimir Frente e Verso (PDF)'}
+              </span>
             </button>
             <button
               onClick={onClose}
@@ -128,17 +207,22 @@ export function PrintBadgeModal({
         </div>
 
         {/* Tag Preview Area */}
-        <div className="p-4 sm:p-6 bg-slate-950 overflow-x-auto flex justify-center">
+        <div className="p-4 sm:p-6 bg-slate-950 overflow-x-auto flex justify-center print:p-0 print:bg-white">
           
           {/* Printable Tag Document Container (PDF A4 Strip/Fold layout) */}
           <div 
             id="printable-badge"
-            className="w-[1100px] min-w-[1100px] bg-white text-black p-4 relative shadow-2xl overflow-hidden border border-slate-300 font-sans print:m-0 print:border-0 print:shadow-none select-none flex gap-4"
+            className={`${
+              printMode === 'BOTH'
+                ? 'w-[1100px] min-w-[1100px] flex gap-4'
+                : 'w-[562px] min-w-[530px] flex justify-center'
+            } bg-white text-black p-4 relative shadow-2xl overflow-hidden border border-slate-300 font-sans print:m-0 print:p-0 print:border-0 print:shadow-none select-none`}
           >
             {/* ======================================================== */}
             {/* LADO ESQUERDO: FRENTE DA ETIQUETA DE GAIOLA               */}
             {/* ======================================================== */}
-            <div className="w-[530px] h-[340px] border-2 border-slate-800 relative bg-white flex flex-col justify-between p-2.5 overflow-hidden">
+            {(printMode === 'BOTH' || printMode === 'FRONT_ONLY') && (
+            <div className="w-[530px] h-[340px] border-2 border-slate-800 relative bg-white flex flex-col justify-between p-2.5 overflow-hidden shrink-0">
               {/* Background from Criatório Config */}
               {frontBg && (
                 <div 
@@ -193,7 +277,7 @@ export function PrintBadgeModal({
                       className="border border-slate-400 px-2 py-0.5 text-center font-bold text-[10px] uppercase truncate"
                       style={{ backgroundColor: maleBg, color: maleText }}
                     >
-                      {bird.fatherName || 'MOLEQUE OASIS'}
+                      {paiNome}
                     </div>
                   </div>
 
@@ -204,7 +288,7 @@ export function PrintBadgeModal({
                       className="border border-slate-400 px-2 py-0.5 text-center font-bold text-[10px] uppercase truncate"
                       style={{ backgroundColor: femaleBg, color: femaleText }}
                     >
-                      {bird.motherName || 'CACAU CM999'}
+                      {maeNome}
                     </div>
                   </div>
 
@@ -286,11 +370,13 @@ export function PrintBadgeModal({
                 </div>
               </div>
             </div>
+            )}
 
             {/* ======================================================== */}
             {/* LADO DIREITO: VERSO DA ETIQUETA (GENEALOGIA COMPACTA)    */}
             {/* ======================================================== */}
-            <div className="w-[530px] h-[340px] border-2 border-slate-800 relative bg-white flex flex-col justify-between p-2 overflow-hidden">
+            {(printMode === 'BOTH' || printMode === 'BACK_ONLY') && (
+            <div className="w-[530px] h-[340px] border-2 border-slate-800 relative bg-white flex flex-col justify-between p-2 overflow-hidden shrink-0">
               {/* Background from Criatório Config */}
               {backBg && (
                 <div 
@@ -322,13 +408,13 @@ export function PrintBadgeModal({
                     className="py-0.5 px-1 text-center text-[7.5px] font-bold uppercase rounded border border-black/40 truncate"
                     style={{ backgroundColor: maleBg, color: maleText }}
                   >
-                    {bird.fatherName || 'MOLEQUE OASIS'}
+                    {paiNome}
                   </div>
                   <div 
                     className="py-0.5 px-1 text-center text-[7.5px] font-bold uppercase rounded border border-black/40 truncate"
                     style={{ backgroundColor: femaleBg, color: femaleText }}
                   >
-                    {bird.motherName || 'CACAU CM999'}
+                    {maeNome}
                   </div>
                 </div>
 
@@ -435,13 +521,14 @@ export function PrintBadgeModal({
               </div>
 
             </div>
+            )}
 
           </div>
 
         </div>
 
         {/* Modal Footer Controls */}
-        <div className="bg-slate-800 px-6 py-3 border-t border-slate-700 flex items-center justify-between print:hidden">
+        <div className="bg-slate-800 px-6 py-3 border-t border-slate-700 flex flex-wrap items-center justify-between gap-3 print:hidden">
           <div className="flex items-center space-x-2 text-slate-400 text-xs">
             <span className="w-2 h-2 rounded-full bg-[#00c853] inline-block"></span>
             <span>Autenticado por <strong>BirdPro</strong> (www.birdpro.com.br)</span>
@@ -459,7 +546,13 @@ export function PrintBadgeModal({
               className="px-6 py-2 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-bold rounded shadow transition flex items-center space-x-2 cursor-pointer"
             >
               <Printer className="w-4 h-4" />
-              <span>Imprimir Crachá de Gaiola</span>
+              <span>
+                {printMode === 'FRONT_ONLY' 
+                  ? 'Imprimir Somente Frente (PDF)' 
+                  : printMode === 'BACK_ONLY' 
+                    ? 'Imprimir Somente Verso (PDF)' 
+                    : 'Imprimir Frente e Verso (PDF)'}
+              </span>
             </button>
           </div>
         </div>
