@@ -23,6 +23,7 @@ import {
   Bird as BirdIcon
 } from 'lucide-react'
 import { db } from '@/lib/db'
+import { firebaseSync } from '@/lib/firebase-service'
 import { Bird } from '@/types'
 import { PrintPedigreeModal } from '@/components/modals/print-pedigree-modal'
 import { PrintBadgeModal } from '@/components/modals/print-badge-modal'
@@ -540,14 +541,30 @@ export function NovaGenealogiaEnvironment({
   // Save genealogy relationship safely
   const handleSave = () => {
     try {
-      if (mainBird && mainBird.id) {
-        const ancestry: Record<string, { id?: string; name: string; ringNumber: string }> = {}
-        for (const [p, n] of Object.entries(nodes)) {
-          if (n && n.name) {
-            ancestry[p] = { ...(n.id ? { id: n.id } : {}), name: n.name, ringNumber: n.ringNumber || '' }
-          }
+      const ancestry: Record<string, { id?: string; name: string; ringNumber: string }> = {}
+      for (const [p, n] of Object.entries(nodes)) {
+        if (n && n.name && n.name !== 'INDEFINIDO' && n.name !== 'INDEFINIDA') {
+          ancestry[p] = { ...(n.id ? { id: n.id } : {}), name: n.name, ringNumber: n.ringNumber || '' }
         }
-        db.updateBird(mainBird.id, {
+      }
+
+      let currentBirdId = mainBird?.id
+      const tenant = db.getTenant()
+      const tenantId = tenant?.id || 'demo-tenant'
+
+      if (!currentBirdId) {
+        // Ave não existia no banco: cria ave oficial no plantel com toda a genealogia
+        const newBird = db.addBird({
+          tenantId,
+          name: mainBird?.name && mainBird.name !== 'Ave' ? mainBird.name : `Ave Genealógica (${nodes.F?.name || 'Linhagem'})`,
+          ringNumber: mainBird?.ringNumber || `ANILHA-${Date.now().toString().slice(-4)}`,
+          species: 'Canário-da-terra (Sicalis flaveola)',
+          sex: mainBird?.sex === 'FEMALE' ? 'FEMALE' : 'MALE',
+          status: 'ACTIVE',
+          origin: 'BRED_HERE',
+          birthDate: new Date().toISOString().split('T')[0],
+          entryDate: new Date().toISOString().split('T')[0],
+          isPublic: true,
           fatherName: nodes.F?.name || undefined,
           fatherRing: nodes.F?.ringNumber || undefined,
           fatherId: nodes.F?.id || undefined,
@@ -560,6 +577,44 @@ export function NovaGenealogiaEnvironment({
           maternalGrandmotherId: nodes.MM?.name || undefined,
           ancestry,
         })
+        currentBirdId = newBird.id
+        setMainBird({
+          id: newBird.id,
+          name: newBird.name,
+          ringNumber: newBird.ringNumber,
+          sex: newBird.sex as any
+        })
+        setSelectedFullBird(newBird)
+      } else {
+        // Ave já existia: atualiza com todos os novos parentescos e genealogia
+        db.updateBird(currentBirdId, {
+          name: mainBird?.name && mainBird.name !== 'Ave' ? mainBird.name : undefined,
+          ringNumber: mainBird?.ringNumber || undefined,
+          fatherName: nodes.F?.name || undefined,
+          fatherRing: nodes.F?.ringNumber || undefined,
+          fatherId: nodes.F?.id || undefined,
+          motherName: nodes.M?.name || undefined,
+          motherRing: nodes.M?.ringNumber || undefined,
+          motherId: nodes.M?.id || undefined,
+          paternalGrandfatherId: nodes.FF?.name || undefined,
+          paternalGrandmotherId: nodes.FM?.name || undefined,
+          maternalGrandfatherId: nodes.MF?.name || undefined,
+          maternalGrandmotherId: nodes.MM?.name || undefined,
+          ancestry,
+        })
+      }
+
+      // Sincroniza na nuvem
+      if (currentBirdId && firebaseSync.isAvailable()) {
+        const full = db.getBirdById(currentBirdId)
+        if (full) {
+          firebaseSync.saveDocument('birds', currentBirdId, full).catch(() => {})
+        }
+      }
+
+      // Notifica todos os componentes para atualizar listas e árvore
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('birdpro_db_updated'))
       }
 
       setSaveSuccess(true)

@@ -65,9 +65,11 @@ export function PrintBadgeModal({
   if (!isOpen) return null
 
   const vc = activeTenant?.visualConfig || {}
-  const publicUrl = typeof window !== 'undefined' 
-    ? `${window.location.origin}/ave/${bird.id}` 
-    : `https://birdpro.com.br/ave/${bird.id}`
+  const publicUrl = bird.qrCodePublicUrl 
+    ? bird.qrCodePublicUrl 
+    : (typeof window !== 'undefined' 
+        ? `${window.location.origin}/ave/${encodeURIComponent(bird.id)}` 
+        : `https://birdpro.com.br/ave/${encodeURIComponent(bird.id)}`)
 
   const handlePrint = () => {
     window.print()
@@ -338,10 +340,15 @@ export function PrintBadgeModal({
                 </div>
               </div>
 
-              {/* Bottom Row: Proprietário, Telefone + BirdPro Watermark */}
-              <div className="relative z-10 pt-1 border-t border-slate-300 flex items-center justify-between">
-                <div className="flex-1 mr-2">
-                  <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Proprietário</span>
+              {/* Bottom Row: QR Code de Autenticidade + Proprietário + BirdPro Watermark */}
+              <div className="relative z-10 pt-1 border-t border-slate-300 flex items-center justify-between gap-2">
+                {/* QR Code Oficial na Frente da Etiqueta */}
+                <div className="w-12 h-12 bg-white p-0.5 border border-slate-400 rounded shrink-0 flex items-center justify-center shadow-2xs">
+                  <QRCodeSVG value={publicUrl} size={42} level="M" />
+                </div>
+
+                <div className="flex-1">
+                  <span className="text-[7.5px] font-bold uppercase block" style={{ color: labelFrontText }}>Proprietário / Criador Responsável</span>
                   <div className="flex border border-slate-400 text-[8.5px] font-bold">
                     <div 
                       className="flex-1 px-1.5 py-0.5 border-r border-slate-400 truncate"
@@ -350,7 +357,7 @@ export function PrintBadgeModal({
                       {activeTenant?.name || '—'}
                     </div>
                     <div 
-                      className="px-2 py-0.5 shrink-0"
+                      className="px-2 py-0.5 shrink-0 font-mono"
                       style={{ backgroundColor: fieldBg, color: fieldText }}
                     >
                       {activeTenant?.phone || activeTenant?.cellphone || '—'}
@@ -359,13 +366,13 @@ export function PrintBadgeModal({
                 </div>
 
                 {/* BirdPro Branding Front */}
-                <div className="flex items-center space-x-1 shrink-0 pt-2.5">
-                  <div className="w-4 h-4 rounded bg-[#00c853] text-white flex items-center justify-center font-black text-[8px]">
+                <div className="flex items-center space-x-1 shrink-0">
+                  <div className="w-5 h-5 rounded bg-[#00c853] text-white flex items-center justify-center font-black text-[9px] shadow-xs">
                     BP
                   </div>
-                  <div className="leading-none">
+                  <div className="leading-tight text-left">
                     <span className="font-extrabold text-[8px] text-slate-900 block">BIRDPRO</span>
-                    <span className="text-[6.5px] text-[#00c853] font-bold">www.birdpro.com.br</span>
+                    <span className="text-[6.5px] text-[#00c853] font-bold block">www.birdpro.com.br</span>
                   </div>
                 </div>
               </div>

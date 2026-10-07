@@ -17,7 +17,8 @@ import {
   FileText
 } from 'lucide-react'
 import { db } from '@/lib/db'
-import { Bird } from '@/types'
+import { firebaseSync } from '@/lib/firebase-service'
+import { Bird, Tenant } from '@/types'
 import { PrintPedigreeModal } from '@/components/modals/print-pedigree-modal'
 import { PrintBadgeModal } from '@/components/modals/print-badge-modal'
 import { NovaGenealogiaEnvironment } from '@/components/genealogy/nova-genealogia-environment'
@@ -26,9 +27,23 @@ function GenealogiaContent() {
   const searchParams = useSearchParams()
   const ringParam = searchParams.get('anilha') || undefined
   const birdIdParam = searchParams.get('birdId') || undefined
+  const tabParam = searchParams.get('tab')
 
-  const tenant = db.getTenant()
-  const birds = db.getBirds()
+  const [birds, setBirds] = useState<Bird[]>(() => db.getBirds())
+  const [tenant, setTenant] = useState<Tenant | null>(() => db.getTenant())
+
+  // Sincronização reativa instantânea para listar todos os pássaros e árvores criadas
+  useEffect(() => {
+    const sync = () => {
+      setBirds(db.getBirds())
+      setTenant(db.getTenant())
+    }
+    sync()
+    if (typeof window !== 'undefined') {
+      window.addEventListener('birdpro_db_updated', sync)
+      return () => window.removeEventListener('birdpro_db_updated', sync)
+    }
+  }, [])
 
   // State
   const [viewMode, setViewMode] = useState<'TREE' | 'LIST'>('TREE')
@@ -45,7 +60,11 @@ function GenealogiaContent() {
       setSelectedTreeBirdId(birdIdParam)
       setViewMode('TREE')
     }
-  }, [ringParam, birdIdParam])
+    if (tabParam === 'list') {
+      setViewMode('LIST')
+    }
+  }, [ringParam, birdIdParam, tabParam])
+
   const [searchField, setSearchField] = useState('ave')
   const [searchQuery, setSearchQuery] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
@@ -54,24 +73,44 @@ function GenealogiaContent() {
   const [selectedPedigreeBird, setSelectedPedigreeBird] = useState<Bird | null>(null)
   const [selectedBadgeBird, setSelectedBadgeBird] = useState<Bird | null>(null)
   const [editingBird, setEditingBird] = useState<Bird | null>(null)
+  const [editModalTab, setEditModalTab] = useState<'GERAL' | 'AVOS' | 'BISAVOS'>('GERAL')
   const [isTrainingOpen, setIsTrainingOpen] = useState(false)
 
-  // Edit Form State
+  // Edit Form State com suporte a Árvore e Todos os Parentescos
   const [editForm, setEditForm] = useState({
     name: '',
     ringNumber: '',
-    fatherName: '',
-    motherName: '',
     species: '',
     sex: 'MALE',
-    status: 'ACTIVE'
+    status: 'ACTIVE',
+    birthDate: '',
+    // Pais (1ª Geração)
+    fatherName: '',
+    fatherRing: '',
+    motherName: '',
+    motherRing: '',
+    // Avós (2ª Geração)
+    paternalGrandfather: '',
+    paternalGrandmother: '',
+    maternalGrandfather: '',
+    maternalGrandmother: '',
+    // Bisavós (3ª Geração - 8 Parentescos)
+    bisavos: {
+      FFF: '',
+      FFM: '',
+      FMF: '',
+      FMM: '',
+      MFF: '',
+      MFM: '',
+      MMF: '',
+      MMM: ''
+    }
   })
 
-  // Filter birds
+  // Filter birds: exibe todas as aves ativas ou em reprodução no criatório
   const filteredBirds = birds.filter(b => {
-    // Tab filter
-    if (activeTab === 'PLANTEL' && b.status !== 'ACTIVE' && b.status !== 'BREEDING') {
-      // return false
+    if (activeTab === 'PLANTEL' && (b.status === 'DECEASED' || b.status === 'TRANSFERRED' || b.status === 'LOST')) {
+      return false
     }
 
     if (!appliedSearch) return true
@@ -103,14 +142,35 @@ function GenealogiaContent() {
 
   const handleOpenEdit = (bird: Bird) => {
     setEditingBird(bird)
+    setEditModalTab('GERAL')
     setEditForm({
-      name: bird.name,
+      name: bird.name || '',
       ringNumber: bird.ringNumber || '',
-      fatherName: bird.fatherName || '',
-      motherName: bird.motherName || '',
-      species: bird.species,
-      sex: bird.sex,
-      status: bird.status
+      species: bird.species || '',
+      sex: bird.sex || 'MALE',
+      status: bird.status || 'ACTIVE',
+      birthDate: bird.birthDate || '',
+      // Pais
+      fatherName: bird.fatherName || bird.ancestry?.['F']?.name || '',
+      fatherRing: bird.fatherRing || bird.ancestry?.['F']?.ringNumber || '',
+      motherName: bird.motherName || bird.ancestry?.['M']?.name || '',
+      motherRing: bird.motherRing || bird.ancestry?.['M']?.ringNumber || '',
+      // Avós
+      paternalGrandfather: bird.paternalGrandfatherId || bird.ancestry?.['FF']?.name || '',
+      paternalGrandmother: bird.paternalGrandmotherId || bird.ancestry?.['FM']?.name || '',
+      maternalGrandfather: bird.maternalGrandfatherId || bird.ancestry?.['MF']?.name || '',
+      maternalGrandmother: bird.maternalGrandmotherId || bird.ancestry?.['MM']?.name || '',
+      // Bisavós
+      bisavos: {
+        FFF: bird.ancestry?.['FFF']?.name || '',
+        FFM: bird.ancestry?.['FFM']?.name || '',
+        FMF: bird.ancestry?.['FMF']?.name || '',
+        FMM: bird.ancestry?.['FMM']?.name || '',
+        MFF: bird.ancestry?.['MFF']?.name || '',
+        MFM: bird.ancestry?.['MFM']?.name || '',
+        MMF: bird.ancestry?.['MMF']?.name || '',
+        MMM: bird.ancestry?.['MMM']?.name || ''
+      }
     })
   }
 
@@ -118,22 +178,77 @@ function GenealogiaContent() {
     e.preventDefault()
     if (!editingBird) return
 
-    db.updateBird(editingBird.id, {
-      name: editForm.name,
-      ringNumber: editForm.ringNumber,
-      fatherName: editForm.fatherName,
-      motherName: editForm.motherName,
-      species: editForm.species,
-      sex: editForm.sex as any,
-      status: editForm.status as any
+    // Monta mapa de ancestrais completo
+    const ancestry: Record<string, { id?: string; name: string; ringNumber: string }> = { 
+      ...(editingBird.ancestry || {}) 
+    }
+
+    if (editForm.fatherName) {
+      ancestry['F'] = { name: editForm.fatherName, ringNumber: editForm.fatherRing || '' }
+    }
+    if (editForm.motherName) {
+      ancestry['M'] = { name: editForm.motherName, ringNumber: editForm.motherRing || '' }
+    }
+    if (editForm.paternalGrandfather) {
+      ancestry['FF'] = { name: editForm.paternalGrandfather, ringNumber: '' }
+    }
+    if (editForm.paternalGrandmother) {
+      ancestry['FM'] = { name: editForm.paternalGrandmother, ringNumber: '' }
+    }
+    if (editForm.maternalGrandfather) {
+      ancestry['MF'] = { name: editForm.maternalGrandfather, ringNumber: '' }
+    }
+    if (editForm.maternalGrandmother) {
+      ancestry['MM'] = { name: editForm.maternalGrandmother, ringNumber: '' }
+    }
+
+    Object.entries(editForm.bisavos).forEach(([k, val]) => {
+      if (val && val.trim()) {
+        ancestry[k] = { name: val.trim(), ringNumber: '' }
+      }
     })
 
+    const updated = db.updateBird(editingBird.id, {
+      name: editForm.name,
+      ringNumber: editForm.ringNumber,
+      species: editForm.species,
+      sex: editForm.sex as any,
+      status: editForm.status as any,
+      birthDate: editForm.birthDate || undefined,
+      fatherName: editForm.fatherName || undefined,
+      fatherRing: editForm.fatherRing || undefined,
+      motherName: editForm.motherName || undefined,
+      motherRing: editForm.motherRing || undefined,
+      paternalGrandfatherId: editForm.paternalGrandfather || undefined,
+      paternalGrandmotherId: editForm.paternalGrandmother || undefined,
+      maternalGrandfatherId: editForm.maternalGrandfather || undefined,
+      maternalGrandmotherId: editForm.maternalGrandmother || undefined,
+      ancestry
+    })
+
+    // Sincroniza na nuvem
+    if (updated && firebaseSync.isAvailable()) {
+      firebaseSync.saveDocument('birds', updated.id, updated).catch(() => {})
+    }
+
+    // Atualiza estado local e dispara evento
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('birdpro_db_updated'))
+    }
+    setBirds(db.getBirds())
     setEditingBird(null)
   }
 
   const handleDeleteBird = (bird: Bird) => {
     if (confirm(`Deseja realmente remover a ave "${bird.name}" (${bird.ringNumber}) da Árvore Genealógica?`)) {
       db.deleteBird(bird.id)
+      if (firebaseSync.isAvailable()) {
+        firebaseSync.removeDocument('birds', bird.id).catch(() => {})
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('birdpro_db_updated'))
+      }
+      setBirds(db.getBirds())
     }
   }
 
@@ -457,108 +572,374 @@ function GenealogiaContent() {
         />
       )}
 
-      {/* Modal de Edição de Ave / Genealogia */}
+      {/* Modal de Edição de Ave / Genealogia Completa */}
       {editingBird && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-md shadow-xl w-full max-w-lg border border-slate-200 overflow-hidden animate-scale-in">
-            <div className="bg-slate-50 px-5 py-3.5 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-800">
-                Editar Genealogia da Ave
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl border border-slate-200 overflow-hidden animate-scale-in flex flex-col max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-black flex items-center gap-2">
+                  <BirdIcon className="w-4 h-4 text-[#00c853]" />
+                  <span>Editar Ave &amp; Parentescos da Genealogia</span>
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  {editingBird.name} ({editingBird.ringNumber || 'Sem anilha'})
+                </p>
+              </div>
               <button
+                type="button"
                 onClick={() => setEditingBird(null)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-slate-400 hover:text-white cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={handleSaveEdit} className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Nome da Ave *</label>
-                  <input
-                    type="text"
-                    required
-                    value={editForm.name}
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
-                  />
-                </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Número da Anilha</label>
-                  <input
-                    type="text"
-                    value={editForm.ringNumber}
-                    onChange={(e) => setEditForm({ ...editForm, ringNumber: e.target.value })}
-                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
-                  />
-                </div>
-              </div>
+            {/* Modal Tabs Navigation */}
+            <div className="flex border-b border-slate-200 bg-slate-50 px-4 pt-2 gap-1 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setEditModalTab('GERAL')}
+                className={`py-2 px-3 border-b-2 transition cursor-pointer ${
+                  editModalTab === 'GERAL'
+                    ? 'border-[#00c853] text-[#00c853] bg-white rounded-t'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                1. Ave Principal &amp; Pais
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditModalTab('AVOS')}
+                className={`py-2 px-3 border-b-2 transition cursor-pointer ${
+                  editModalTab === 'AVOS'
+                    ? 'border-[#00c853] text-[#00c853] bg-white rounded-t'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                2. Avós (2ª Geração)
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditModalTab('BISAVOS')}
+                className={`py-2 px-3 border-b-2 transition cursor-pointer ${
+                  editModalTab === 'BISAVOS'
+                    ? 'border-[#00c853] text-[#00c853] bg-white rounded-t'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                3. Bisavós (3ª Geração - 8 Parentes)
+              </button>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Ave Pai</label>
-                  <input
-                    type="text"
-                    value={editForm.fatherName}
-                    onChange={(e) => setEditForm({ ...editForm, fatherName: e.target.value })}
-                    placeholder="Nome do Pai"
-                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
-                  />
-                </div>
+            {/* Modal Form Content */}
+            <form onSubmit={handleSaveEdit} className="p-5 overflow-y-auto space-y-4 flex-1">
+              
+              {/* ABA 1: AVE PRINCIPAL & PAIS */}
+              {editModalTab === 'GERAL' && (
+                <div className="space-y-4">
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-3">
+                    <span className="text-[11px] font-black uppercase text-slate-700 block">
+                      Dados da Ave Principal
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Nome da Ave *</label>
+                        <input
+                          type="text"
+                          required
+                          value={editForm.name}
+                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                          className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 font-bold focus:outline-none focus:border-[#00c853]"
+                        />
+                      </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Ave Mãe</label>
-                  <input
-                    type="text"
-                    value={editForm.motherName}
-                    onChange={(e) => setEditForm({ ...editForm, motherName: e.target.value })}
-                    placeholder="Nome da Mãe"
-                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
-                  />
-                </div>
-              </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Número da Anilha Oficial</label>
+                        <input
+                          type="text"
+                          value={editForm.ringNumber}
+                          onChange={(e) => setEditForm({ ...editForm, ringNumber: e.target.value })}
+                          className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 font-mono font-bold focus:outline-none focus:border-[#00c853]"
+                        />
+                      </div>
+                    </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Espécie</label>
-                  <input
-                    type="text"
-                    value={editForm.species}
-                    onChange={(e) => setEditForm({ ...editForm, species: e.target.value })}
-                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
-                  />
-                </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Espécie</label>
+                        <input
+                          type="text"
+                          value={editForm.species}
+                          onChange={(e) => setEditForm({ ...editForm, species: e.target.value })}
+                          className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
+                        />
+                      </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Sexo</label>
-                  <select
-                    value={editForm.sex}
-                    onChange={(e) => setEditForm({ ...editForm, sex: e.target.value })}
-                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
-                  >
-                    <option value="MALE">Macho (♂)</option>
-                    <option value="FEMALE">Fêmea (♀)</option>
-                    <option value="UNKNOWN">Indefinido (?)</option>
-                  </select>
-                </div>
-              </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Sexo</label>
+                        <select
+                          value={editForm.sex}
+                          onChange={(e) => setEditForm({ ...editForm, sex: e.target.value })}
+                          className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
+                        >
+                          <option value="MALE">Macho (♂)</option>
+                          <option value="FEMALE">Fêmea (♀)</option>
+                          <option value="UNKNOWN">Indefinido (?)</option>
+                        </select>
+                      </div>
 
-              <div className="pt-2 flex justify-between items-center">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Data de Nascimento</label>
+                        <input
+                          type="date"
+                          value={editForm.birthDate}
+                          onChange={(e) => setEditForm({ ...editForm, birthDate: e.target.value })}
+                          className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* PAIS (1ª GERAÇÃO) */}
+                  <div className="bg-sky-50/50 p-3 rounded-lg border border-sky-200 space-y-3">
+                    <span className="text-[11px] font-black uppercase text-sky-800 block">
+                      Pais (1ª Geração)
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="bg-white p-2.5 rounded border border-sky-100 space-y-2">
+                        <span className="text-[10px] font-bold text-sky-700 uppercase block">Ave Pai ♂</span>
+                        <div>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">Nome do Pai</label>
+                          <input
+                            type="text"
+                            placeholder="Nome do Pai"
+                            value={editForm.fatherName}
+                            onChange={(e) => setEditForm({ ...editForm, fatherName: e.target.value })}
+                            className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-white text-slate-800 font-semibold focus:outline-none focus:border-[#00c853]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">Anilha do Pai</label>
+                          <input
+                            type="text"
+                            placeholder="Anilha do Pai"
+                            value={editForm.fatherRing}
+                            onChange={(e) => setEditForm({ ...editForm, fatherRing: e.target.value })}
+                            className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-white text-slate-800 font-mono text-[11px] focus:outline-none focus:border-[#00c853]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-2.5 rounded border border-rose-100 space-y-2">
+                        <span className="text-[10px] font-bold text-rose-700 uppercase block">Ave Mãe ♀</span>
+                        <div>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">Nome da Mãe</label>
+                          <input
+                            type="text"
+                            placeholder="Nome da Mãe"
+                            value={editForm.motherName}
+                            onChange={(e) => setEditForm({ ...editForm, motherName: e.target.value })}
+                            className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-white text-slate-800 font-semibold focus:outline-none focus:border-[#00c853]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">Anilha da Mãe</label>
+                          <input
+                            type="text"
+                            placeholder="Anilha da Mãe"
+                            value={editForm.motherRing}
+                            onChange={(e) => setEditForm({ ...editForm, motherRing: e.target.value })}
+                            className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-white text-slate-800 font-mono text-[11px] focus:outline-none focus:border-[#00c853]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ABA 2: AVÓS (2ª GERAÇÃO) */}
+              {editModalTab === 'AVOS' && (
+                <div className="space-y-4">
+                  {/* Linha Paterna */}
+                  <div className="bg-sky-50/60 p-3 rounded-lg border border-sky-200 space-y-3">
+                    <span className="text-[11px] font-black uppercase text-sky-800 block">
+                      Avós Paternos (Pais do Pai)
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Avô Paterno (Pai do Pai) ♂
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Soberano da Fibra"
+                          value={editForm.paternalGrandfather}
+                          onChange={(e) => setEditForm({ ...editForm, paternalGrandfather: e.target.value })}
+                          className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 font-medium focus:outline-none focus:border-[#00c853]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Avó Paterna (Mãe do Pai) ♀
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Felícia Matriz"
+                          value={editForm.paternalGrandmother}
+                          onChange={(e) => setEditForm({ ...editForm, paternalGrandmother: e.target.value })}
+                          className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 font-medium focus:outline-none focus:border-[#00c853]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Linha Materna */}
+                  <div className="bg-rose-50/60 p-3 rounded-lg border border-rose-200 space-y-3">
+                    <span className="text-[11px] font-black uppercase text-rose-800 block">
+                      Avós Maternos (Pais da Mãe)
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Avô Materno (Pai da Mãe) ♂
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Zeus Campeão"
+                          value={editForm.maternalGrandfather}
+                          onChange={(e) => setEditForm({ ...editForm, maternalGrandfather: e.target.value })}
+                          className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 font-medium focus:outline-none focus:border-[#00c853]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Avó Materna (Mãe da Mãe) ♀
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Lady Gaga Ouro"
+                          value={editForm.maternalGrandmother}
+                          onChange={(e) => setEditForm({ ...editForm, maternalGrandmother: e.target.value })}
+                          className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 font-medium focus:outline-none focus:border-[#00c853]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ABA 3: BISAVÓS (3ª GERAÇÃO) */}
+              {editModalTab === 'BISAVOS' && (
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-500">
+                    Preencha os bisavós da ave. Se não souber algum, pode deixar em branco (o sistema preenche automaticamente com Indefinido).
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Bisavós Linha Paterna */}
+                    <div className="p-3 bg-sky-50/40 rounded-lg border border-sky-100 space-y-2">
+                      <span className="text-[10px] font-black uppercase text-sky-800 block">Bisavós do Lado Paterno</span>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Bisavô FFF (Pai do Avô Paterno) ♂</label>
+                        <input
+                          type="text"
+                          value={editForm.bisavos.FFF}
+                          onChange={(e) => setEditForm({ ...editForm, bisavos: { ...editForm.bisavos, FFF: e.target.value } })}
+                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-white text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Bisavó FFM (Mãe do Avô Paterno) ♀</label>
+                        <input
+                          type="text"
+                          value={editForm.bisavos.FFM}
+                          onChange={(e) => setEditForm({ ...editForm, bisavos: { ...editForm.bisavos, FFM: e.target.value } })}
+                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-white text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Bisavô FMF (Pai da Avó Paterna) ♂</label>
+                        <input
+                          type="text"
+                          value={editForm.bisavos.FMF}
+                          onChange={(e) => setEditForm({ ...editForm, bisavos: { ...editForm.bisavos, FMF: e.target.value } })}
+                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-white text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Bisavó FMM (Mãe da Avó Paterna) ♀</label>
+                        <input
+                          type="text"
+                          value={editForm.bisavos.FMM}
+                          onChange={(e) => setEditForm({ ...editForm, bisavos: { ...editForm.bisavos, FMM: e.target.value } })}
+                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-white text-slate-800"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Bisavós Linha Materna */}
+                    <div className="p-3 bg-rose-50/40 rounded-lg border border-rose-100 space-y-2">
+                      <span className="text-[10px] font-black uppercase text-rose-800 block">Bisavós do Lado Materno</span>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Bisavô MFF (Pai do Avô Materno) ♂</label>
+                        <input
+                          type="text"
+                          value={editForm.bisavos.MFF}
+                          onChange={(e) => setEditForm({ ...editForm, bisavos: { ...editForm.bisavos, MFF: e.target.value } })}
+                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-white text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Bisavó MFM (Mãe do Avô Materno) ♀</label>
+                        <input
+                          type="text"
+                          value={editForm.bisavos.MFM}
+                          onChange={(e) => setEditForm({ ...editForm, bisavos: { ...editForm.bisavos, MFM: e.target.value } })}
+                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-white text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Bisavô MMF (Pai da Avó Materna) ♂</label>
+                        <input
+                          type="text"
+                          value={editForm.bisavos.MMF}
+                          onChange={(e) => setEditForm({ ...editForm, bisavos: { ...editForm.bisavos, MMF: e.target.value } })}
+                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-white text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Bisavó MMM (Mãe da Avó Materna) ♀</label>
+                        <input
+                          type="text"
+                          value={editForm.bisavos.MMM}
+                          onChange={(e) => setEditForm({ ...editForm, bisavos: { ...editForm.bisavos, MMM: e.target.value } })}
+                          className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-white text-slate-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Bottom Actions */}
+              <div className="pt-3 border-t border-slate-200 flex flex-wrap justify-between items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     if (editingBird) {
                       setSelectedTreeBirdId(editingBird.id)
+                      setSelectedRingNumber(editingBird.ringNumber)
                       setViewMode('TREE')
                       setEditingBird(null)
                     }
                   }}
-                  className="px-3 py-2 bg-[#009fe3] hover:bg-[#008ac7] text-white text-xs font-bold rounded shadow-xs transition flex items-center space-x-1 cursor-pointer"
+                  className="px-3 py-2 bg-[#009fe3] hover:bg-[#008ac7] text-white text-xs font-bold rounded shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
                 >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Abrir na Árvore Visual</span>
+                  <BirdIcon className="w-3.5 h-3.5" />
+                  <span>Abrir na Árvore Visual Interativa</span>
                 </button>
 
                 <div className="flex items-center space-x-2">
@@ -569,16 +950,16 @@ function GenealogiaContent() {
                   >
                     Cancelar
                   </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-bold rounded shadow-xs transition flex items-center space-x-1"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  <span>Salvar Alterações</span>
-                </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-bold rounded shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Salvar Alterações</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          </form>
+            </form>
           </div>
         </div>
       )}

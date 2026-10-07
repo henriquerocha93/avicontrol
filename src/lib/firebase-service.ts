@@ -316,6 +316,61 @@ export class FirebaseSyncService {
       return false;
     }
   }
+
+  // Fetch single document from Firestore
+  public async fetchDocument<T>(collectionName: string, id: string): Promise<T | null> {
+    if (!this.isAvailable() || !dbFirestore || !id) return null;
+    try {
+      const docRef = doc(dbFirestore, collectionName, id);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        return { id: snap.id, ...snap.data() } as T;
+      }
+      return null;
+    } catch (err) {
+      console.error(`Error fetching document ${id} from ${collectionName} in Firebase:`, err);
+      return null;
+    }
+  }
+
+  // Fetch bird by ID or ringNumber across cloud Firestore
+  public async fetchBirdAnywhere(birdIdOrRing: string): Promise<Bird | null> {
+    if (!this.isAvailable() || !dbFirestore || !birdIdOrRing) return null;
+    const cleanQuery = birdIdOrRing.trim();
+    try {
+      // 1. Try directly by document ID in 'birds'
+      const docRef = doc(dbFirestore, 'birds', cleanQuery);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        return { id: snap.id, ...snap.data() } as Bird;
+      }
+
+      // 2. Try by ringNumber in 'birds'
+      const birdsRef = collection(dbFirestore, 'birds');
+      const q = query(birdsRef, where('ringNumber', '==', cleanQuery));
+      const qSnap = await getDocs(q);
+      if (!qSnap.empty) {
+        const d = qSnap.docs[0];
+        return { id: d.id, ...d.data() } as Bird;
+      }
+
+      // 3. Fallback: case insensitive ringNumber search
+      const allBirdsSnap = await getDocs(birdsRef);
+      for (const d of allBirdsSnap.docs) {
+        const data = d.data();
+        if (
+          d.id.toLowerCase() === cleanQuery.toLowerCase() ||
+          (data.ringNumber && String(data.ringNumber).trim().toLowerCase() === cleanQuery.toLowerCase())
+        ) {
+          return { id: d.id, ...data } as Bird;
+        }
+      }
+      return null;
+    } catch (err) {
+      console.error('Error fetching bird from cloud:', err);
+      return null;
+    }
+  }
 }
 
 export const firebaseSync = FirebaseSyncService.getInstance();

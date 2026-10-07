@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { db } from '@/lib/db';
+import { firebaseSync } from '@/lib/firebase-service';
 import { Bird, Tenant } from '@/types';
 import { BadgeFrontAndBack, BadgeAncestors } from '@/components/genealogy/badge-front-and-back';
 import { SpeciesCombobox } from '@/components/ui/species-combobox';
@@ -53,39 +54,39 @@ export default function CriarCrachaPage() {
 
   // 1. Dados da Ave Principal (de fácil preenchimento para o usuário leigo)
   const [birdData, setBirdData] = useState({
-    name: 'Soberano da Fibra',
-    ringNumber: 'FOB-2026-BR-05898',
-    species: 'Canário-da-terra (Sicalis flaveola)',
+    name: '',
+    ringNumber: '',
+    species: '',
     sex: 'MALE' as 'MALE' | 'FEMALE',
-    birthDate: '2025-11-20',
+    birthDate: '',
     registryNumber: tenant?.registryNumber || ''
   });
 
   // 2. Pais (1ª Geração)
   const [parents, setParents] = useState({
-    fatherName: '05898 EP (Campeão)',
-    motherName: '047 EP 03/04 (Matriz de Ouro)'
+    fatherName: '',
+    motherName: ''
   });
 
   // 3. Avós (2ª Geração)
   const [grandparents, setGrandparents] = useState({
-    paternalGrandfather: 'Carcaça Puro Sangue',
-    paternalGrandmother: 'Felícia Canto Clássico',
-    maternalGrandfather: 'Zeus CMA Fibra',
-    maternalGrandmother: 'Lady Gaga CM999'
+    paternalGrandfather: '',
+    paternalGrandmother: '',
+    maternalGrandfather: '',
+    maternalGrandmother: ''
   });
 
   // 4. Bisavós (3ª Geração)
   const [showBisavos, setShowBisavos] = useState(false);
   const [greatGrandparents, setGreatGrandparents] = useState([
-    { name: 'Soberano Campeão', male: true },
-    { name: 'Dourada Matriarca', male: false },
-    { name: 'Ventania Puro', male: true },
-    { name: 'Serena Campeã', male: false },
-    { name: 'Rei do Canto', male: true },
-    { name: 'Rainha Matrizes', male: false },
-    { name: 'Monte Negro Fibra', male: true },
-    { name: 'Estrela Guia Ouro', male: false }
+    { name: '', male: true },
+    { name: '', male: false },
+    { name: '', male: true },
+    { name: '', male: false },
+    { name: '', male: true },
+    { name: '', male: false },
+    { name: '', male: true },
+    { name: '', male: false }
   ]);
 
   // Objeto Bird sintético para passar ao BadgeFrontAndBack
@@ -93,18 +94,18 @@ export default function CriarCrachaPage() {
     return {
       id: `sim-cracha-${birdData.ringNumber || '001'}`,
       tenantId: tenant?.id || 'demo-tenant',
-      name: birdData.name || 'Nome da Ave',
-      ringNumber: birdData.ringNumber || 'ANILHA-2026',
-      species: birdData.species,
+      name: birdData.name || '',
+      ringNumber: birdData.ringNumber || '',
+      species: birdData.species || '',
       sex: birdData.sex,
       status: 'ALIVE',
-      fatherName: parents.fatherName,
-      motherName: parents.motherName,
-      paternalGrandfatherId: grandparents.paternalGrandfather,
-      paternalGrandmotherId: grandparents.paternalGrandmother,
-      maternalGrandfatherId: grandparents.maternalGrandfather,
-      maternalGrandmotherId: grandparents.maternalGrandmother,
-      birthDate: birdData.birthDate,
+      fatherName: parents.fatherName || '',
+      motherName: parents.motherName || '',
+      paternalGrandfatherId: grandparents.paternalGrandfather || '',
+      paternalGrandmotherId: grandparents.paternalGrandmother || '',
+      maternalGrandfatherId: grandparents.maternalGrandfather || '',
+      maternalGrandmotherId: grandparents.maternalGrandmother || '',
+      birthDate: birdData.birthDate || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -123,7 +124,10 @@ export default function CriarCrachaPage() {
   }, [parents, grandparents, greatGrandparents]);
 
   const handlePrint = () => {
-    // Salva ave temporária no localStorage para autenticação imediata se escanearem o QR
+    // Se o usuário preencheu a ave, garante que fique salva no plantel/lista
+    if ((birdData.name || birdData.ringNumber) && !savedBirdRecord) {
+      handleSaveToCriatorio();
+    }
     if (typeof window !== 'undefined') {
       localStorage.setItem('birdpro_simulated_bird', JSON.stringify(previewBird));
     }
@@ -132,14 +136,31 @@ export default function CriarCrachaPage() {
 
   const handleSaveToCriatorio = () => {
     try {
-      // 1. Prepara APENAS o pássaro filho no plantel com toda a linhagem vinculada
+      // Monta mapa de linhagem genealógica completa (Pais, Avós e Bisavós)
+      const ancestry: Record<string, { name: string; ringNumber: string }> = {
+        'F': { name: parents.fatherName || '', ringNumber: '' },
+        'M': { name: parents.motherName || '', ringNumber: '' },
+        'FF': { name: grandparents.paternalGrandfather || '', ringNumber: '' },
+        'FM': { name: grandparents.paternalGrandmother || '', ringNumber: '' },
+        'MF': { name: grandparents.maternalGrandfather || '', ringNumber: '' },
+        'MM': { name: grandparents.maternalGrandmother || '', ringNumber: '' },
+      };
+
+      const bisavoKeys = ['FFF', 'FFM', 'FMF', 'FMM', 'MFF', 'MFM', 'MMF', 'MMM'];
+      greatGrandparents.forEach((bg, idx) => {
+        if (bg.name) {
+          ancestry[bisavoKeys[idx]] = { name: bg.name, ringNumber: '' };
+        }
+      });
+
+      // 1. Prepara o pássaro no plantel com status oficial ACTIVE e toda a genealogia vinculada
       const childBirdData: Omit<Bird, 'id' | 'createdAt' | 'updatedAt'> = {
         tenantId: tenant?.id || 'demo-tenant',
         name: birdData.name || 'Nova Ave (Crachá)',
         ringNumber: birdData.ringNumber || `ANILHA-${Date.now().toString().slice(-4)}`,
         species: birdData.species || 'Canário-da-terra (Sicalis flaveola)',
         sex: birdData.sex || 'MALE',
-        status: 'ALIVE',
+        status: 'ACTIVE',
         origin: 'BRED_HERE',
         fatherName: parents.fatherName || undefined,
         motherName: parents.motherName || undefined,
@@ -149,15 +170,23 @@ export default function CriarCrachaPage() {
         maternalGrandmotherId: grandparents.maternalGrandmother || undefined,
         birthDate: birdData.birthDate || new Date().toISOString().split('T')[0],
         entryDate: birdData.birthDate || new Date().toISOString().split('T')[0],
+        isPublic: true,
+        ancestry
       };
 
-      // 2. Salva oficialmente no banco de dados do criatório (apenas o filho entra no plantel)
+      // 2. Salva oficialmente no banco de dados do criatório
       const savedBird = db.addBird(childBirdData);
 
-      // 3. Marca este pássaro como ativo para a Árvore Genealógica carregar de imediato
+      // 3. Sincroniza imediatamente na nuvem se disponível
+      if (firebaseSync.isAvailable()) {
+        firebaseSync.saveDocument('birds', savedBird.id, savedBird).catch(() => {});
+      }
+
+      // 4. Marca este pássaro como ativo para a Árvore Genealógica carregar de imediato
       if (typeof window !== 'undefined') {
         localStorage.setItem('birdpro_active_tree_bird_id', savedBird.id);
         localStorage.setItem('birdpro_simulated_bird', JSON.stringify(savedBird));
+        window.dispatchEvent(new Event('birdpro_db_updated'));
       }
 
       setIsSaved(true);
@@ -172,9 +201,9 @@ export default function CriarCrachaPage() {
     setBirdData({
       name: '',
       ringNumber: '',
-      species: 'Canário-da-terra (Sicalis flaveola)',
+      species: '',
       sex: 'MALE',
-      birthDate: new Date().toISOString().split('T')[0],
+      birthDate: '',
       registryNumber: tenant?.registryNumber || ''
     });
     setParents({ fatherName: '', motherName: '' });

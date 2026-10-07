@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
 import { Printer, Download, ArrowLeft, ShieldCheck, CheckCircle2, QrCode, Sparkles, Moon, Sun } from 'lucide-react'
 import { db } from '@/lib/db'
+import { firebaseSync } from '@/lib/firebase-service'
 import { Bird, Tenant } from '@/types'
 import { formatDate } from '@/lib/utils'
 import { resolvePedigreeTree } from '@/lib/pedigree'
@@ -18,80 +19,120 @@ function PublicCertificateContent() {
   const routeId = params?.id as string
   const queryCode = searchParams?.get('code') || ''
   const autoPrint = searchParams?.get('print') === '1'
-  const requestedStyle = (searchParams?.get('style') as any) || 'DARK_PRESTIGE'
+  const requestedStyle = (searchParams?.get('style') as any) || 'BADGE_PRO'
   const requestedGen = Number(searchParams?.get('gen')) || 4
   
   const [bird, setBird] = useState<Bird | null>(null)
   const [tenant, setTenant] = useState<Tenant | null>(null)
-  const [themeStyle, setThemeStyle] = useState<'DARK_PRESTIGE' | 'CLASSIC_LIGHT' | 'BADGE_PRO'>(requestedStyle)
+  const [themeStyle, setThemeStyle] = useState<'BADGE_PRO' | 'DARK_PRESTIGE' | 'CLASSIC_LIGHT'>(requestedStyle)
   const [generationsCount, setGenerationsCount] = useState<3 | 4 | 5>(requestedGen as any)
   const [isAuthenticating, setIsAuthenticating] = useState(true)
 
   useEffect(() => {
-    let targetBird: Bird | null = null
-    const allBirds = db.getBirds()
+    let isCancelled = false
 
-    if (routeId) {
-      targetBird = db.getBirdById(routeId) || null
-    }
+    const loadBirdData = async () => {
+      let targetBird: Bird | null = null
+      const decodedId = decodeURIComponent(routeId || '')
 
-    if (!targetBird && typeof window !== 'undefined') {
-      try {
-        const storedSim = localStorage.getItem('birdpro_simulated_bird')
-        if (storedSim) {
-          const parsed = JSON.parse(storedSim)
-          if (parsed && (parsed.id === routeId || routeId?.startsWith('sim-'))) {
-            targetBird = parsed
+      // 1. Local Database by ID or Ring
+      if (decodedId) {
+        targetBird = db.getBirdById(decodedId) || null
+        if (!targetBird) {
+          const allBirds = db.getBirds()
+          targetBird = allBirds.find(b => 
+            b.id === decodedId || 
+            (b.ringNumber && b.ringNumber.trim().toLowerCase() === decodedId.trim().toLowerCase())
+          ) || null
+        }
+      }
+
+      // 2. Query code
+      if (!targetBird && queryCode) {
+        const decodedQuery = decodeURIComponent(queryCode)
+        const allBirds = db.getBirds()
+        targetBird = allBirds.find(b => 
+          b.id === decodedQuery || 
+          (b.ringNumber && b.ringNumber.trim().toLowerCase() === decodedQuery.trim().toLowerCase())
+        ) || null
+      }
+
+      // 3. LocalStorage for simulated or recently viewed bird
+      if (!targetBird && typeof window !== 'undefined') {
+        try {
+          const storedSim = localStorage.getItem('birdpro_simulated_bird')
+          if (storedSim) {
+            const parsed = JSON.parse(storedSim)
+            if (parsed && (parsed.id === decodedId || parsed.ringNumber === decodedId || decodedId.startsWith('sim-'))) {
+              targetBird = parsed
+            }
+          }
+        } catch {}
+      }
+
+      // 4. Cloud Firestore (permite leitura instantânea por qualquer celular ao escanear a etiqueta física)
+      if (!targetBird && decodedId && firebaseSync.isAvailable()) {
+        try {
+          targetBird = await firebaseSync.fetchBirdAnywhere(decodedId)
+        } catch (e) {
+          console.warn('Erro ao consultar ave na nuvem:', e)
+        }
+      }
+
+      // 5. Fallback para ave existente ou demonstração
+      if (!targetBird) {
+        const allBirds = db.getBirds()
+        if (allBirds.length > 0) {
+          targetBird = allBirds[0]
+        } else {
+          targetBird = {
+            id: decodedId || `sim-${Date.now()}`,
+            tenantId: 'tenant-demo-01',
+            name: 'AVE REGISTRADA BIRDPRO',
+            ringNumber: decodedId || 'SISPASS 2026',
+            species: 'Canário-da-terra (Sicalis flaveola)',
+            sex: 'MALE',
+            birthDate: new Date().toISOString().split('T')[0],
+            status: 'ACTIVE',
+            origin: 'OTHER',
+            entryDate: new Date().toISOString().split('T')[0],
+            isPublic: true,
+            fatherName: 'INDEFINIDO',
+            fatherRing: '—',
+            motherName: 'INDEFINIDA',
+            motherRing: '—',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
           }
         }
-      } catch {}
-    }
-
-    if (!targetBird && queryCode) {
-      targetBird = allBirds.find(b => b.id === queryCode || b.ringNumber === queryCode) || null
-    }
-
-    if (!targetBird && allBirds.length > 0) {
-      targetBird = allBirds[0]
-    }
-
-    // Immediate fallback: construct simulated bird so it NEVER gets stuck on authenticating
-    if (!targetBird) {
-      targetBird = {
-        id: routeId || `sim-${Date.now()}`,
-        tenantId: 'tenant-demo-01',
-        name: 'FILHOTE (PAI X MÃE)',
-        ringNumber: 'SIMULAÇÃO 2026',
-        species: 'Canário-da-terra (Sicalis flaveola)',
-        sex: 'MALE',
-        birthDate: new Date().toISOString().split('T')[0],
-        status: 'ACTIVE',
-        origin: 'OTHER',
-        entryDate: new Date().toISOString().split('T')[0],
-        isPublic: true,
-        fatherName: 'PAI SIMULADO',
-        fatherRing: 'SISPASS 0001',
-        motherName: 'MÃE SIMULADA',
-        motherRing: 'SISPASS 0002',
-        paternalGrandfatherId: 'CARCAÇA',
-        paternalGrandmotherId: 'FELICIA',
-        maternalGrandfatherId: 'ZEUS CMA',
-        maternalGrandmotherId: 'LADY GAGA CM999',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
       }
+
+      if (isCancelled) return
+
+      setBird(targetBird)
+
+      // Carrega criatório responsável
+      let t: Tenant | null = null
+      if (targetBird?.tenantId) {
+        t = db.getTenant(targetBird.tenantId) || null
+        if (!t && firebaseSync.isAvailable()) {
+          try {
+            t = await firebaseSync.fetchTenantById(targetBird.tenantId)
+          } catch {}
+        }
+      }
+      if (!t) {
+        t = db.getTenant() || null
+      }
+      setTenant(t)
+      setIsAuthenticating(false)
     }
 
-    setBird(targetBird)
-    const t = db.getTenant(targetBird?.tenantId) || db.getTenant()
-    setTenant(t)
+    loadBirdData()
 
-    // Fast authenticating transition
-    const timer = setTimeout(() => {
-      setIsAuthenticating(false)
-    }, 250)
-
-    return () => clearTimeout(timer)
+    return () => {
+      isCancelled = true
+    }
   }, [routeId, queryCode])
 
   useEffect(() => {
@@ -182,8 +223,191 @@ function PublicCertificateContent() {
       {/* Main Certificate / Badge Display */}
       <div className="p-4 sm:p-8 flex justify-center w-full overflow-x-auto print:p-0">
         {themeStyle === 'BADGE_PRO' ? (
-          <div className="w-full flex justify-center">
-            <BadgeFrontAndBack bird={bird} tenant={tenant} />
+          <div className="w-full max-w-5xl flex flex-col items-center space-y-8">
+            
+            {/* 1. CRACHÁ OFICIAL FRENTE E VERSO DA AVE */}
+            <div className="w-full flex flex-col items-center space-y-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-400 self-start print:hidden">
+                <span className="w-2 h-2 rounded-full bg-[#00c853] animate-pulse" />
+                <span>Crachá Oficial de Gaiola (Frente e Verso)</span>
+              </div>
+              <div className="w-full flex justify-center">
+                <BadgeFrontAndBack bird={bird} tenant={tenant} mode="BOTH" />
+              </div>
+            </div>
+
+            {/* 2. DOCUMENTO INDIVIDUAL OFICIAL DA AVE */}
+            <div className="w-full bg-[#111827] border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 shadow-2xl text-slate-200">
+              
+              {/* Document Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#00c853] to-emerald-600 flex items-center justify-center text-white font-black text-lg shadow-lg">
+                    BP
+                  </div>
+                  <div>
+                    <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-wide flex items-center gap-2">
+                      Documento Individual Oficial da Ave
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      Registro Genealógico &amp; Certificado de Autenticidade Digital
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full text-xs font-bold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Registro Oficial Ativo</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Grid 1: Identificação da Ave & Criatório */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Coluna A: Dados da Ave */}
+                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="text-[11px] font-black uppercase text-emerald-400 tracking-wider">
+                      Identificação da Ave
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">ID: {bird.id}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase block font-semibold">Nome da Ave</span>
+                      <strong className="text-white text-sm uppercase block truncate">{bird.name}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase block font-semibold">Anilha Oficial</span>
+                      <strong className="text-emerald-400 font-mono text-xs block">{bird.ringNumber}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase block font-semibold">Espécie</span>
+                      <span className="text-slate-300 font-medium block">{bird.species}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase block font-semibold">Sexo</span>
+                      <span className="text-slate-300 font-semibold block">
+                        {bird.sex === 'MALE' ? '♂ Macho' : bird.sex === 'FEMALE' ? '♀ Fêmea' : 'Indefinido'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase block font-semibold">Data de Nascimento</span>
+                      <span className="text-slate-300 block">{bird.birthDate ? formatDate(bird.birthDate) : 'Não informada'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase block font-semibold">Situação no Criatório</span>
+                      <span className="text-emerald-400 font-bold block">Plantel Oficial</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Coluna B: Dados do Criatório Responsável */}
+                <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="text-[11px] font-black uppercase text-emerald-400 tracking-wider">
+                      Criatório Proprietário
+                    </span>
+                    <span className="text-[10px] text-slate-400">Autorizado SISPASS</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase block font-semibold">Nome do Criatório</span>
+                      <strong className="text-white text-sm block truncate">{tenant.name || 'Criatório Autorizado'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase block font-semibold">Registro CTF / IBAMA</span>
+                      <strong className="text-sky-400 font-mono text-xs block">{tenant.registryNumber || '—'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase block font-semibold">Criador Responsável</span>
+                      <span className="text-slate-300 block truncate">{tenant.ownerName || tenant.name || '—'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase block font-semibold">Contato / Telefone</span>
+                      <span className="text-slate-300 font-mono block">{tenant.phone || tenant.cellphone || '—'}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-[10px] text-slate-500 uppercase block font-semibold">Localidade</span>
+                      <span className="text-slate-300 block">
+                        {tenant.city && tenant.state ? `${tenant.city} - ${tenant.state}` : 'Brasil'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Grid 2: Linhagem e Filiação Completa */}
+              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 space-y-4">
+                <span className="text-[11px] font-black uppercase text-emerald-400 tracking-wider block border-b border-slate-800 pb-2">
+                  Linhagem &amp; Parentescos da Ave
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                  {/* Pai */}
+                  <div className="bg-sky-950/40 border border-sky-800/40 rounded-lg p-3 space-y-1">
+                    <span className="text-[9.5px] font-black uppercase text-sky-400 block">Pai ♂ (1ª Geração)</span>
+                    <strong className="text-white block truncate">{bird.fatherName || 'INDEFINIDO'}</strong>
+                    <span className="text-[10px] font-mono text-slate-400 block">{bird.fatherRing || '—'}</span>
+                  </div>
+
+                  {/* Mãe */}
+                  <div className="bg-rose-950/40 border border-rose-800/40 rounded-lg p-3 space-y-1">
+                    <span className="text-[9.5px] font-black uppercase text-rose-400 block">Mãe ♀ (1ª Geração)</span>
+                    <strong className="text-white block truncate">{bird.motherName || 'INDEFINIDA'}</strong>
+                    <span className="text-[10px] font-mono text-slate-400 block">{bird.motherRing || '—'}</span>
+                  </div>
+
+                  {/* Avô Paterno */}
+                  <div className="bg-slate-800/60 border border-slate-700/60 rounded-lg p-3 space-y-1">
+                    <span className="text-[9.5px] font-black uppercase text-slate-400 block">Avô Paterno ♂</span>
+                    <strong className="text-slate-200 block truncate">
+                      {bird.paternalGrandfatherId || bird.ancestry?.['FF']?.name || 'INDEFINIDO'}
+                    </strong>
+                    <span className="text-[10px] text-slate-500 block">Pai do Pai</span>
+                  </div>
+
+                  {/* Avó Materna */}
+                  <div className="bg-slate-800/60 border border-slate-700/60 rounded-lg p-3 space-y-1">
+                    <span className="text-[9.5px] font-black uppercase text-slate-400 block">Avó Materna ♀</span>
+                    <strong className="text-slate-200 block truncate">
+                      {bird.maternalGrandmotherId || bird.ancestry?.['MM']?.name || 'INDEFINIDA'}
+                    </strong>
+                    <span className="text-[10px] text-slate-500 block">Mãe da Mãe</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Document Footer: Autenticação Digital BirdPro */}
+              <div className="border-t border-slate-800 pt-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+                <div className="flex items-center gap-3">
+                  <div className="p-1 bg-white rounded border border-slate-400 shrink-0">
+                    <QRCodeSVG value={publicUrl} size={48} level="M" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-white block">Selo de Autenticidade Digital BirdPro</span>
+                    <span className="text-[10px] text-slate-500 block font-mono">
+                      CHAVE: BP-{bird.id.toUpperCase()}-VERIFIED
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-bold block">
+                      www.birdpro.com.br/ave/{bird.id}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-right text-[11px]">
+                  <p className="text-slate-300 font-semibold">Documento emitido eletronicamente pela plataforma BIRDPRO</p>
+                  <p className="text-slate-500 text-[10px]">Válido em todo território nacional conforme registro do criatório</p>
+                </div>
+              </div>
+
+            </div>
+
           </div>
         ) : (
           <div
