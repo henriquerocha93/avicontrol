@@ -1106,8 +1106,47 @@ class DataService {
   }
 
   // --- BIRDS ---
-  getBirds(tenantId = 'tenant-demo-01'): Bird[] {
-    return this.state.birds.filter(b => b.tenantId === tenantId);
+  getAllBirds(): Bird[] {
+    return [...this.state.birds];
+  }
+
+  getBirds(tenantId?: string): Bird[] {
+    let tid = tenantId;
+    if (!tid || tid === 'tenant-demo-01') {
+      if (this.isBrowser) {
+        try {
+          const raw = localStorage.getItem('birdpro_current_user');
+          if (raw) {
+            const u = JSON.parse(raw);
+            if (u?.tenantId) tid = u.tenantId;
+          }
+        } catch {}
+      }
+    }
+    if (!tid || tid === 'tenant-demo-01') {
+      const activeT = this.getTenant();
+      if (activeT?.id && activeT.id !== 'tenant-demo-01') tid = activeT.id;
+    }
+
+    if (tid && tid !== 'tenant-demo-01') {
+      const match = this.state.birds.filter(b => b.tenantId === tid);
+      if (match.length > 0) return match;
+
+      // Se não achou com esse tid exato, busca aves cadastradas sem tenantId ou com ids genéricos de demonstração
+      const generic = this.state.birds.filter(b => 
+        !b.tenantId || 
+        b.tenantId === 'demo-tenant' || 
+        b.tenantId === 'tenant-demo-01'
+      );
+      if (generic.length > 0) return generic;
+    }
+
+    // Se tid for padrão
+    const byTid = this.state.birds.filter(b => b.tenantId === (tid || 'tenant-demo-01'));
+    if (byTid.length > 0) return byTid;
+
+    // Fallback: se houver aves cadastradas no banco, retorna todas elas
+    return this.state.birds;
   }
 
   getBirdById(id: string): Bird | undefined {

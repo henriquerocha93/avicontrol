@@ -145,13 +145,23 @@ export function NovaGenealogiaEnvironment({
   // Safe load birds from database
   useEffect(() => {
     setMounted(true)
-    try {
-      const list = db.getBirds()
-      if (Array.isArray(list)) {
-        setAllBirds(list)
+    const loadBirds = () => {
+      try {
+        let list = db.getBirds()
+        if (!list || list.length === 0) {
+          list = db.getAllBirds()
+        }
+        if (Array.isArray(list)) {
+          setAllBirds(list)
+        }
+      } catch (e) {
+        console.warn('Erro ao carregar aves para genealogia:', e)
       }
-    } catch (e) {
-      console.warn('Erro ao carregar aves para genealogia:', e)
+    }
+    loadBirds()
+    if (typeof window !== 'undefined') {
+      window.addEventListener('birdpro_db_updated', loadBirds)
+      return () => window.removeEventListener('birdpro_db_updated', loadBirds)
     }
   }, [])
 

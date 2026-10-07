@@ -16,6 +16,7 @@ import {
   Tag,
   FileText
 } from 'lucide-react'
+import { useAuth } from '@/lib/auth-context'
 import { db } from '@/lib/db'
 import { firebaseSync } from '@/lib/firebase-service'
 import { Bird, Tenant } from '@/types'
@@ -24,26 +25,33 @@ import { PrintBadgeModal } from '@/components/modals/print-badge-modal'
 import { NovaGenealogiaEnvironment } from '@/components/genealogy/nova-genealogia-environment'
 
 function GenealogiaContent() {
+  const { tenant: authTenant } = useAuth()
   const searchParams = useSearchParams()
   const ringParam = searchParams.get('anilha') || undefined
   const birdIdParam = searchParams.get('birdId') || undefined
   const tabParam = searchParams.get('tab')
 
-  const [birds, setBirds] = useState<Bird[]>(() => db.getBirds())
-  const [tenant, setTenant] = useState<Tenant | null>(() => db.getTenant())
+  const [birds, setBirds] = useState<Bird[]>([])
+  const [tenant, setTenant] = useState<Tenant | null>(null)
 
   // Sincronização reativa instantânea para listar todos os pássaros e árvores criadas
   useEffect(() => {
     const sync = () => {
-      setBirds(db.getBirds())
-      setTenant(db.getTenant())
+      const activeT = authTenant || db.getTenant()
+      setTenant(activeT)
+      const tid = activeT?.id
+      let list = db.getBirds(tid)
+      if (list.length === 0) {
+        list = db.getAllBirds()
+      }
+      setBirds(list)
     }
     sync()
     if (typeof window !== 'undefined') {
       window.addEventListener('birdpro_db_updated', sync)
       return () => window.removeEventListener('birdpro_db_updated', sync)
     }
-  }, [])
+  }, [authTenant?.id])
 
   // State
   const [viewMode, setViewMode] = useState<'TREE' | 'LIST'>('TREE')
