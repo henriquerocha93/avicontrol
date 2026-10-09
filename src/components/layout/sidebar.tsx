@@ -39,13 +39,14 @@ import {
   Edit3,
   Award,
   Trophy,
-  Timer
+  Timer,
+  Smartphone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { db } from '@/lib/db';
 import { Logo } from '@/components/ui/logo';
-import { InstallAppButton } from '@/components/pwa/pwa-installer';
+import { InstallAppButton, usePWA } from '@/components/pwa/pwa-installer';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -55,6 +56,7 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout, tenant } = useAuth();
+  const { triggerInstall, isInstalled } = usePWA();
   
   const [isConfigOpen, setIsConfigOpen] = useState(true);
   const [isFinanceiroOpen, setIsFinanceiroOpen] = useState(false);
@@ -94,6 +96,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { name: 'Painel de Pássaro', href: '/dashboard/aves', icon: LayoutDashboard },
     { name: 'Painel do Financeiro', href: '/dashboard/painel-financeiro', icon: DollarSign },
     { name: 'Criar Crachá', href: '/dashboard/criar-cracha', icon: Award },
+    { name: 'Criar App', href: '#criar-app', icon: Smartphone },
     { name: 'Torneio', href: '/dashboard/torneio', icon: Trophy, badge: 'NOVO' },
     { name: 'Treinamento', href: '/dashboard/treinamento', icon: GraduationCap },
     { name: 'Calendário', href: '/dashboard/calendario', icon: Calendar },
@@ -189,6 +192,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 );
               })}
 
+              {/* Botão Criar App no Super Admin */}
+              <div className="px-3 pt-2">
+                <InstallAppButton variant="sidebar" onAfterClick={onClose} />
+              </div>
+
               <div className="pt-4 px-4 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 Sessão
               </div>
@@ -235,6 +243,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   </Link>
                 );
               })}
+
+              {/* Botão Criar App no Seller */}
+              <div className="px-3 pt-2">
+                <InstallAppButton variant="sidebar" onAfterClick={onClose} />
+              </div>
 
               <div className="pt-4 px-4 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 Sessão
@@ -312,6 +325,32 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         </div>
                       )}
                     </div>
+                  );
+                }
+
+                if (item.name === 'Criar App') {
+                  return (
+                    <button
+                      key="main-menu-criar-app"
+                      type="button"
+                      onClick={() => {
+                        triggerInstall();
+                        onClose?.();
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-bold bg-gradient-to-r from-emerald-500/25 via-emerald-500/10 to-transparent hover:from-emerald-500/35 hover:via-emerald-500/20 hover:to-transparent text-emerald-300 hover:text-white border-l-4 border-emerald-400 transition-all duration-200 cursor-pointer text-left group my-0.5"
+                      title="Criar Aplicativo no Celular ou PC"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform shadow-xs">
+                          <Smartphone className="w-3.5 h-3.5 text-emerald-300 drop-shadow-[0_0_6px_rgba(52,211,153,0.9)] animate-pulse" />
+                        </div>
+                        <span className="font-black text-white group-hover:text-emerald-200 transition-colors">Criar App</span>
+                      </div>
+                      <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-full tracking-wider bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-xs flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                        <span>{isInstalled ? 'Instalado' : 'Instalar'}</span>
+                      </span>
+                    </button>
                   );
                 }
 
@@ -526,8 +565,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 )}
               </div>
 
-              {/* Instalar Aplicativo */}
-              <InstallAppButton variant="sidebar" onAfterClick={onClose} />
+              {/* Botão de Destaque: Criar App no Celular / PC */}
+              <div className="px-3 py-1.5">
+                <InstallAppButton variant="sidebar" onAfterClick={onClose} />
+              </div>
 
               {/* Suporte do Sistema */}
               <Link

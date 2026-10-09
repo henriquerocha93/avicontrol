@@ -261,7 +261,7 @@ interface InstallAppButtonProps {
 }
 
 /**
- * Botão discreto, elegante e perfeitamente dimensionado para a interface do BirdPro
+ * Botão Criar App integrado para a interface do BirdPro (Desktop, Mobile, iOS e Android)
  */
 export function InstallAppButton({ 
   className = '',
@@ -269,10 +269,6 @@ export function InstallAppButton({
   onAfterClick
 }: InstallAppButtonProps) {
   const { isInstalled, triggerInstall } = usePWA();
-
-  if (isInstalled) {
-    return null;
-  }
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -282,37 +278,41 @@ export function InstallAppButton({
     }
   };
 
-  // Botão minimalista para a barra superior (Topbar)
+  // Botão com destaque para a barra superior (Topbar)
   if (variant === 'topbar') {
     return (
       <button
         onClick={handleClick}
         type="button"
-        className={`h-8 px-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-center gap-1.5 transition cursor-pointer border border-slate-200 dark:border-slate-700/80 ${className}`}
-        title="Instalar Aplicativo (iOS, Android, Chrome, Edge)"
+        className={`h-8 px-3 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-lg flex items-center gap-1.5 transition cursor-pointer shadow-sm shadow-emerald-950/40 border border-emerald-400/50 active:scale-95 ${className}`}
+        title="Criar App no Celular ou PC (iOS, Android, Chrome, Edge)"
       >
-        <Smartphone className="w-3.5 h-3.5 text-[#00c853]" />
-        <span className="hidden sm:inline">Instalar App</span>
+        <Smartphone className="w-3.5 h-3.5 text-amber-300 animate-pulse shrink-0" />
+        <span className="hidden sm:inline font-black tracking-wide">Criar App</span>
       </button>
     );
   }
 
-  // Botão elegante perfeitamente integrado no Menu Lateral (Sidebar)
-  // Segue exatamente a altura, fontes e cores dos outros itens (Suporte do Sistema, Sair)
+  // Card com destaque vibrante integrado no Menu Lateral (Sidebar)
   if (variant === 'sidebar') {
     return (
       <button
         onClick={handleClick}
         type="button"
-        className={`w-full flex items-center justify-between px-4 py-2.5 text-xs font-medium text-[#8b949e] hover:bg-[#2d333b] hover:text-white transition-colors cursor-pointer group text-left ${className}`}
-        title="Instalar Aplicativo no Celular ou PC"
+        className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-bold transition-all duration-200 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-950/60 border border-emerald-300/40 cursor-pointer group text-left active:scale-[0.99] ${className}`}
+        title="Criar Aplicativo no Celular ou PC"
       >
-        <div className="flex items-center gap-3">
-          <Smartphone className="w-4 h-4 text-[#8b949e] group-hover:text-[#00c853] transition-colors shrink-0" />
-          <span>Instalar Aplicativo</span>
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-black/25 text-white flex items-center justify-center shrink-0 group-hover:scale-110 transition shadow-inner">
+            <Smartphone className="w-4 h-4 text-amber-300 animate-pulse" />
+          </div>
+          <div className="text-left">
+            <p className="leading-tight font-black text-white text-xs">Criar App</p>
+            <p className="text-[10px] text-emerald-100 font-medium">Instalar no Celular &amp; PC</p>
+          </div>
         </div>
-        <span className="text-[10px] font-bold uppercase px-1.5 py-0.2 rounded bg-[#00c853]/15 text-[#00c853] border border-[#00c853]/30">
-          App
+        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 shadow-xs">
+          {isInstalled ? 'Instalado' : 'Instalar'}
         </span>
       </button>
     );
@@ -323,10 +323,10 @@ export function InstallAppButton({
     <button
       onClick={handleClick}
       type="button"
-      className={`px-3 py-1.5 bg-[#00c853] hover:bg-[#00b84a] text-slate-950 font-bold text-xs rounded-lg shadow-xs flex items-center gap-1.5 transition cursor-pointer ${className}`}
+      className={`px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition cursor-pointer border border-emerald-400/30 ${className}`}
     >
-      <Smartphone className="w-3.5 h-3.5" />
-      <span>Instalar App</span>
+      <Smartphone className="w-3.5 h-3.5 text-amber-300" />
+      <span>Criar App</span>
     </button>
   );
 }
