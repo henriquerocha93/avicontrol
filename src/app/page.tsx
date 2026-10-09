@@ -458,8 +458,8 @@ export default function LandingPage() {
           </h1>
 
           {/* Readable Subtitle */}
-          <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto leading-relaxed font-normal">
-            Controle integrado de anilhas FOB &amp; SISPASS, genealogia de 5 gerações com cálculo de consanguinidade, ovoscopia, reprodução e emissão de pedigree A4 com QR Code.
+          <p className="text-sm sm:text-base text-slate-300 max-w-3xl mx-auto leading-relaxed font-normal">
+            Controle integrado de anilhas FOB &amp; SISPASS, genealogia de 5 gerações com cálculo de consanguinidade, ovoscopia, reprodução, emissão de pedigree A4 e crachá de gaiola com todos os dados do criatório e árvore genealógica, pronto para imprimir e colocar na gaiola com QR Code de autenticação da ave.
           </p>
 
           {/* Hero CTAs */}
