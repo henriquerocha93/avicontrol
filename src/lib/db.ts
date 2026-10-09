@@ -4,7 +4,7 @@ import {
   NotificationItem, Tenant, User, SupportTicket, BirdDocument, BirdPhoto, AuditLog,
   SellerAffiliate, AffiliateCommission, AffiliatePayout, GlobalSystemConfig,
   CalendarEvent, NoteItem, AiLearnedInsight, UserReferralProgram, ReferredFriend, PlanType,
-  CouponValidationResult
+  CouponValidationResult, TournamentSession
 } from '@/types';
 import { 
   INITIAL_TENANT, INITIAL_ALL_TENANTS, INITIAL_USERS, INITIAL_BIRDS, INITIAL_CAGES, 
@@ -45,6 +45,7 @@ interface DatabaseState {
   events: CalendarEvent[];
   notes: NoteItem[];
   insights: AiLearnedInsight[];
+  tournaments: TournamentSession[];
 }
 
 const STORAGE_KEY = 'birdpro_production_db_v2';
@@ -58,7 +59,7 @@ class DataService {
   private static SYNC_COLLECTIONS = [
     'birds', 'cages', 'rings', 'pairs', 'clutches', 'eggs', 'medications', 'treatments',
     'diseases', 'sexings', 'genotyping', 'timeline', 'notifications', 'documents',
-    'photos', 'events', 'notes'
+    'photos', 'events', 'notes', 'tournaments'
   ];
   private syncTenantId: string | null = null;
   private syncReady = false;
@@ -131,7 +132,8 @@ class DataService {
       events: [...INITIAL_CALENDAR_EVENTS],
       notes: [...INITIAL_NOTES],
       insights: [],
-      auditLogs: []
+      auditLogs: [],
+      tournaments: []
     };
   }
 
@@ -1621,9 +1623,8 @@ class DataService {
   }
 
   getNotifications(tenantId = 'tenant-demo-01'): NotificationItem[] {
-    if (!this.state.notifications || this.state.notifications.length === 0) {
-      this.state.notifications = [...INITIAL_NOTIFICATIONS];
-      this.saveToStorage();
+    if (!this.state.notifications) {
+      this.state.notifications = [];
     }
     return this.state.notifications.filter(n => n.tenantId === tenantId);
   }
@@ -2603,9 +2604,8 @@ class DataService {
 
   // --- CALENDAR & APPOINTMENTS ---
   getEvents(tenantId = 'tenant-demo-01'): CalendarEvent[] {
-    if (!this.state.events || this.state.events.length === 0) {
-      this.state.events = [...INITIAL_CALENDAR_EVENTS];
-      this.saveToStorage();
+    if (!this.state.events) {
+      this.state.events = [];
     }
     return this.state.events.filter(e => e.tenantId === tenantId);
   }
@@ -2673,9 +2673,8 @@ class DataService {
 
   // --- ANOTAÇÕES & BLOCO DE NOTAS ---
   getNotes(tenantId = 'tenant-demo-01'): NoteItem[] {
-    if (!this.state.notes || this.state.notes.length === 0) {
-      this.state.notes = [...INITIAL_NOTES];
-      this.saveToStorage();
+    if (!this.state.notes) {
+      this.state.notes = [];
     }
     return this.state.notes
       .filter(n => n.tenantId === tenantId)
@@ -2788,6 +2787,60 @@ class DataService {
     this.state.insights.push(newInsight);
     this.saveToStorage();
     return newInsight;
+  }
+
+  // --- TORNEIO & MARCADOR DE CANTO ---
+  getTournaments(tenantId = 'tenant-demo-01'): TournamentSession[] {
+    if (!this.state.tournaments) {
+      this.state.tournaments = [];
+    }
+    return this.state.tournaments
+      .filter(t => t.tenantId === tenantId)
+      .sort((a, b) => new Date(b.date + ' ' + (b.time || '00:00')).getTime() - new Date(a.date + ' ' + (a.time || '00:00')).getTime());
+  }
+
+  getTournamentsByBirdId(birdId: string, tenantId = 'tenant-demo-01'): TournamentSession[] {
+    return this.getTournaments(tenantId).filter(t => t.birdId === birdId);
+  }
+
+  addTournamentSession(session: Omit<TournamentSession, 'id' | 'createdAt'>): TournamentSession {
+    if (!this.state.tournaments) this.state.tournaments = [];
+    const newSession: TournamentSession = {
+      ...session,
+      id: `tourn-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      createdAt: new Date().toISOString()
+    };
+    this.state.tournaments.unshift(newSession);
+    this.logAction(session.tenantId, 'ADD_TOURNAMENT', 'TORNEIO', `Sessão de canto registrada: ${session.birdName} (${session.totalSongs} cantos)`);
+    this.saveToStorage();
+    return newSession;
+  }
+
+  updateTournamentSession(id: string, updates: Partial<TournamentSession>): TournamentSession | null {
+    if (!this.state.tournaments) return null;
+    const idx = this.state.tournaments.findIndex(t => t.id === id);
+    if (idx >= 0) {
+      this.state.tournaments[idx] = {
+        ...this.state.tournaments[idx],
+        ...updates,
+        updatedAt: new Date().toISOString()
+      };
+      this.saveToStorage();
+      return this.state.tournaments[idx];
+    }
+    return null;
+  }
+
+  deleteTournamentSession(id: string): boolean {
+    if (!this.state.tournaments) return false;
+    const item = this.state.tournaments.find(t => t.id === id);
+    if (item) {
+      this.state.tournaments = this.state.tournaments.filter(t => t.id !== id);
+      this.logAction(item.tenantId, 'DELETE_TOURNAMENT', 'TORNEIO', `Sessão de canto excluída: ${item.birdName}`);
+      this.saveToStorage();
+      return true;
+    }
+    return false;
   }
 
   resetToDemoData(): void {

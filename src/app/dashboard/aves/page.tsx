@@ -32,6 +32,8 @@ import { QRModal } from '@/components/modals/qr-modal';
 import { PrintBadgeModal } from '@/components/modals/print-badge-modal';
 import { PrintPedigreeModal } from '@/components/modals/print-pedigree-modal';
 import { SpeciesCombobox } from '@/components/ui/species-combobox';
+import { DateManualInput } from '@/components/ui/date-manual-input';
+import { inheritFullAncestryFromCouple, resolvePedigreeTree } from '@/lib/pedigree';
 import { formatDate, calculateAge, exportToExcel, exportToCsv } from '@/lib/utils';
 
 function BirdsContent() {
@@ -55,6 +57,11 @@ function BirdsContent() {
   const [badgeModalBird, setBadgeModalBird] = useState<BirdType | null>(null);
   const [pedigreeModalBird, setPedigreeModalBird] = useState<BirdType | null>(null);
 
+  // Couple / Ancestry inheritance state
+  const [selectedFatherId, setSelectedFatherId] = useState('');
+  const [selectedMotherId, setSelectedMotherId] = useState('');
+  const [ancestryMessage, setAncestryMessage] = useState<string | null>(null);
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -70,8 +77,10 @@ function BirdsContent() {
     features: '',
     origin: 'BRED_HERE' as BirdType['origin'],
     breederOrigin: '',
+    fatherId: '',
     fatherName: '',
     fatherRing: '',
+    motherId: '',
     motherName: '',
     motherRing: '',
     paternalGrandfatherId: '',
@@ -83,7 +92,8 @@ function BirdsContent() {
     notes: '',
     entryDate: new Date().toISOString().split('T')[0],
     isPublic: true,
-    photoUrl: ''
+    photoUrl: '',
+    ancestry: {} as Record<string, { id?: string; name: string; ringNumber: string }>
   });
 
   const loadBirds = () => {
@@ -118,8 +128,79 @@ function BirdsContent() {
   // Species unique list
   const uniqueSpecies = Array.from(new Set(birds.map(b => b.species.split('(')[0].trim())));
 
+  const handleSelectFather = (fId: string) => {
+    setSelectedFatherId(fId);
+    if (!fId) {
+      setFormData(prev => ({
+        ...prev,
+        fatherId: '',
+        fatherName: '',
+        fatherRing: ''
+      }));
+      return;
+    }
+    const father = birds.find(b => b.id === fId);
+    if (!father) return;
+
+    const currentMother = selectedMotherId ? birds.find(b => b.id === selectedMotherId) : null;
+    const fullAncestry = inheritFullAncestryFromCouple(father, currentMother, birds);
+
+    setFormData(prev => ({
+      ...prev,
+      fatherId: father.id,
+      fatherName: father.name,
+      fatherRing: father.ringNumber || '',
+      paternalGrandfatherId: father.fatherName || father.ancestry?.['F']?.name || prev.paternalGrandfatherId,
+      paternalGrandmotherId: father.motherName || father.ancestry?.['M']?.name || prev.paternalGrandmotherId,
+      ancestry: {
+        ...(prev.ancestry || {}),
+        ...fullAncestry
+      }
+    }));
+
+    setAncestryMessage(`✓ Linhagem ancestral completa de ${father.name} herdada com sucesso (todas as gerações)!`);
+    setTimeout(() => setAncestryMessage(null), 5000);
+  };
+
+  const handleSelectMother = (mId: string) => {
+    setSelectedMotherId(mId);
+    if (!mId) {
+      setFormData(prev => ({
+        ...prev,
+        motherId: '',
+        motherName: '',
+        motherRing: ''
+      }));
+      return;
+    }
+    const mother = birds.find(b => b.id === mId);
+    if (!mother) return;
+
+    const currentFather = selectedFatherId ? birds.find(b => b.id === selectedFatherId) : null;
+    const fullAncestry = inheritFullAncestryFromCouple(currentFather, mother, birds);
+
+    setFormData(prev => ({
+      ...prev,
+      motherId: mother.id,
+      motherName: mother.name,
+      motherRing: mother.ringNumber || '',
+      maternalGrandfatherId: mother.fatherName || mother.ancestry?.['F']?.name || prev.maternalGrandfatherId,
+      maternalGrandmotherId: mother.motherName || mother.ancestry?.['M']?.name || prev.maternalGrandmotherId,
+      ancestry: {
+        ...(prev.ancestry || {}),
+        ...fullAncestry
+      }
+    }));
+
+    setAncestryMessage(`✓ Linhagem ancestral completa de ${mother.name} herdada com sucesso (todas as gerações)!`);
+    setTimeout(() => setAncestryMessage(null), 5000);
+  };
+
   const handleOpenCreate = () => {
     setEditingBird(null);
+    setSelectedFatherId('');
+    setSelectedMotherId('');
+    setAncestryMessage(null);
     setFormData({
       name: '',
       nickname: '',
@@ -134,8 +215,10 @@ function BirdsContent() {
       features: '',
       origin: 'BRED_HERE',
       breederOrigin: '',
+      fatherId: '',
       fatherName: '',
       fatherRing: '',
+      motherId: '',
       motherName: '',
       motherRing: '',
       paternalGrandfatherId: '',
@@ -147,13 +230,17 @@ function BirdsContent() {
       notes: '',
       entryDate: new Date().toISOString().split('T')[0],
       isPublic: true,
-      photoUrl: ''
+      photoUrl: '',
+      ancestry: {}
     });
     setIsFormModalOpen(true);
   };
 
   const handleOpenEdit = (bird: BirdType) => {
     setEditingBird(bird);
+    setSelectedFatherId(bird.fatherId || '');
+    setSelectedMotherId(bird.motherId || '');
+    setAncestryMessage(null);
     setFormData({
       name: bird.name,
       nickname: bird.nickname || '',
@@ -168,8 +255,10 @@ function BirdsContent() {
       features: bird.features || '',
       origin: bird.origin || 'BRED_HERE',
       breederOrigin: bird.breederOrigin || '',
+      fatherId: bird.fatherId || '',
       fatherName: bird.fatherName || '',
       fatherRing: bird.fatherRing || '',
+      motherId: bird.motherId || '',
       motherName: bird.motherName || '',
       motherRing: bird.motherRing || '',
       paternalGrandfatherId: bird.paternalGrandfatherId || '',
@@ -181,7 +270,8 @@ function BirdsContent() {
       notes: bird.notes || '',
       entryDate: bird.entryDate,
       isPublic: bird.isPublic,
-      photoUrl: bird.photoUrl || ''
+      photoUrl: bird.photoUrl || '',
+      ancestry: bird.ancestry || {}
     });
     setIsFormModalOpen(true);
   };
@@ -193,12 +283,22 @@ function BirdsContent() {
       return;
     }
 
+    const currentFather = selectedFatherId ? birds.find(b => b.id === selectedFatherId) : (formData.fatherRing ? birds.find(b => b.ringNumber === formData.fatherRing) : (formData.fatherName ? birds.find(b => b.name === formData.fatherName) : null));
+    const currentMother = selectedMotherId ? birds.find(b => b.id === selectedMotherId) : (formData.motherRing ? birds.find(b => b.ringNumber === formData.motherRing) : (formData.motherName ? birds.find(b => b.name === formData.motherName) : null));
+    
+    let finalAncestry = { ...(formData.ancestry || {}) };
+    if ((currentFather || currentMother) && Object.keys(finalAncestry).length <= 2) {
+      const inherited = inheritFullAncestryFromCouple(currentFather, currentMother, birds);
+      finalAncestry = { ...finalAncestry, ...inherited };
+    }
+
     if (editingBird) {
-      db.updateBird(editingBird.id, formData);
+      db.updateBird(editingBird.id, { ...formData, ancestry: finalAncestry });
     } else {
       db.addBird({
         tenantId: tenant?.id || 'tenant-demo-01',
-        ...formData
+        ...formData,
+        ancestry: finalAncestry
       });
     }
 
@@ -573,12 +673,14 @@ function BirdsContent() {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Data de Nascimento</label>
-                <input
-                  type="date"
+                <label className="block font-bold text-slate-700 mb-1">
+                  Data de Nascimento (Manual DD/MM/AAAA)
+                </label>
+                <DateManualInput
                   value={formData.birthDate}
-                  onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  onChange={(val) => setFormData({ ...formData, birthDate: val })}
+                  placeholder="DD/MM/AAAA"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 font-medium"
                 />
               </div>
             </div>
@@ -648,44 +750,103 @@ function BirdsContent() {
 
           {/* Section 3: Genealogia / Pais */}
           <div className="space-y-3">
-            <h4 className="font-bold text-slate-900 uppercase text-[11px] tracking-wider border-b border-slate-100 pb-1">
-              3. Ascendência (Genealogia Direta)
-            </h4>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-1">
+              <h4 className="font-bold text-slate-900 uppercase text-[11px] tracking-wider">
+                3. Ascendência (Genealogia Completa)
+              </h4>
+              <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                🌱 Puxa toda a árvore cadastrada (Pais, Avós, Bisavós e Trisavós)
+              </span>
+            </div>
+
+            {ancestryMessage && (
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{ancestryMessage}</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2">
                 <span className="font-bold text-blue-900 block text-[11px]">♂ Informações do Pai</span>
-                <input
-                  type="text"
-                  placeholder="Nome do Pai (Ex: Trovão Negro)"
-                  value={formData.fatherName}
-                  onChange={(e) => setFormData({ ...formData, fatherName: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg focus:outline-none"
-                />
-                <input
-                  type="text"
-                  placeholder="Anilha do Pai (Ex: FOB-2022-BR-0112)"
-                  value={formData.fatherRing}
-                  onChange={(e) => setFormData({ ...formData, fatherRing: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg font-mono focus:outline-none"
-                />
+                <div>
+                  <label className="block text-[10px] font-bold text-blue-700 mb-1">
+                    Puxar Pai do Plantel com Árvore Completa
+                  </label>
+                  <select
+                    value={selectedFatherId}
+                    onChange={(e) => handleSelectFather(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-semibold focus:outline-none"
+                  >
+                    <option value="">-- Selecionar Pai cadastrado --</option>
+                    {birds.filter(b => b.sex !== 'FEMALE' && (!editingBird || b.id !== editingBird.id)).map(b => (
+                      <option key={b.id} value={b.id}>
+                        ♂ {b.name} {b.ringNumber ? `(${b.ringNumber})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-0.5">Nome do Pai</label>
+                  <input
+                    type="text"
+                    placeholder="Nome do Pai (Ex: Trovão Negro)"
+                    value={formData.fatherName}
+                    onChange={(e) => setFormData({ ...formData, fatherName: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg focus:outline-none text-xs font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-0.5">Anilha do Pai</label>
+                  <input
+                    type="text"
+                    placeholder="Anilha do Pai (Ex: FOB-2022-BR-0112)"
+                    value={formData.fatherRing}
+                    onChange={(e) => setFormData({ ...formData, fatherRing: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg font-mono text-xs focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div className="p-3 bg-rose-50/50 rounded-xl border border-rose-100 space-y-2">
                 <span className="font-bold text-rose-900 block text-[11px]">♀ Informações da Mãe</span>
-                <input
-                  type="text"
-                  placeholder="Nome da Mãe (Ex: Rainha do Ouro)"
-                  value={formData.motherName}
-                  onChange={(e) => setFormData({ ...formData, motherName: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg focus:outline-none"
-                />
-                <input
-                  type="text"
-                  placeholder="Anilha da Mãe (Ex: FOB-2023-BR-0445)"
-                  value={formData.motherRing}
-                  onChange={(e) => setFormData({ ...formData, motherRing: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg font-mono focus:outline-none"
-                />
+                <div>
+                  <label className="block text-[10px] font-bold text-rose-700 mb-1">
+                    Puxar Mãe do Plantel com Árvore Completa
+                  </label>
+                  <select
+                    value={selectedMotherId}
+                    onChange={(e) => handleSelectMother(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-rose-200 rounded-lg text-xs font-semibold focus:outline-none"
+                  >
+                    <option value="">-- Selecionar Mãe cadastrada --</option>
+                    {birds.filter(b => b.sex !== 'MALE' && (!editingBird || b.id !== editingBird.id)).map(b => (
+                      <option key={b.id} value={b.id}>
+                        ♀ {b.name} {b.ringNumber ? `(${b.ringNumber})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-0.5">Nome da Mãe</label>
+                  <input
+                    type="text"
+                    placeholder="Nome da Mãe (Ex: Rainha do Ouro)"
+                    value={formData.motherName}
+                    onChange={(e) => setFormData({ ...formData, motherName: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg focus:outline-none text-xs font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-0.5">Anilha da Mãe</label>
+                  <input
+                    type="text"
+                    placeholder="Anilha da Mãe (Ex: FOB-2023-BR-0445)"
+                    value={formData.motherRing}
+                    onChange={(e) => setFormData({ ...formData, motherRing: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg font-mono text-xs focus:outline-none"
+                  />
+                </div>
               </div>
             </div>
           </div>

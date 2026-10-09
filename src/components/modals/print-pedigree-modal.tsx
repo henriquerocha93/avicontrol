@@ -27,7 +27,14 @@ export function PrintPedigreeModal({
   const [activeBird, setActiveBird] = useState<Bird>(initialBird)
   
   // Customization controls matching user's screenshot
-  const [generationsCount, setGenerationsCount] = useState<3 | 4 | 5>(4)
+  const [generationsCount, setGenerationsCount] = useState<number>(() => {
+    try {
+      const p = resolvePedigreeTree(initialBird, allBirds)
+      return p.maxGenerations || 4
+    } catch {
+      return 4
+    }
+  })
   const [themeStyle, setThemeStyle] = useState<'DARK_PRESTIGE' | 'CLASSIC_LIGHT' | 'BADGE_PRO'>('DARK_PRESTIGE')
   const [showCertificateHeader, setShowCertificateHeader] = useState<boolean>(true)
   const [showQrCode, setShowQrCode] = useState<boolean>(true)
@@ -38,6 +45,10 @@ export function PrintPedigreeModal({
     if (initialBird) {
       setActiveBird(initialBird)
       setSelectedBirdId(initialBird.id)
+      const p = resolvePedigreeTree(initialBird, allBirds)
+      if (p.maxGenerations) {
+        setGenerationsCount(p.maxGenerations)
+      }
     }
   }, [initialBird])
 
@@ -46,6 +57,10 @@ export function PrintPedigreeModal({
     const found = allBirds.find(b => b.id === newId)
     if (found) {
       setActiveBird(found)
+      const p = resolvePedigreeTree(found, allBirds)
+      if (p.maxGenerations) {
+        setGenerationsCount(p.maxGenerations)
+      }
     }
   }
 
@@ -80,7 +95,7 @@ export function PrintPedigreeModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white">
       
       {/* Modal Container */}
-      <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-[1260px] border border-slate-700 overflow-hidden flex flex-col my-auto animate-scale-in print:border-0 print:shadow-none print:bg-white">
+      <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-[1360px] border border-slate-700 overflow-hidden flex flex-col my-auto animate-scale-in print:border-0 print:shadow-none print:bg-white">
         
         {/* ========================================================================= */}
         {/* TOP CONTROLS BAR (Matching User Screenshot: Selecione Ave | Gerações | Checkboxes) */}
@@ -111,12 +126,13 @@ export function PrintPedigreeModal({
               <span className="text-[10px] font-bold text-slate-400 block mb-0.5">Gerações para Exibição</span>
               <select
                 value={generationsCount}
-                onChange={(e) => setGenerationsCount(Number(e.target.value) as any)}
+                onChange={(e) => setGenerationsCount(Number(e.target.value))}
                 className="bg-slate-800 border border-slate-600 rounded-md px-3 py-1.5 text-xs text-white font-bold focus:outline-none focus:border-emerald-400 cursor-pointer"
               >
                 <option value={3}>3 Gerações (Até Avós)</option>
                 <option value={4}>4 Gerações (Até Bisavós)</option>
                 <option value={5}>5 Gerações (Até Trisavós)</option>
+                <option value={6}>6 Gerações (Até Tataravós)</option>
               </select>
             </div>
 
@@ -221,7 +237,9 @@ export function PrintPedigreeModal({
           ) : (
             <div
               id="pedigree-certificate"
-              className={`w-[1140px] min-w-[1140px] h-[720px] relative shadow-2xl overflow-hidden font-sans select-none flex flex-col justify-between print:m-0 print:border-0 print:shadow-none ${
+              className={`${
+                generationsCount >= 6 ? 'w-[1360px] min-w-[1360px]' : generationsCount >= 5 ? 'w-[1240px] min-w-[1240px]' : 'w-[1140px] min-w-[1140px]'
+              } h-[740px] relative shadow-2xl overflow-hidden font-sans select-none flex flex-col justify-between print:m-0 print:border-0 print:shadow-none ${
                 themeStyle === 'DARK_PRESTIGE'
                   ? 'bg-[#111827] text-white border border-slate-700'
                   : 'bg-white text-slate-900 border border-slate-300'
@@ -443,7 +461,7 @@ export function PrintPedigreeModal({
 
                 {/* 5. GERAÇÃO 4: TRISAVÓS (16 Cards) */}
                 {generationsCount >= 5 && (
-                  <div className="w-[150px] shrink-0 h-[490px] flex flex-col justify-around">
+                  <div className="w-[145px] shrink-0 h-[490px] flex flex-col justify-around">
                     {pedigree.greatGreatGrandparents.map((tri, idx) => (
                       <div
                         key={idx}
@@ -452,8 +470,39 @@ export function PrintPedigreeModal({
                             ? 'bg-sky-950/40 text-sky-200 border border-sky-500/20 text-[7.5px]'
                             : 'bg-rose-950/40 text-rose-200 border border-rose-500/20 text-[7.5px]'
                         }`}
+                        title={`${tri.role}: ${tri.name}`}
                       >
                         {tri.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* CONECTOR 5 -> 6: Trisavós para Tataravós (se 6 gerações) */}
+                {generationsCount >= 6 && (
+                  <div className="w-[10px] h-[500px] relative shrink-0">
+                    <svg className="w-full h-full" viewBox="0 0 10 500" fill="none" preserveAspectRatio="none">
+                      {Array.from({ length: 16 }).map((_, i) => (
+                        <path key={i} d={`M 0,${15 + i * 31} H 5 V ${8 + i * 31} H 10 M 5,${15 + i * 31} V ${22 + i * 31} H 10`} stroke="#64748b" strokeWidth="0.8" />
+                      ))}
+                    </svg>
+                  </div>
+                )}
+
+                {/* 6. GERAÇÃO 5: TATARAVÓS (32 Cards) */}
+                {generationsCount >= 6 && (
+                  <div className="w-[130px] shrink-0 h-[500px] flex flex-col justify-around">
+                    {pedigree.tataravos.map((tat, idx) => (
+                      <div
+                        key={idx}
+                        className={`py-0 px-0.5 rounded text-center truncate ${
+                          tat.sex === 'MALE'
+                            ? 'bg-sky-950/50 text-sky-300 border border-sky-500/20 text-[6.5px]'
+                            : 'bg-rose-950/50 text-rose-300 border border-rose-500/20 text-[6.5px]'
+                        }`}
+                        title={`${tat.role}: ${tat.name}`}
+                      >
+                        {tat.name}
                       </div>
                     ))}
                   </div>

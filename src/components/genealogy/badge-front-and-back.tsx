@@ -14,6 +14,7 @@ export interface BadgeAncestors {
   maternalGrandfather?: string;
   maternalGrandmother?: string;
   greatGrandparents?: { name: string; male: boolean }[];
+  greatGreatGrandparents?: { name: string; male: boolean }[];
 }
 
 interface BadgeFrontAndBackProps {
@@ -172,36 +173,32 @@ export function BadgeFrontAndBack({
     return name.trim().toUpperCase()
   }
 
-  const paiNome = formatAncestorName(customAncestors?.fatherName || bird.fatherName, true)
-  const maeNome = formatAncestorName(customAncestors?.motherName || bird.motherName, false)
+  const pedigree = resolvePedigreeTree(bird)
+
+  const paiNome = formatAncestorName(customAncestors?.fatherName || (pedigree.father.isRegistered ? pedigree.father.name : bird.fatherName), true)
+  const maeNome = formatAncestorName(customAncestors?.motherName || (pedigree.mother.isRegistered ? pedigree.mother.name : bird.motherName), false)
 
   const avos = [
-    { name: formatAncestorName(customAncestors?.paternalGrandfather || bird.paternalGrandfatherId || bird.ancestry?.['FF']?.name, true), male: true },
-    { name: formatAncestorName(customAncestors?.paternalGrandmother || bird.paternalGrandmotherId || bird.ancestry?.['FM']?.name, false), male: false },
-    { name: formatAncestorName(customAncestors?.maternalGrandfather || bird.maternalGrandfatherId || bird.ancestry?.['MF']?.name, true), male: true },
-    { name: formatAncestorName(customAncestors?.maternalGrandmother || bird.maternalGrandmotherId || bird.ancestry?.['MM']?.name, false), male: false }
+    { name: formatAncestorName(customAncestors?.paternalGrandfather || (pedigree.grandparents[0]?.isRegistered ? pedigree.grandparents[0].name : bird.paternalGrandfatherId), true), male: true },
+    { name: formatAncestorName(customAncestors?.paternalGrandmother || (pedigree.grandparents[1]?.isRegistered ? pedigree.grandparents[1].name : bird.paternalGrandmotherId), false), male: false },
+    { name: formatAncestorName(customAncestors?.maternalGrandfather || (pedigree.grandparents[2]?.isRegistered ? pedigree.grandparents[2].name : bird.maternalGrandfatherId), true), male: true },
+    { name: formatAncestorName(customAncestors?.maternalGrandmother || (pedigree.grandparents[3]?.isRegistered ? pedigree.grandparents[3].name : bird.maternalGrandmotherId), false), male: false }
   ]
 
-  const bisavoKeys = ['FFF', 'FFM', 'FMF', 'FMM', 'MFF', 'MFM', 'MMF', 'MMM']
-  const bisavos = bisavoKeys.map((key, idx) => {
-    const isMale = key.endsWith('F')
+  const bisavos = pedigree.greatGrandparents.map((bis, idx) => {
+    const isMale = bis.sex === 'MALE'
     const custom = customAncestors?.greatGrandparents?.[idx]?.name
-    const realName = custom || bird.ancestry?.[key]?.name
+    const realName = custom || (bis.isRegistered ? bis.name : undefined)
     return {
       name: formatAncestorName(realName, isMale),
       male: isMale
     }
   })
 
-  const trisavoKeys = [
-    'FFFF', 'FFFM', 'FFMF', 'FFMM',
-    'FMFF', 'FMFM', 'FMMF', 'FMMM',
-    'MFFF', 'MFFM', 'MFMF', 'MFMM',
-    'MMFF', 'MMFM', 'MMMF', 'MMMM'
-  ]
-  const trisavos = trisavoKeys.map((key) => {
-    const isMale = key.endsWith('F')
-    const realName = bird.ancestry?.[key]?.name
+  const trisavos = pedigree.greatGreatGrandparents.map((tri, idx) => {
+    const isMale = tri.sex === 'MALE'
+    const custom = customAncestors?.greatGreatGrandparents?.[idx]?.name
+    const realName = custom || (tri.isRegistered ? tri.name : undefined)
     return {
       name: formatAncestorName(realName, isMale),
       male: isMale

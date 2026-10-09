@@ -24,6 +24,8 @@ import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
+import { inheritFullAncestryFromCouple } from '@/lib/pedigree';
+import { DateManualInput } from '@/components/ui/date-manual-input';
 
 export default function BreedingPage() {
   const { tenant } = useAuth();
@@ -172,8 +174,11 @@ export default function BreedingPage() {
     if (!selectedEggToHatch) return;
 
     const pair = pairs.find(p => p.id === selectedEggToHatch.pairId);
+    const maleBird = birds.find(b => b.id === pair?.maleId);
+    const femaleBird = birds.find(b => b.id === pair?.femaleId);
+    const inheritedAncestry = inheritFullAncestryFromCouple(maleBird, femaleBird, birds);
 
-    // 1. Create offspring bird
+    // 1. Create offspring bird with complete 5-generation ancestry inherited
     const newBird = db.addBird({
       tenantId: tenant?.id || 'tenant-demo-01',
       name: hatchForm.name || `Filhote Canto Nobre ${Math.floor(10 + Math.random() * 90)}`,
@@ -181,10 +186,17 @@ export default function BreedingPage() {
       species: pair ? pair.maleSpecies : 'Canário da Terra (Sicalis flaveola)',
       sex: hatchForm.sex,
       birthDate: new Date().toISOString().split('T')[0],
-      fatherName: pair?.maleName,
-      fatherRing: pair?.maleRing,
-      motherName: pair?.femaleName,
-      motherRing: pair?.femaleRing,
+      fatherId: maleBird?.id || pair?.maleId,
+      fatherName: maleBird?.name || pair?.maleName,
+      fatherRing: maleBird?.ringNumber || pair?.maleRing,
+      motherId: femaleBird?.id || pair?.femaleId,
+      motherName: femaleBird?.name || pair?.femaleName,
+      motherRing: femaleBird?.ringNumber || pair?.femaleRing,
+      paternalGrandfatherId: inheritedAncestry['FF']?.name || maleBird?.paternalGrandfatherId || undefined,
+      paternalGrandmotherId: inheritedAncestry['FM']?.name || maleBird?.paternalGrandmotherId || undefined,
+      maternalGrandfatherId: inheritedAncestry['MF']?.name || femaleBird?.maternalGrandfatherId || undefined,
+      maternalGrandmotherId: inheritedAncestry['MM']?.name || femaleBird?.maternalGrandmotherId || undefined,
+      ancestry: inheritedAncestry,
       cageId: pair?.cageCode || 'VO-02',
       status: 'ACTIVE',
       origin: 'BRED_HERE',
@@ -440,10 +452,9 @@ export default function BreedingPage() {
 
             <div>
               <label className="block font-bold text-slate-700 mb-1">Data de Formação</label>
-              <input
-                type="date"
+              <DateManualInput
                 value={pairForm.formedDate}
-                onChange={(e) => setPairForm({ ...pairForm, formedDate: e.target.value })}
+                onChange={(val) => setPairForm({ ...pairForm, formedDate: val })}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
               />
             </div>
@@ -485,10 +496,9 @@ export default function BreedingPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-bold text-slate-700 mb-1">Data Início da Postura</label>
-              <input
-                type="date"
+              <DateManualInput
                 value={clutchForm.startDate}
-                onChange={(e) => setClutchForm({ ...clutchForm, startDate: e.target.value })}
+                onChange={(val) => setClutchForm({ ...clutchForm, startDate: val })}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
               />
             </div>

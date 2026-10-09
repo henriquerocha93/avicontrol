@@ -15,6 +15,7 @@ import {
   X,
   ShoppingCart
 } from 'lucide-react';
+import { DateManualInput } from '@/components/ui/date-manual-input';
 
 export interface CompraItem {
   id: string;
@@ -382,11 +383,10 @@ export default function CompraPage() {
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 mb-1">Data da Compra *</label>
-                  <input
-                    type="date"
+                  <DateManualInput
                     required
                     value={form.data}
-                    onChange={(e) => setForm({ ...form, data: e.target.value })}
+                    onChange={(val) => setForm({ ...form, data: val })}
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0099e5]/20 focus:border-[#0099e5]"
                   />
                 </div>

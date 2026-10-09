@@ -37,23 +37,36 @@ import { formatDate } from '@/lib/utils';
 import { AdminCommercialDashboard } from '@/components/admin/admin-commercial-dashboard';
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+
+  // If logged in as Super Admin, render 100% Commercial Dashboard!
+  if (user?.role === 'SUPER_ADMIN') {
+    return <AdminCommercialDashboard />;
+  }
+
+  return <CriatorioDashboard />;
+}
+
+function CriatorioDashboard() {
   const { tenant, user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   const [dbTick, setDbTick] = useState(0);
 
   useEffect(() => {
     setIsMounted(true);
+    let debounceTimer: any = null;
     const handleDbUpdate = () => {
-      setDbTick(prev => prev + 1);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        setDbTick(prev => prev + 1);
+      }, 150);
     };
     window.addEventListener('birdpro_db_updated', handleDbUpdate);
-    return () => window.removeEventListener('birdpro_db_updated', handleDbUpdate);
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      window.removeEventListener('birdpro_db_updated', handleDbUpdate);
+    };
   }, []);
-
-  // If logged in as Super Admin, render 100% Commercial Dashboard!
-  if (user?.role === 'SUPER_ADMIN') {
-    return <AdminCommercialDashboard />;
-  }
   
   // Stable data fetches tied to tenant and db updates
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -516,7 +529,7 @@ export default function DashboardPage() {
 
           <div className="h-72 w-full">
             {isMounted ? (
-              <ResponsiveContainer width="100%" height="100%" debounce={50}>
+              <ResponsiveContainer width="100%" height={280} debounce={100}>
                 <AreaChart data={evolutionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="totalColor" x1="0" y1="0" x2="0" y2="1">
@@ -567,7 +580,7 @@ export default function DashboardPage() {
             <>
               <div className="h-60 w-full flex items-center justify-center">
                 {isMounted ? (
-                  <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                  <ResponsiveContainer width="100%" height={240} debounce={100}>
                     <PieChart>
                       <Pie
                         data={speciesChartData}

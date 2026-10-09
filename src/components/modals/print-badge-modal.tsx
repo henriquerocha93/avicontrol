@@ -6,6 +6,7 @@ import { Printer, X, Eye } from 'lucide-react'
 import { Bird, Tenant } from '@/types'
 import { formatDate } from '@/lib/utils'
 import { db } from '@/lib/db'
+import { resolvePedigreeTree } from '@/lib/pedigree'
 
 interface PrintBadgeModalProps {
   isOpen: boolean
@@ -98,35 +99,31 @@ export function PrintBadgeModal({
     return val.trim().toUpperCase()
   }
 
-  const paiNome = formatName(bird.fatherName, true)
-  const maeNome = formatName(bird.motherName, false)
+  const allBirds = db.getBirds()
+  const pedigree = resolvePedigreeTree(bird, allBirds)
+
+  const paiNome = formatName(pedigree.father.isRegistered ? pedigree.father.name : bird.fatherName, true)
+  const maeNome = formatName(pedigree.mother.isRegistered ? pedigree.mother.name : bird.motherName, false)
 
   const avos = [
-    { name: formatName(bird.paternalGrandfatherId || bird.ancestry?.['FF']?.name, true), male: true },
-    { name: formatName(bird.paternalGrandmotherId || bird.ancestry?.['FM']?.name, false), male: false },
-    { name: formatName(bird.maternalGrandfatherId || bird.ancestry?.['MF']?.name, true), male: true },
-    { name: formatName(bird.maternalGrandmotherId || bird.ancestry?.['MM']?.name, false), male: false }
+    { name: formatName(pedigree.grandparents[0]?.isRegistered ? pedigree.grandparents[0].name : bird.paternalGrandfatherId, true), male: true },
+    { name: formatName(pedigree.grandparents[1]?.isRegistered ? pedigree.grandparents[1].name : bird.paternalGrandmotherId, false), male: false },
+    { name: formatName(pedigree.grandparents[2]?.isRegistered ? pedigree.grandparents[2].name : bird.maternalGrandfatherId, true), male: true },
+    { name: formatName(pedigree.grandparents[3]?.isRegistered ? pedigree.grandparents[3].name : bird.maternalGrandmotherId, false), male: false }
   ]
 
-  const bisavoKeys = ['FFF', 'FFM', 'FMF', 'FMM', 'MFF', 'MFM', 'MMF', 'MMM']
-  const bisavos = bisavoKeys.map((key) => {
-    const isMale = key.endsWith('F')
-    const realName = bird.ancestry?.[key]?.name
+  const bisavos = pedigree.greatGrandparents.map((bis) => {
+    const isMale = bis.sex === 'MALE'
+    const realName = bis.isRegistered ? bis.name : undefined
     return {
       name: formatName(realName, isMale),
       male: isMale
     }
   })
 
-  const trisavoKeys = [
-    'FFFF', 'FFFM', 'FFMF', 'FFMM',
-    'FMFF', 'FMFM', 'FMMF', 'FMMM',
-    'MFFF', 'MFFM', 'MFMF', 'MFMM',
-    'MMFF', 'MMFM', 'MMMF', 'MMMM'
-  ]
-  const trisavos = trisavoKeys.map((key) => {
-    const isMale = key.endsWith('F')
-    const realName = bird.ancestry?.[key]?.name
+  const trisavos = pedigree.greatGreatGrandparents.map((tri) => {
+    const isMale = tri.sex === 'MALE'
+    const realName = tri.isRegistered ? tri.name : undefined
     return {
       name: formatName(realName, isMale),
       male: isMale

@@ -18,7 +18,7 @@ function QrCodeReaderContent() {
   const [bird, setBird] = useState<Bird | null>(null)
   const [tenant, setTenant] = useState<Tenant | null>(null)
   const [themeStyle, setThemeStyle] = useState<'DARK_PRESTIGE' | 'CLASSIC_LIGHT' | 'BADGE_PRO'>(requestedStyle)
-  const [generationsCount, setGenerationsCount] = useState<3 | 4 | 5>(requestedGen as any)
+  const [generationsCount, setGenerationsCount] = useState<number>(requestedGen)
 
   useEffect(() => {
     let targetBird: Bird | null = null
@@ -36,8 +36,12 @@ function QrCodeReaderContent() {
       setBird(targetBird)
       const t = db.getTenant(targetBird.tenantId)
       setTenant(t)
+      const p = resolvePedigreeTree(targetBird, allBirds)
+      if (p.maxGenerations && !searchParams?.get('gen')) {
+        setGenerationsCount(p.maxGenerations)
+      }
     }
-  }, [queryCode])
+  }, [queryCode, searchParams])
 
   useEffect(() => {
     if (autoPrint && bird) {
@@ -121,7 +125,9 @@ function QrCodeReaderContent() {
       <div className="p-4 sm:p-8 flex justify-center w-full overflow-x-auto print:p-0">
         <div
           id="pedigree-certificate"
-          className={`w-[1140px] min-w-[1140px] h-[720px] relative shadow-2xl overflow-hidden font-sans select-none flex flex-col justify-between print:m-0 print:border-0 print:shadow-none ${
+          className={`${
+            generationsCount >= 6 ? 'w-[1360px] min-w-[1360px]' : generationsCount >= 5 ? 'w-[1240px] min-w-[1240px]' : 'w-[1140px] min-w-[1140px]'
+          } h-[740px] relative shadow-2xl overflow-hidden font-sans select-none flex flex-col justify-between print:m-0 print:border-0 print:shadow-none ${
             themeStyle === 'DARK_PRESTIGE'
               ? 'bg-[#111827] text-white border border-slate-700'
               : 'bg-white text-slate-900 border border-slate-300'
@@ -237,7 +243,72 @@ function QrCodeReaderContent() {
                 ))}
               </div>
             )}
-          </div>
+
+            {/* Conector 4 -> 5: Bisavós para Trisavós */}
+              {generationsCount >= 5 && (
+                <div className="w-[12px] h-[490px] relative shrink-0">
+                  <svg className="w-full h-full" viewBox="0 0 12 490" fill="none" preserveAspectRatio="none">
+                    <path d="M 0,30 H 6 V 15 H 12 M 6,30 V 45 H 12" stroke="#64748b" strokeWidth="1" />
+                    <path d="M 0,90 H 6 V 75 H 12 M 6,90 V 105 H 12" stroke="#64748b" strokeWidth="1" />
+                    <path d="M 0,150 H 6 V 135 H 12 M 6,150 V 165 H 12" stroke="#64748b" strokeWidth="1" />
+                    <path d="M 0,210 H 6 V 195 H 12 M 6,210 V 225 H 12" stroke="#64748b" strokeWidth="1" />
+                    <path d="M 0,270 H 6 V 255 H 12 M 6,270 V 285 H 12" stroke="#64748b" strokeWidth="1" />
+                    <path d="M 0,330 H 6 V 315 H 12 M 6,330 V 345 H 12" stroke="#64748b" strokeWidth="1" />
+                    <path d="M 0,390 H 6 V 375 H 12 M 6,390 V 405 H 12" stroke="#64748b" strokeWidth="1" />
+                    <path d="M 0,450 H 6 V 435 H 12 M 6,450 V 465 H 12" stroke="#64748b" strokeWidth="1" />
+                  </svg>
+                </div>
+              )}
+
+              {/* 5. Geração 4: Trisavós (16 Cards) */}
+              {generationsCount >= 5 && (
+                <div className="w-[145px] shrink-0 h-[490px] flex flex-col justify-around">
+                  {pedigree.greatGreatGrandparents.map((tri, idx) => (
+                    <div
+                      key={idx}
+                      className={`py-0.5 px-1 rounded text-center truncate ${
+                        tri.sex === 'MALE'
+                          ? 'bg-sky-950/40 text-sky-200 border border-sky-500/20 text-[7.5px]'
+                          : 'bg-rose-950/40 text-rose-200 border border-rose-500/20 text-[7.5px]'
+                      }`}
+                      title={`${tri.role}: ${tri.name}`}
+                    >
+                      {tri.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Conector 5 -> 6: Trisavós para Tataravós */}
+              {generationsCount >= 6 && (
+                <div className="w-[10px] h-[500px] relative shrink-0">
+                  <svg className="w-full h-full" viewBox="0 0 10 500" fill="none" preserveAspectRatio="none">
+                    {Array.from({ length: 16 }).map((_, i) => (
+                      <path key={i} d={`M 0,${15 + i * 31} H 5 V ${8 + i * 31} H 10 M 5,${15 + i * 31} V ${22 + i * 31} H 10`} stroke="#64748b" strokeWidth="0.8" />
+                    ))}
+                  </svg>
+                </div>
+              )}
+
+              {/* 6. Geração 5: Tataravós (32 Cards) */}
+              {generationsCount >= 6 && (
+                <div className="w-[130px] shrink-0 h-[500px] flex flex-col justify-around">
+                  {pedigree.tataravos.map((tat, idx) => (
+                    <div
+                      key={idx}
+                      className={`py-0 px-0.5 rounded text-center truncate ${
+                        tat.sex === 'MALE'
+                          ? 'bg-sky-950/50 text-sky-300 border border-sky-500/20 text-[6.5px]'
+                          : 'bg-rose-950/50 text-rose-300 border border-rose-500/20 text-[6.5px]'
+                      }`}
+                      title={`${tat.role}: ${tat.name}`}
+                    >
+                      {tat.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
           {/* Footer QR Code */}
           <div className={`px-8 py-3 border-t flex items-center justify-between relative z-10 ${

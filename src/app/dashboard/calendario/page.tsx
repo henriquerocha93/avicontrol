@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { db } from '@/lib/db';
 import { useAuth } from '@/lib/auth-context';
+import { DateManualInput } from '@/components/ui/date-manual-input';
 import { CalendarEvent, EventCategory, Bird } from '@/types';
 import { Button } from '@/components/ui/button';
 
@@ -1014,21 +1015,19 @@ export default function CalendarioPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Data de Início *</label>
-                  <input
-                    type="date"
+                  <DateManualInput
                     required
                     value={formStartDate}
-                    onChange={(e) => setFormStartDate(e.target.value)}
+                    onChange={(val) => setFormStartDate(val)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-[#00c853] text-xs"
                   />
                 </div>
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Data Término (Opcional)</label>
-                  <input
-                    type="date"
+                  <DateManualInput
                     value={formEndDate}
-                    onChange={(e) => setFormEndDate(e.target.value)}
+                    onChange={(val) => setFormEndDate(val)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-[#00c853] text-xs"
                   />
                 </div>

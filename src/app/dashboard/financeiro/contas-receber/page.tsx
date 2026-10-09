@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { DateManualInput } from '@/components/ui/date-manual-input';
 
 interface ContaReceber {
   id: string;
@@ -308,11 +309,10 @@ export default function ContasReceberPage() {
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Data Prevista *</label>
-                  <input
-                    type="date"
+                  <DateManualInput
                     required
                     value={form.vencimento}
-                    onChange={(e) => setForm({ ...form, vencimento: e.target.value })}
+                    onChange={(val) => setForm({ ...form, vencimento: val })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#4caf50]"
                   />
                 </div>

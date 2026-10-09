@@ -31,6 +31,7 @@ import {
 import { db } from '@/lib/db'
 import { Tenant, BreederOwner, TenantVisualConfig, Bird } from '@/types'
 import { BadgeFrontAndBack } from '@/components/genealogy/badge-front-and-back'
+import { DateManualInput } from '@/components/ui/date-manual-input'
 
 export default function CriatorioConfigPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null)
@@ -613,10 +614,9 @@ export default function CriatorioConfigPage() {
 
               <div className="md:col-span-2">
                 <label className="block text-xs text-slate-600 mb-1">Data Licença</label>
-                <input
-                  type="date"
+                <DateManualInput
                   value={tenant.licenseDate || ''}
-                  onChange={(e) => handleInputChange('licenseDate', e.target.value)}
+                  onChange={(val) => handleInputChange('licenseDate', val)}
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
                 />
               </div>

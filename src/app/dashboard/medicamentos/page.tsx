@@ -18,8 +18,8 @@ import { db } from '@/lib/db';
 import { Medication, Treatment, Bird as BirdType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
-import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
+import { DateManualInput } from '@/components/ui/date-manual-input';
 
 export default function MedicamentosPage() {
   const { tenant } = useAuth();
@@ -341,19 +341,17 @@ export default function MedicamentosPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-bold text-slate-700 mb-1">Data de Início</label>
-              <input
-                type="date"
+              <DateManualInput
                 value={treatForm.startDate}
-                onChange={(e) => setTreatForm({ ...treatForm, startDate: e.target.value })}
+                onChange={(val) => setTreatForm({ ...treatForm, startDate: val })}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
               />
             </div>
             <div>
               <label className="block font-bold text-slate-700 mb-1">Data de Término</label>
-              <input
-                type="date"
+              <DateManualInput
                 value={treatForm.endDate}
-                onChange={(e) => setTreatForm({ ...treatForm, endDate: e.target.value })}
+                onChange={(val) => setTreatForm({ ...treatForm, endDate: val })}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
               />
             </div>

@@ -24,6 +24,7 @@ import { firebaseSync } from '@/lib/firebase-service';
 import { Bird, Tenant } from '@/types';
 import { BadgeFrontAndBack, BadgeAncestors } from '@/components/genealogy/badge-front-and-back';
 import { SpeciesCombobox } from '@/components/ui/species-combobox';
+import { resolvePedigreeTree } from '@/lib/pedigree';
 
 export default function CriarCrachaPage() {
   const { tenant } = useAuth();
@@ -51,6 +52,11 @@ export default function CriarCrachaPage() {
   const plantelBirds = useMemo(() => {
     return db.getBirds(currentTenant?.id);
   }, [currentTenant?.id, isSaved]);
+
+  // Herança direta de casal do plantel
+  const [selectedFatherId, setSelectedFatherId] = useState('');
+  const [selectedMotherId, setSelectedMotherId] = useState('');
+  const [coupleSuccessMsg, setCoupleSuccessMsg] = useState<string | null>(null);
 
   // 1. Dados da Ave Principal (de fácil preenchimento para o usuário leigo)
   const [birdData, setBirdData] = useState({
@@ -89,8 +95,141 @@ export default function CriarCrachaPage() {
     { name: '', male: false }
   ]);
 
+  // 5. Trisavós (4ª Geração - 16 Aves)
+  const [showTrisavos, setShowTrisavos] = useState(false);
+  const [greatGreatGrandparents, setGreatGreatGrandparents] = useState([
+    { name: '', male: true },
+    { name: '', male: false },
+    { name: '', male: true },
+    { name: '', male: false },
+    { name: '', male: true },
+    { name: '', male: false },
+    { name: '', male: true },
+    { name: '', male: false },
+    { name: '', male: true },
+    { name: '', male: false },
+    { name: '', male: true },
+    { name: '', male: false },
+    { name: '', male: true },
+    { name: '', male: false },
+    { name: '', male: true },
+    { name: '', male: false }
+  ]);
+
+  const handleApplyFather = (fatherId: string) => {
+    setSelectedFatherId(fatherId);
+    if (!fatherId) return;
+    const father = plantelBirds.find(b => b.id === fatherId);
+    if (!father) return;
+
+    const fTree = resolvePedigreeTree(father, plantelBirds);
+    setParents(prev => ({ ...prev, fatherName: father.name || '' }));
+
+    setGrandparents(prev => ({
+      ...prev,
+      paternalGrandfather: fTree.father.isRegistered ? fTree.father.name : prev.paternalGrandfather,
+      paternalGrandmother: fTree.mother.isRegistered ? fTree.mother.name : prev.paternalGrandmother
+    }));
+
+    setGreatGrandparents(prev => {
+      const next = [...prev];
+      if (fTree.grandparents[0]?.isRegistered) next[0] = { name: fTree.grandparents[0].name, male: true };
+      if (fTree.grandparents[1]?.isRegistered) next[1] = { name: fTree.grandparents[1].name, male: false };
+      if (fTree.grandparents[2]?.isRegistered) next[2] = { name: fTree.grandparents[2].name, male: true };
+      if (fTree.grandparents[3]?.isRegistered) next[3] = { name: fTree.grandparents[3].name, male: false };
+      return next;
+    });
+
+    setGreatGreatGrandparents(prev => {
+      const next = [...prev];
+      for (let i = 0; i < 8; i++) {
+        if (fTree.greatGrandparents[i]?.isRegistered) {
+          next[i] = { name: fTree.greatGrandparents[i].name, male: i % 2 === 0 };
+        }
+      }
+      return next;
+    });
+
+    if (fTree.greatGrandparents.some(g => g.isRegistered)) {
+      setShowBisavos(true);
+    }
+    if (fTree.greatGreatGrandparents.some(g => g.isRegistered)) {
+      setShowTrisavos(true);
+    }
+
+    setCoupleSuccessMsg(`Linhagem paterna herdada de ${father.name}!`);
+    setTimeout(() => setCoupleSuccessMsg(null), 4500);
+  };
+
+  const handleApplyMother = (motherId: string) => {
+    setSelectedMotherId(motherId);
+    if (!motherId) return;
+    const mother = plantelBirds.find(b => b.id === motherId);
+    if (!mother) return;
+
+    const mTree = resolvePedigreeTree(mother, plantelBirds);
+    setParents(prev => ({ ...prev, motherName: mother.name || '' }));
+
+    setGrandparents(prev => ({
+      ...prev,
+      maternalGrandfather: mTree.father.isRegistered ? mTree.father.name : prev.maternalGrandfather,
+      maternalGrandmother: mTree.mother.isRegistered ? mTree.mother.name : prev.maternalGrandmother
+    }));
+
+    setGreatGrandparents(prev => {
+      const next = [...prev];
+      if (mTree.grandparents[0]?.isRegistered) next[4] = { name: mTree.grandparents[0].name, male: true };
+      if (mTree.grandparents[1]?.isRegistered) next[5] = { name: mTree.grandparents[1].name, male: false };
+      if (mTree.grandparents[2]?.isRegistered) next[6] = { name: mTree.grandparents[2].name, male: true };
+      if (mTree.grandparents[3]?.isRegistered) next[7] = { name: mTree.grandparents[3].name, male: false };
+      return next;
+    });
+
+    setGreatGreatGrandparents(prev => {
+      const next = [...prev];
+      for (let i = 0; i < 8; i++) {
+        if (mTree.greatGrandparents[i]?.isRegistered) {
+          next[8 + i] = { name: mTree.greatGrandparents[i].name, male: i % 2 === 0 };
+        }
+      }
+      return next;
+    });
+
+    if (mTree.grandparents.some(g => g.isRegistered)) {
+      setShowBisavos(true);
+    }
+    if (mTree.greatGrandparents.some(g => g.isRegistered)) {
+      setShowTrisavos(true);
+    }
+
+    setCoupleSuccessMsg(`Linhagem materna herdada de ${mother.name}!`);
+    setTimeout(() => setCoupleSuccessMsg(null), 4500);
+  };
+
   // Objeto Bird sintético para passar ao BadgeFrontAndBack
   const previewBird: Bird = useMemo(() => {
+    const ancestry: Record<string, { name: string; ringNumber: string }> = {
+      'F': { name: parents.fatherName || '', ringNumber: '' },
+      'M': { name: parents.motherName || '', ringNumber: '' },
+      'FF': { name: grandparents.paternalGrandfather || '', ringNumber: '' },
+      'FM': { name: grandparents.paternalGrandmother || '', ringNumber: '' },
+      'MF': { name: grandparents.maternalGrandfather || '', ringNumber: '' },
+      'MM': { name: grandparents.maternalGrandmother || '', ringNumber: '' },
+    };
+    const bisavoKeys = ['FFF', 'FFM', 'FMF', 'FMM', 'MFF', 'MFM', 'MMF', 'MMM'];
+    greatGrandparents.forEach((bg, idx) => {
+      if (bg.name) ancestry[bisavoKeys[idx]] = { name: bg.name, ringNumber: '' };
+    });
+    const trisavoKeys = [
+      'FFFF', 'FFFM', 'FFMF', 'FFMM',
+      'FMFF', 'FMFM', 'FMMF', 'FMMM',
+      'MFFF', 'MFFM', 'MFMF', 'MFMM',
+      'MMFF', 'MMFM', 'MMMF', 'MMMM'
+    ];
+    greatGreatGrandparents.forEach((tg, idx) => {
+      if (tg.name) ancestry[trisavoKeys[idx]] = { name: tg.name, ringNumber: '' };
+    });
+
     return {
       id: `sim-cracha-${birdData.ringNumber || '001'}`,
       tenantId: tenant?.id || 'demo-tenant',
@@ -105,11 +244,12 @@ export default function CriarCrachaPage() {
       paternalGrandmotherId: grandparents.paternalGrandmother || '',
       maternalGrandfatherId: grandparents.maternalGrandfather || '',
       maternalGrandmotherId: grandparents.maternalGrandmother || '',
+      ancestry,
       birthDate: birdData.birthDate || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-  }, [birdData, parents, grandparents, tenant?.id]);
+  }, [birdData, parents, grandparents, greatGrandparents, greatGreatGrandparents, tenant?.id]);
 
   const customAncestors: BadgeAncestors = useMemo(() => {
     return {
@@ -119,9 +259,10 @@ export default function CriarCrachaPage() {
       paternalGrandmother: grandparents.paternalGrandmother,
       maternalGrandfather: grandparents.maternalGrandfather,
       maternalGrandmother: grandparents.maternalGrandmother,
-      greatGrandparents: greatGrandparents
+      greatGrandparents: greatGrandparents,
+      greatGreatGrandparents: greatGreatGrandparents
     };
-  }, [parents, grandparents, greatGrandparents]);
+  }, [parents, grandparents, greatGrandparents, greatGreatGrandparents]);
 
   const handlePrint = () => {
     // Se o usuário preencheu a ave, garante que fique salva no plantel/lista
@@ -136,7 +277,7 @@ export default function CriarCrachaPage() {
 
   const handleSaveToCriatorio = () => {
     try {
-      // Monta mapa de linhagem genealógica completa (Pais, Avós e Bisavós)
+      // Monta mapa de linhagem genealógica completa (Pais, Avós, Bisavós e Trisavós)
       const ancestry: Record<string, { name: string; ringNumber: string }> = {
         'F': { name: parents.fatherName || '', ringNumber: '' },
         'M': { name: parents.motherName || '', ringNumber: '' },
@@ -150,6 +291,18 @@ export default function CriarCrachaPage() {
       greatGrandparents.forEach((bg, idx) => {
         if (bg.name) {
           ancestry[bisavoKeys[idx]] = { name: bg.name, ringNumber: '' };
+        }
+      });
+
+      const trisavoKeys = [
+        'FFFF', 'FFFM', 'FFMF', 'FFMM',
+        'FMFF', 'FMFM', 'FMMF', 'FMMM',
+        'MFFF', 'MFFM', 'MFMF', 'MFMM',
+        'MMFF', 'MMFM', 'MMMF', 'MMMM'
+      ];
+      greatGreatGrandparents.forEach((tg, idx) => {
+        if (tg.name) {
+          ancestry[trisavoKeys[idx]] = { name: tg.name, ringNumber: '' };
         }
       });
 
@@ -206,6 +359,9 @@ export default function CriarCrachaPage() {
       birthDate: '',
       registryNumber: tenant?.registryNumber || ''
     });
+    setSelectedFatherId('');
+    setSelectedMotherId('');
+    setCoupleSuccessMsg(null);
     setParents({ fatherName: '', motherName: '' });
     setGrandparents({
       paternalGrandfather: '',
@@ -223,6 +379,26 @@ export default function CriarCrachaPage() {
       { name: '', male: true },
       { name: '', male: false }
     ]);
+    setGreatGreatGrandparents([
+      { name: '', male: true },
+      { name: '', male: false },
+      { name: '', male: true },
+      { name: '', male: false },
+      { name: '', male: true },
+      { name: '', male: false },
+      { name: '', male: true },
+      { name: '', male: false },
+      { name: '', male: true },
+      { name: '', male: false },
+      { name: '', male: true },
+      { name: '', male: false },
+      { name: '', male: true },
+      { name: '', male: false },
+      { name: '', male: true },
+      { name: '', male: false }
+    ]);
+    setShowBisavos(false);
+    setShowTrisavos(false);
   };
 
   const handleLoadSample = () => {
@@ -254,6 +430,26 @@ export default function CriarCrachaPage() {
       { name: 'Monte Negro Fibra', male: true },
       { name: 'Estrela Guia Ouro', male: false }
     ]);
+    setGreatGreatGrandparents([
+      { name: 'Titã Raiz', male: true },
+      { name: 'Estrela Mãe', male: false },
+      { name: 'Relâmpago Fino', male: true },
+      { name: 'Flor da Noite', male: false },
+      { name: 'Furacão do Sul', male: true },
+      { name: 'Princesa Ouro', male: false },
+      { name: 'Águia Real', male: true },
+      { name: 'Bela Fêmea', male: false },
+      { name: 'Barão Campeão', male: true },
+      { name: 'Diana Fibra', male: false },
+      { name: 'Trovão Antigo', male: true },
+      { name: 'Sereia Canto', male: false },
+      { name: 'Falcão Nobre', male: true },
+      { name: 'Vitória Matriz', male: false },
+      { name: 'Leão da Montanha', male: true },
+      { name: 'Aurora Dourada', male: false }
+    ]);
+    setShowBisavos(true);
+    setShowTrisavos(true);
   };
 
   return (
@@ -310,7 +506,7 @@ export default function CriarCrachaPage() {
         <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-start gap-3 text-xs text-emerald-900">
           <Info className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
           <p>
-            <strong>Como funciona:</strong> Digite os dados da sua ave e dos pais/avós abaixo. O crachá é gerado automaticamente na tela em tempo real utilizando o <strong>brasão, imagens de fundo e cores oficiais</strong> configuradas no seu criatório. Ao final, escolha entre imprimir <strong>Apenas Frente</strong> ou <strong>Frente e Verso</strong>.
+            <strong>Como funciona:</strong> Digite os dados da sua ave e dos pais/avós abaixo, ou <strong>selecione um pai e mãe do seu plantel</strong> para herdar a árvore completa automaticamente. O crachá é gerado na tela em tempo real utilizando o <strong>brasão, imagens e cores oficiais</strong> do seu criatório.
           </p>
         </div>
 
@@ -367,6 +563,64 @@ export default function CriarCrachaPage() {
               </select>
             </div>
           </div>
+        </div>
+
+        {/* OPÇÃO DE HERANÇA: PUXAR DE CASAL DO PLANTEL */}
+        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-xl p-3.5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🐣</span>
+              <div>
+                <span className="text-xs font-black text-teal-950 block">Puxar Linhagem de Casal do Plantel</span>
+                <span className="text-[10px] text-teal-700">Selecione o pai e a mãe cadastrados para herdar automaticamente as árvores ancestrais de ambos</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold text-teal-900 mb-1">
+                ♂ Selecionar Pai do Plantel
+              </label>
+              <select
+                value={selectedFatherId}
+                onChange={(e) => handleApplyFather(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-teal-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-400"
+              >
+                <option value="">-- Escolha o Macho Reprodutor --</option>
+                {plantelBirds.filter(b => b.sex !== 'FEMALE').map(b => (
+                  <option key={b.id} value={b.id}>
+                    ♂ {b.name || 'Sem Nome'} {b.ringNumber ? `(${b.ringNumber})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-teal-900 mb-1">
+                ♀ Selecionar Mãe do Plantel
+              </label>
+              <select
+                value={selectedMotherId}
+                onChange={(e) => handleApplyMother(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-teal-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-400"
+              >
+                <option value="">-- Escolha a Fêmea Matriz --</option>
+                {plantelBirds.filter(b => b.sex !== 'MALE').map(b => (
+                  <option key={b.id} value={b.id}>
+                    ♀ {b.name || 'Sem Nome'} {b.ringNumber ? `(${b.ringNumber})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {coupleSuccessMsg && (
+            <div className="text-[11px] font-bold text-emerald-800 bg-emerald-100/70 border border-emerald-300 px-2.5 py-1 rounded-md flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>{coupleSuccessMsg}</span>
+            </div>
+          )}
         </div>
 
         {/* BLOCO 2: PAIS (1ª GERAÇÃO) */}
@@ -455,12 +709,12 @@ export default function CriarCrachaPage() {
           </div>
         </div>
 
-        {/* BLOCO 4: BISAVÓS (OPCIONAL) */}
+        {/* BLOCO 4: BISAVÓS (3ª GERAÇÃO - 8 AVES) */}
         <div>
           <button
             type="button"
             onClick={() => setShowBisavos(!showBisavos)}
-            className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 py-1"
+            className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 py-1 cursor-pointer"
           >
             <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showBisavos ? 'rotate-90' : ''}`} />
             <span>Configurar Bisavós (3ª Geração - 8 Aves Opcionais)</span>
@@ -480,6 +734,41 @@ export default function CriarCrachaPage() {
                       const updated = [...greatGrandparents];
                       updated[idx].name = e.target.value;
                       setGreatGrandparents(updated);
+                    }}
+                    placeholder={`Nome`}
+                    className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-[11px]"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* BLOCO 5: TRISAVÓS (4ª GERAÇÃO - 16 AVES) */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowTrisavos(!showTrisavos)}
+            className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 py-1 cursor-pointer"
+          >
+            <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showTrisavos ? 'rotate-90' : ''}`} />
+            <span>Configurar Trisavós (4ª Geração - 16 Aves Opcionais)</span>
+          </button>
+
+          {showTrisavos && (
+            <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              {greatGreatGrandparents.map((tri, idx) => (
+                <div key={idx} className="space-y-0.5">
+                  <label className="block text-[9.5px] font-bold text-slate-500 truncate">
+                    Trisavô {idx + 1} ({tri.male ? '♂' : '♀'})
+                  </label>
+                  <input
+                    type="text"
+                    value={tri.name}
+                    onChange={(e) => {
+                      const updated = [...greatGreatGrandparents];
+                      updated[idx].name = e.target.value;
+                      setGreatGreatGrandparents(updated);
                     }}
                     placeholder={`Nome`}
                     className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-[11px]"

@@ -37,7 +37,8 @@ import {
   Briefcase,
   Target,
   Edit3,
-  Award
+  Award,
+  Trophy
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
@@ -92,6 +93,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { name: 'Painel de Pássaro', href: '/dashboard/aves', icon: LayoutDashboard },
     { name: 'Painel do Financeiro', href: '/dashboard/painel-financeiro', icon: DollarSign },
     { name: 'Criar Crachá', href: '/dashboard/criar-cracha', icon: Award },
+    { name: 'Torneio', href: '/dashboard/torneio', icon: Trophy, badge: 'NOVO' },
     { name: 'Treinamento', href: '/dashboard/treinamento', icon: GraduationCap },
     { name: 'Calendário', href: '/dashboard/calendario', icon: Calendar },
     { name: 'Anotação', href: '/dashboard/anotacao', icon: FileText },

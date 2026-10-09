@@ -18,8 +18,8 @@ import { db } from '@/lib/db';
 import { DiseaseRecord, Bird as BirdType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
-import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
+import { DateManualInput } from '@/components/ui/date-manual-input';
 
 export default function SaudePage() {
   const { tenant } = useAuth();
@@ -225,10 +225,9 @@ export default function SaudePage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-bold text-slate-700 mb-1">Data do Diagnóstico</label>
-              <input
-                type="date"
+              <DateManualInput
                 value={formData.diagnosedDate}
-                onChange={(e) => setFormData({ ...formData, diagnosedDate: e.target.value })}
+                onChange={(val) => setFormData({ ...formData, diagnosedDate: val })}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
               />
             </div>

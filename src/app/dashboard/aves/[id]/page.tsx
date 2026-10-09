@@ -28,7 +28,8 @@ import {
   ExternalLink,
   ChevronRight,
   Check,
-  AlertCircle
+  AlertCircle,
+  Trophy
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { db } from '@/lib/db';
@@ -109,6 +110,7 @@ export default function BirdDetailPage() {
   const pairs = db.getPairs(tenant?.id).filter(p => p.maleId === bird.id || p.femaleId === bird.id);
   const cages = db.getCages(tenant?.id);
   const currentCage = cages.find(c => c.code === bird.cageId || c.id === bird.cageId);
+  const birdTournaments = db.getTournamentsByBirdId(bird.id, tenant?.id);
 
   // Inbreeding risk check
   const compareBird = allBirds.find(b => b.id === compareBirdId);
@@ -116,6 +118,7 @@ export default function BirdDetailPage() {
 
   const tabs = [
     { id: 'geral', label: 'Dados Gerais', icon: Bird },
+    { id: 'torneios', label: 'Torneios & Canto', icon: Trophy, count: birdTournaments.length },
     { id: 'timeline', label: 'Histórico & Timeline', icon: Clock, count: timeline.length },
     { id: 'genealogia', label: 'Genealogia Visual', icon: Award },
     { id: 'reproducao', label: 'Reprodução & Ninhadas', icon: Heart, count: pairs.length },
@@ -227,6 +230,12 @@ export default function BirdDetailPage() {
 
           {/* Quick Action Buttons */}
           <div className="flex flex-wrap items-center justify-center md:justify-end gap-2 shrink-0 border-t md:border-t-0 pt-4 md:pt-0 border-slate-100">
+            <Link href={`/dashboard/torneio?birdId=${bird.id}`}>
+              <Button variant="outline" size="sm" className="border-amber-300 text-amber-700 hover:bg-amber-50">
+                <Trophy className="w-4 h-4 mr-1.5 text-amber-500" />
+                Marcar Canto
+              </Button>
+            </Link>
             <Button variant="outline" size="sm" onClick={() => setIsQrOpen(true)}>
               <QrCode className="w-4 h-4 mr-1.5 text-emerald-600" />
               QR Code
@@ -776,6 +785,131 @@ export default function BirdDetailPage() {
                 ★★★★☆ <span className="text-slate-700 text-xs ml-1">(4/5)</span>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: TORNEIOS & CANTO */}
+      {activeTab === 'torneios' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-amber-500" />
+                  Histórico de Torneios & Cantadas
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Desempenho em rodas oficiais de 10 e 15 minutos e validação de mexida
+                </p>
+              </div>
+              <Link href={`/dashboard/torneio?birdId=${bird.id}`}>
+                <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white font-bold">
+                  <Trophy className="w-4 h-4 mr-1.5" />
+                  Iniciar Nova Marcação
+                </Button>
+              </Link>
+            </div>
+
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-6">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-center">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Total de Rodas</span>
+                <span className="text-2xl font-black text-slate-900">{birdTournaments.length}</span>
+              </div>
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 text-center">
+                <span className="text-[10px] uppercase font-bold text-emerald-700 block mb-1">Recorde 10 Min</span>
+                <span className="text-2xl font-black text-emerald-700">
+                  {Math.max(...birdTournaments.map(s => s.tenMinuteTotal || s.totalSongs), 0)}
+                </span>
+              </div>
+              <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-center">
+                <span className="text-[10px] uppercase font-bold text-amber-700 block mb-1">Recorde 15 Min</span>
+                <span className="text-2xl font-black text-amber-700">
+                  {Math.max(...birdTournaments.filter(s => s.targetMode === '15_MIN').map(s => s.fifteenMinuteTotal || s.totalSongs), 0)}
+                </span>
+              </div>
+              <div className="p-4 bg-blue-50 rounded-2xl border border-blue-200 text-center">
+                <span className="text-[10px] uppercase font-bold text-blue-700 block mb-1">Média Cantos</span>
+                <span className="text-2xl font-black text-blue-700">
+                  {birdTournaments.length > 0 
+                    ? Math.round(birdTournaments.reduce((acc, s) => acc + s.totalSongs, 0) / birdTournaments.length)
+                    : 0}
+                </span>
+              </div>
+            </div>
+
+            {/* Session Cards */}
+            {birdTournaments.length === 0 ? (
+              <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <Trophy className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                <h4 className="font-bold text-slate-700 text-sm">Nenhuma marcação registrada para esta ave</h4>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                  Utilize o marcador de canto ao vivo na roda de torneio para registrar minuto a minuto e validar a mexida.
+                </p>
+                <div className="mt-4">
+                  <Link href={`/dashboard/torneio?birdId=${bird.id}`}>
+                    <Button size="sm" variant="outline" className="border-amber-400 text-amber-700">
+                      Abrir Marcador de Canto
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {birdTournaments.map((sess) => (
+                  <div key={sess.id} className="p-4 rounded-2xl border border-slate-200 hover:border-amber-300 transition-all bg-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-sm text-slate-900">{formatDate(sess.date)}</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                          {sess.sessionType}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                          {sess.targetMode === '10_MIN' ? '10 Min' : '15 Min'}
+                        </span>
+                        {sess.placement && (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1 shadow-2xs">
+                            <Trophy className="w-3 h-3 text-amber-600" />
+                            {sess.placement}
+                            {sess.trophy && ' 🏆'}
+                          </span>
+                        )}
+                        {sess.location && (
+                          <span className="text-xs text-slate-400">• {sess.location}</span>
+                        )}
+                      </div>
+                      {(sess.notes || (sess as any).mexidaNotes) && (
+                        <p className="text-xs text-slate-600 italic">
+                          &ldquo;{sess.notes || (sess as any).mexidaNotes}&rdquo;
+                        </p>
+                      )}
+                      {sess.mexidaEvaluation && (
+                        <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                          sess.mexidaEvaluation.status === 'VALIDATED' 
+                            ? 'bg-emerald-100 text-emerald-800' 
+                            : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {sess.mexidaEvaluation.headline}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-4 shrink-0">
+                      <div className="text-right">
+                        <span className="text-2xl font-black text-slate-900">{sess.totalSongs}</span>
+                        <span className="text-[10px] text-slate-400 block font-bold">cantos</span>
+                      </div>
+                      <Link href="/dashboard/torneio">
+                        <Button size="sm" variant="outline">
+                          Ver no Torneio
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

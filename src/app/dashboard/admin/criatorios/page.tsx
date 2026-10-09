@@ -36,6 +36,7 @@ import { db } from '@/lib/db'
 import { firebaseSync } from '@/lib/firebase-service'
 import { Tenant, PlanType } from '@/types'
 import { formatDate } from '@/lib/utils'
+import { DateManualInput } from '@/components/ui/date-manual-input'
 
 export default function AdminCriatoriosPage() {
   const [tenants, setTenants] = useState<Tenant[]>([])
@@ -852,10 +853,9 @@ export default function AdminCriatoriosPage() {
                     <label className="text-[11px] font-medium text-slate-600 block">
                       Data Inicial de Vencimento (Opcional - Padrão automático)
                     </label>
-                    <input
-                      type="date"
+                    <DateManualInput
                       value={formCustomExpires}
-                      onChange={(e) => setFormCustomExpires(e.target.value)}
+                      onChange={(val) => setFormCustomExpires(val)}
                       className="w-full h-8.5 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -1180,10 +1180,9 @@ export default function AdminCriatoriosPage() {
                 {editBillingCycle !== 'ISENTO' && (
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-slate-700 block">Data de Expiração</label>
-                    <input
-                      type="date"
+                    <DateManualInput
                       value={editExpiresAt}
-                      onChange={(e) => setEditExpiresAt(e.target.value)}
+                      onChange={(val) => setEditExpiresAt(val)}
                       className="w-full h-8.5 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#00c853]"
                     />
                   </div>

@@ -25,7 +25,7 @@ function PublicCertificateContent() {
   const [bird, setBird] = useState<Bird | null>(null)
   const [tenant, setTenant] = useState<Tenant | null>(null)
   const [themeStyle, setThemeStyle] = useState<'BADGE_PRO' | 'DARK_PRESTIGE' | 'CLASSIC_LIGHT'>(requestedStyle)
-  const [generationsCount, setGenerationsCount] = useState<3 | 4 | 5>(requestedGen as any)
+  const [generationsCount, setGenerationsCount] = useState<number>(requestedGen)
   const [isAuthenticating, setIsAuthenticating] = useState(true)
 
   useEffect(() => {
@@ -136,6 +136,15 @@ function PublicCertificateContent() {
   }, [routeId, queryCode])
 
   useEffect(() => {
+    if (bird) {
+      const p = resolvePedigreeTree(bird)
+      if (p.maxGenerations && !searchParams?.get('gen')) {
+        setGenerationsCount(p.maxGenerations)
+      }
+    }
+  }, [bird?.id, bird?.ancestry, searchParams])
+
+  useEffect(() => {
     if (autoPrint && bird && !isAuthenticating) {
       setTimeout(() => {
         window.print()
@@ -188,6 +197,20 @@ function PublicCertificateContent() {
 
         {/* Action Controls */}
         <div className="flex items-center space-x-2 text-xs">
+          {/* Generations Selector for Certificate */}
+          {themeStyle !== 'BADGE_PRO' && (
+            <select
+              value={generationsCount}
+              onChange={(e) => setGenerationsCount(Number(e.target.value))}
+              className="bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs text-white font-bold focus:outline-none cursor-pointer"
+            >
+              <option value={3}>3 Gerações (Até Avós)</option>
+              <option value={4}>4 Gerações (Até Bisavós)</option>
+              <option value={5}>5 Gerações (Até Trisavós)</option>
+              <option value={6}>6 Gerações (Até Tataravós)</option>
+            </select>
+          )}
+
           {/* Theme Selector */}
           <div className="inline-flex rounded-md bg-slate-800 p-0.5 border border-slate-700">
             <button
@@ -345,42 +368,69 @@ function PublicCertificateContent() {
               {/* Grid 2: Linhagem e Filiação Completa */}
               <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 space-y-4">
                 <span className="text-[11px] font-black uppercase text-emerald-400 tracking-wider block border-b border-slate-800 pb-2">
-                  Linhagem &amp; Parentescos da Ave
+                  Linhagem &amp; Parentescos da Ave (Todas as Gerações Registradas)
                 </span>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                  {/* Pai */}
-                  <div className="bg-sky-950/40 border border-sky-800/40 rounded-lg p-3 space-y-1">
-                    <span className="text-[9.5px] font-black uppercase text-sky-400 block">Pai ♂ (1ª Geração)</span>
-                    <strong className="text-white block truncate">{bird.fatherName || 'INDEFINIDO'}</strong>
-                    <span className="text-[10px] font-mono text-slate-400 block">{bird.fatherRing || '—'}</span>
-                  </div>
+                {/* 1ª Geração: Pais */}
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1.5">1ª Geração • Pais</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    {/* Pai */}
+                    <div className="bg-sky-950/40 border border-sky-800/40 rounded-lg p-3 space-y-1">
+                      <span className="text-[9.5px] font-black uppercase text-sky-400 block">Pai ♂ (1ª Geração)</span>
+                      <strong className="text-white block truncate">{pedigree.father.name}</strong>
+                      <span className="text-[10px] font-mono text-slate-400 block">{pedigree.father.ringNumber || '—'}</span>
+                    </div>
 
-                  {/* Mãe */}
-                  <div className="bg-rose-950/40 border border-rose-800/40 rounded-lg p-3 space-y-1">
-                    <span className="text-[9.5px] font-black uppercase text-rose-400 block">Mãe ♀ (1ª Geração)</span>
-                    <strong className="text-white block truncate">{bird.motherName || 'INDEFINIDA'}</strong>
-                    <span className="text-[10px] font-mono text-slate-400 block">{bird.motherRing || '—'}</span>
-                  </div>
-
-                  {/* Avô Paterno */}
-                  <div className="bg-slate-800/60 border border-slate-700/60 rounded-lg p-3 space-y-1">
-                    <span className="text-[9.5px] font-black uppercase text-slate-400 block">Avô Paterno ♂</span>
-                    <strong className="text-slate-200 block truncate">
-                      {bird.paternalGrandfatherId || bird.ancestry?.['FF']?.name || 'INDEFINIDO'}
-                    </strong>
-                    <span className="text-[10px] text-slate-500 block">Pai do Pai</span>
-                  </div>
-
-                  {/* Avó Materna */}
-                  <div className="bg-slate-800/60 border border-slate-700/60 rounded-lg p-3 space-y-1">
-                    <span className="text-[9.5px] font-black uppercase text-slate-400 block">Avó Materna ♀</span>
-                    <strong className="text-slate-200 block truncate">
-                      {bird.maternalGrandmotherId || bird.ancestry?.['MM']?.name || 'INDEFINIDA'}
-                    </strong>
-                    <span className="text-[10px] text-slate-500 block">Mãe da Mãe</span>
+                    {/* Mãe */}
+                    <div className="bg-rose-950/40 border border-rose-800/40 rounded-lg p-3 space-y-1">
+                      <span className="text-[9.5px] font-black uppercase text-rose-400 block">Mãe ♀ (1ª Geração)</span>
+                      <strong className="text-white block truncate">{pedigree.mother.name}</strong>
+                      <span className="text-[10px] font-mono text-slate-400 block">{pedigree.mother.ringNumber || '—'}</span>
+                    </div>
                   </div>
                 </div>
+
+                {/* 2ª Geração: 4 Avós */}
+                <div className="pt-2 border-t border-slate-800/60">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1.5">2ª Geração • Avós</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                    {pedigree.grandparents.map((av, idx) => (
+                      <div key={idx} className={`p-2.5 rounded-lg border space-y-1 ${av.sex === 'MALE' ? 'bg-sky-950/30 border-sky-800/30' : 'bg-rose-950/30 border-rose-800/30'}`}>
+                        <span className="text-[9px] font-black uppercase text-slate-400 block">{av.role}</span>
+                        <strong className="text-slate-200 block truncate">{av.name}</strong>
+                        <span className="text-[10px] font-mono text-slate-500 block">{av.ringNumber || '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3ª Geração: 8 Bisavós */}
+                <div className="pt-2 border-t border-slate-800/60">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1.5">3ª Geração • Bisavós</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-xs">
+                    {pedigree.greatGrandparents.map((bis, idx) => (
+                      <div key={idx} className={`p-2 rounded border text-center space-y-0.5 ${bis.sex === 'MALE' ? 'bg-sky-950/20 border-sky-800/20' : 'bg-rose-950/20 border-rose-800/20'}`}>
+                        <span className="text-[8px] font-bold text-slate-400 block truncate">{bis.role.split(' ')[0]} {bis.sex === 'MALE' ? '♂' : '♀'}</span>
+                        <p className="font-bold text-[10px] text-slate-200 truncate">{bis.name}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4ª Geração: 16 Trisavós (se houver cadastrados) */}
+                {pedigree.greatGreatGrandparents.some(t => t.isRegistered) && (
+                  <div className="pt-2 border-t border-slate-800/60">
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1.5">4ª Geração • Trisavós</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 text-xs">
+                      {pedigree.greatGreatGrandparents.map((tri, idx) => (
+                        <div key={idx} className={`p-1 rounded border text-center ${tri.sex === 'MALE' ? 'bg-sky-950/20 border-sky-800/20 text-sky-200' : 'bg-rose-950/20 border-rose-800/20 text-rose-200'}`}>
+                          <p className="text-[8px] font-mono truncate">{tri.name}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Document Footer: Autenticação Digital BirdPro */}
@@ -412,7 +462,9 @@ function PublicCertificateContent() {
         ) : (
           <div
             id="pedigree-certificate"
-            className={`w-[1140px] min-w-[1140px] h-[720px] relative shadow-2xl overflow-hidden font-sans select-none flex flex-col justify-between print:m-0 print:border-0 print:shadow-none ${
+            className={`${
+              generationsCount >= 6 ? 'w-[1360px] min-w-[1360px]' : generationsCount >= 5 ? 'w-[1240px] min-w-[1240px]' : 'w-[1140px] min-w-[1140px]'
+            } h-[740px] relative shadow-2xl overflow-hidden font-sans select-none flex flex-col justify-between print:m-0 print:border-0 print:shadow-none ${
               themeStyle === 'DARK_PRESTIGE'
                 ? 'bg-[#111827] text-white border border-slate-700'
                 : 'bg-white text-slate-900 border border-slate-300'
@@ -566,6 +618,71 @@ function PublicCertificateContent() {
                     >
                       <span className="text-[7.5px] font-bold text-slate-400 block truncate">{bis.role}</span>
                       <p className="font-bold text-[9.5px] truncate">{bis.name}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Conector 4 -> 5: Bisavós para Trisavós */}
+              {generationsCount >= 5 && (
+                <div className="w-[12px] h-[490px] relative shrink-0">
+                  <svg className="w-full h-full" viewBox="0 0 12 490" fill="none" preserveAspectRatio="none">
+                    <path d="M 0,30 H 6 V 15 H 12 M 6,30 V 45 H 12" stroke="#64748b" strokeWidth="1" />
+                    <path d="M 0,90 H 6 V 75 H 12 M 6,90 V 105 H 12" stroke="#64748b" strokeWidth="1" />
+                    <path d="M 0,150 H 6 V 135 H 12 M 6,150 V 165 H 12" stroke="#64748b" strokeWidth="1" />
+                    <path d="M 0,210 H 6 V 195 H 12 M 6,210 V 225 H 12" stroke="#64748b" strokeWidth="1" />
+                    <path d="M 0,270 H 6 V 255 H 12 M 6,270 V 285 H 12" stroke="#64748b" strokeWidth="1" />
+                    <path d="M 0,330 H 6 V 315 H 12 M 6,330 V 345 H 12" stroke="#64748b" strokeWidth="1" />
+                    <path d="M 0,390 H 6 V 375 H 12 M 6,390 V 405 H 12" stroke="#64748b" strokeWidth="1" />
+                    <path d="M 0,450 H 6 V 435 H 12 M 6,450 V 465 H 12" stroke="#64748b" strokeWidth="1" />
+                  </svg>
+                </div>
+              )}
+
+              {/* 5. Geração 4: Trisavós (16 Cards) */}
+              {generationsCount >= 5 && (
+                <div className="w-[145px] shrink-0 h-[490px] flex flex-col justify-around">
+                  {pedigree.greatGreatGrandparents.map((tri, idx) => (
+                    <div
+                      key={idx}
+                      className={`py-0.5 px-1 rounded text-center truncate ${
+                        tri.sex === 'MALE'
+                          ? 'bg-sky-950/40 text-sky-200 border border-sky-500/20 text-[7.5px]'
+                          : 'bg-rose-950/40 text-rose-200 border border-rose-500/20 text-[7.5px]'
+                      }`}
+                      title={`${tri.role}: ${tri.name}`}
+                    >
+                      {tri.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Conector 5 -> 6: Trisavós para Tataravós */}
+              {generationsCount >= 6 && (
+                <div className="w-[10px] h-[500px] relative shrink-0">
+                  <svg className="w-full h-full" viewBox="0 0 10 500" fill="none" preserveAspectRatio="none">
+                    {Array.from({ length: 16 }).map((_, i) => (
+                      <path key={i} d={`M 0,${15 + i * 31} H 5 V ${8 + i * 31} H 10 M 5,${15 + i * 31} V ${22 + i * 31} H 10`} stroke="#64748b" strokeWidth="0.8" />
+                    ))}
+                  </svg>
+                </div>
+              )}
+
+              {/* 6. Geração 5: Tataravós (32 Cards) */}
+              {generationsCount >= 6 && (
+                <div className="w-[130px] shrink-0 h-[500px] flex flex-col justify-around">
+                  {pedigree.tataravos.map((tat, idx) => (
+                    <div
+                      key={idx}
+                      className={`py-0 px-0.5 rounded text-center truncate ${
+                        tat.sex === 'MALE'
+                          ? 'bg-sky-950/50 text-sky-300 border border-sky-500/20 text-[6.5px]'
+                          : 'bg-rose-950/50 text-rose-300 border border-rose-500/20 text-[6.5px]'
+                      }`}
+                      title={`${tat.role}: ${tat.name}`}
+                    >
+                      {tat.name}
                     </div>
                   ))}
                 </div>

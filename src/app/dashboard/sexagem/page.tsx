@@ -18,8 +18,8 @@ import { db } from '@/lib/db';
 import { SexingRecord, Bird as BirdType, BirdSex } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
-import { SexBadge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
+import { DateManualInput } from '@/components/ui/date-manual-input';
 
 export default function SexagemPage() {
   const { tenant } = useAuth();
@@ -196,10 +196,9 @@ export default function SexagemPage() {
 
             <div>
               <label className="block font-bold text-slate-700 mb-1">Data do Laudo</label>
-              <input
-                type="date"
+              <DateManualInput
                 value={formData.resultDate}
-                onChange={(e) => setFormData({ ...formData, resultDate: e.target.value })}
+                onChange={(val) => setFormData({ ...formData, resultDate: val })}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
               />
             </div>

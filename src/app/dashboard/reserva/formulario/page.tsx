@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { db } from '@/lib/db'
 import { Bird, Tenant } from '@/types'
+import { DateManualInput } from '@/components/ui/date-manual-input'
 
 interface AvailableBirdItem {
   id: string
@@ -859,10 +860,9 @@ function ReservaFormContent() {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[11px] font-medium text-slate-600 block">Data Prevista</label>
-                  <input
-                    type="date"
+                  <DateManualInput
                     value={chickDate}
-                    onChange={(e) => setChickDate(e.target.value)}
+                    onChange={(val) => setChickDate(val)}
                     className="w-full h-8 px-2.5 text-xs bg-white border border-slate-300 rounded focus:outline-none focus:border-[#00c853]"
                   />
                 </div>

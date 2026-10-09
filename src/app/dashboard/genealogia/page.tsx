@@ -23,6 +23,7 @@ import { Bird, Tenant } from '@/types'
 import { PrintPedigreeModal } from '@/components/modals/print-pedigree-modal'
 import { PrintBadgeModal } from '@/components/modals/print-badge-modal'
 import { NovaGenealogiaEnvironment } from '@/components/genealogy/nova-genealogia-environment'
+import { DateManualInput } from '@/components/ui/date-manual-input'
 
 function GenealogiaContent() {
   const { tenant: authTenant } = useAuth()
@@ -81,7 +82,7 @@ function GenealogiaContent() {
   const [selectedPedigreeBird, setSelectedPedigreeBird] = useState<Bird | null>(null)
   const [selectedBadgeBird, setSelectedBadgeBird] = useState<Bird | null>(null)
   const [editingBird, setEditingBird] = useState<Bird | null>(null)
-  const [editModalTab, setEditModalTab] = useState<'GERAL' | 'AVOS' | 'BISAVOS'>('GERAL')
+  const [editModalTab, setEditModalTab] = useState<'GERAL' | 'AVOS' | 'BISAVOS' | 'TRISAVOS'>('GERAL')
   const [isTrainingOpen, setIsTrainingOpen] = useState(false)
 
   // Edit Form State com suporte a Árvore e Todos os Parentescos
@@ -112,6 +113,25 @@ function GenealogiaContent() {
       MFM: '',
       MMF: '',
       MMM: ''
+    },
+    // Trisavós (4ª Geração - 16 Parentescos)
+    trisavos: {
+      FFFF: '',
+      FFFM: '',
+      FFMF: '',
+      FFMM: '',
+      FMFF: '',
+      FMFM: '',
+      FMMF: '',
+      FMMM: '',
+      MFFF: '',
+      MFFM: '',
+      MFMF: '',
+      MFMM: '',
+      MMFF: '',
+      MMFM: '',
+      MMMF: '',
+      MMMM: ''
     }
   })
 
@@ -178,6 +198,25 @@ function GenealogiaContent() {
         MFM: bird.ancestry?.['MFM']?.name || '',
         MMF: bird.ancestry?.['MMF']?.name || '',
         MMM: bird.ancestry?.['MMM']?.name || ''
+      },
+      // Trisavós
+      trisavos: {
+        FFFF: bird.ancestry?.['FFFF']?.name || '',
+        FFFM: bird.ancestry?.['FFFM']?.name || '',
+        FFMF: bird.ancestry?.['FFMF']?.name || '',
+        FFMM: bird.ancestry?.['FFMM']?.name || '',
+        FMFF: bird.ancestry?.['FMFF']?.name || '',
+        FMFM: bird.ancestry?.['FMFM']?.name || '',
+        FMMF: bird.ancestry?.['FMMF']?.name || '',
+        FMMM: bird.ancestry?.['FMMM']?.name || '',
+        MFFF: bird.ancestry?.['MFFF']?.name || '',
+        MFFM: bird.ancestry?.['MFFM']?.name || '',
+        MFMF: bird.ancestry?.['MFMF']?.name || '',
+        MFMM: bird.ancestry?.['MFMM']?.name || '',
+        MMFF: bird.ancestry?.['MMFF']?.name || '',
+        MMFM: bird.ancestry?.['MMFM']?.name || '',
+        MMMF: bird.ancestry?.['MMMF']?.name || '',
+        MMMM: bird.ancestry?.['MMMM']?.name || ''
       }
     })
   }
@@ -211,6 +250,12 @@ function GenealogiaContent() {
     }
 
     Object.entries(editForm.bisavos).forEach(([k, val]) => {
+      if (val && val.trim()) {
+        ancestry[k] = { name: val.trim(), ringNumber: '' }
+      }
+    })
+
+    Object.entries(editForm.trisavos).forEach(([k, val]) => {
       if (val && val.trim()) {
         ancestry[k] = { name: val.trim(), ringNumber: '' }
       }
@@ -637,7 +682,18 @@ function GenealogiaContent() {
                     : 'border-transparent text-slate-600 hover:text-slate-900'
                 }`}
               >
-                3. Bisavós (3ª Geração - 8 Parentes)
+                3. Bisavós (3ª Geração - 8)
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditModalTab('TRISAVOS')}
+                className={`py-2 px-3 border-b-2 transition cursor-pointer ${
+                  editModalTab === 'TRISAVOS'
+                    ? 'border-[#00c853] text-[#00c853] bg-white rounded-t'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                4. Trisavós (4ª Geração - 16)
               </button>
             </div>
 
@@ -700,10 +756,9 @@ function GenealogiaContent() {
 
                       <div>
                         <label className="block text-xs font-semibold text-slate-600 mb-1">Data de Nascimento</label>
-                        <input
-                          type="date"
+                        <DateManualInput
                           value={editForm.birthDate}
-                          onChange={(e) => setEditForm({ ...editForm, birthDate: e.target.value })}
+                          onChange={(val) => setEditForm({ ...editForm, birthDate: val })}
                           className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-[#00c853]"
                         />
                       </div>
@@ -931,6 +986,78 @@ function GenealogiaContent() {
                   </div>
                 </div>
               )}
+
+              {/* ABA 4: TRISAVÓS (4ª GERAÇÃO - 16 ANCESTRAIS) */}
+              {editModalTab === 'TRISAVOS' && (
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-500">
+                    Preencha os 16 trisavós da ave (4ª geração). Todos os trisavós preenchidos aparecem e imprimem nos Certificados e Crachás Oficiais.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Trisavós Linha Paterna (8 aves) */}
+                    <div className="p-3 bg-sky-50/40 rounded-lg border border-sky-100 space-y-2">
+                      <span className="text-[10px] font-black uppercase text-sky-800 block">
+                        Trisavós do Lado Paterno (8 Aves)
+                      </span>
+                      {[
+                        { k: 'FFFF', label: 'Trisavô FFFF (Pai de FFF) ♂' },
+                        { k: 'FFFM', label: 'Trisavó FFFM (Mãe de FFF) ♀' },
+                        { k: 'FFMF', label: 'Trisavô FFMF (Pai de FFM) ♂' },
+                        { k: 'FFMM', label: 'Trisavó FFMM (Mãe de FFM) ♀' },
+                        { k: 'FMFF', label: 'Trisavô FMFF (Pai de FMF) ♂' },
+                        { k: 'FMFM', label: 'Trisavó FMFM (Mãe de FMF) ♀' },
+                        { k: 'FMMF', label: 'Trisavô FMMF (Pai de FMM) ♂' },
+                        { k: 'FMMM', label: 'Trisavó FMMM (Mãe de FMM) ♀' }
+                      ].map(({ k, label }) => (
+                        <div key={k}>
+                          <label className="block text-[10.5px] font-semibold text-slate-600 mb-0.5">{label}</label>
+                          <input
+                            type="text"
+                            value={(editForm.trisavos as any)[k]}
+                            onChange={(e) => setEditForm({
+                              ...editForm,
+                              trisavos: { ...editForm.trisavos, [k]: e.target.value }
+                            })}
+                            className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-white text-slate-800"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Trisavós Linha Materna (8 aves) */}
+                    <div className="p-3 bg-rose-50/40 rounded-lg border border-rose-100 space-y-2">
+                      <span className="text-[10px] font-black uppercase text-rose-800 block">
+                        Trisavós do Lado Materno (8 Aves)
+                      </span>
+                      {[
+                        { k: 'MFFF', label: 'Trisavô MFFF (Pai de MFF) ♂' },
+                        { k: 'MFFM', label: 'Trisavó MFFM (Mãe de MFF) ♀' },
+                        { k: 'MFMF', label: 'Trisavô MFMF (Pai de MFM) ♂' },
+                        { k: 'MFMM', label: 'Trisavó MFMM (Mãe de MFM) ♀' },
+                        { k: 'MMFF', label: 'Trisavô MMFF (Pai de MMF) ♂' },
+                        { k: 'MMFM', label: 'Trisavó MMFM (Mãe de MMF) ♀' },
+                        { k: 'MMMF', label: 'Trisavô MMMF (Pai de MMM) ♂' },
+                        { k: 'MMMM', label: 'Trisavó MMMM (Mãe de MMM) ♀' }
+                      ].map(({ k, label }) => (
+                        <div key={k}>
+                          <label className="block text-[10.5px] font-semibold text-slate-600 mb-0.5">{label}</label>
+                          <input
+                            type="text"
+                            value={(editForm.trisavos as any)[k]}
+                            onChange={(e) => setEditForm({
+                              ...editForm,
+                              trisavos: { ...editForm.trisavos, [k]: e.target.value }
+                            })}
+                            className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-white text-slate-800"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
 
               {/* Bottom Actions */}
               <div className="pt-3 border-t border-slate-200 flex flex-wrap justify-between items-center gap-2">

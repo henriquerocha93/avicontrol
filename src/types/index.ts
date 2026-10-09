@@ -719,3 +719,47 @@ export interface AiLearnedInsight {
   updatedAt: string;
 }
 
+// Marcador de Canto & Torneio (Roda, Treino e Competição Silvestre)
+export type TournamentMode = '10_MIN' | '15_MIN';
+export type TournamentSessionType = 'RODA' | 'TREINO' | 'TORNEIO' | 'BADERNA' | 'EM_CASA';
+
+export interface MinuteCount {
+  minute: number; // 1 to 10 or 1 to 15
+  count: number;  // Cantos neste minuto
+  pace?: number;  // Ritmo / média até o momento
+}
+
+export interface MexidaEvaluation {
+  status: 'VALIDATED' | 'ATTENTION' | 'REGULAR';
+  title: string;
+  description: string;
+}
+
+export interface TournamentSession {
+  id: string;
+  tenantId: string;
+  birdId?: string;
+  birdName: string;
+  birdRing?: string;
+  birdSpecies?: string;
+  date: string; // YYYY-MM-DD
+  time?: string; // HH:mm
+  type: TournamentSessionType;
+  mode: TournamentMode; // '10_MIN' | '15_MIN'
+  totalSeconds: number; // Ex: 600 ou 900
+  totalSongs: number;
+  songsPerMinute: number;
+  bestMinute: { minute: number; count: number };
+  worstMinute: { minute: number; count: number };
+  minuteCounts: MinuteCount[];
+  projection10Min: number;
+  projection15Min: number;
+  mexidaEvaluation: MexidaEvaluation;
+  notes?: string;
+  placement?: string; // Classificação / Colocação no dia (ex: '1º Lugar', '2º Lugar', '3º', 'Finalista', etc.)
+  trophy?: boolean;   // Se conquistou troféu / pódio
+  location?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+

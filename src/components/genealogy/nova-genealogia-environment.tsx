@@ -27,6 +27,7 @@ import { firebaseSync } from '@/lib/firebase-service'
 import { Bird } from '@/types'
 import { PrintPedigreeModal } from '@/components/modals/print-pedigree-modal'
 import { PrintBadgeModal } from '@/components/modals/print-badge-modal'
+import { resolvePedigreeTree, inheritFullAncestryFromCouple } from '@/lib/pedigree'
 
 // Desenho nítido e autêntico de passarinho pousado no galho, fiel ao print de genealogia
 export function PassarinhoIcon({ 
@@ -323,6 +324,15 @@ export function NovaGenealogiaEnvironment({
   const [manualRing, setManualRing] = useState('')
   const [saveSuccess, setSaveSuccess] = useState(false)
 
+  // Couple Selection Modal (Criar filhote herdando pai e mãe)
+  const [isCoupleModalOpen, setIsCoupleModalOpen] = useState(false)
+  const [coupleFatherId, setCoupleFatherId] = useState('')
+  const [coupleMotherId, setCoupleMotherId] = useState('')
+  const [filhoteName, setFilhoteName] = useState('')
+  const [filhoteRing, setFilhoteRing] = useState('')
+  const [filhoteSex, setFilhoteSex] = useState<'MALE' | 'FEMALE' | 'UNKNOWN'>('UNKNOWN')
+  const [coupleSuccessMsg, setCoupleSuccessMsg] = useState<string | null>(null)
+
   // Open modal to select bird
   const handleOpenSelector = (target: string) => {
     setModalTarget(target)
@@ -341,7 +351,7 @@ export function NovaGenealogiaEnvironment({
     )
   }
 
-  // Resolve recursivamente os ancestrais de uma ave a partir do plantel
+  // Resolve recursivamente os ancestrais de uma ave a partir do plantel herdando árvores completas
   const resolveAncestors = (
     bird: Bird,
     basePath: string,
@@ -351,6 +361,62 @@ export function NovaGenealogiaEnvironment({
   ) => {
     if (basePath.length >= MAX_LEVELS) return
     visited.add(bird.id)
+
+    // 0. Resolve árvore profunda usando o motor centralizado (avós, bisavós, trisavós e tataravós)
+    try {
+      const resolvedTree = resolvePedigreeTree(bird, allBirds)
+      if (resolvedTree && resolvedTree.nodesByPath) {
+        for (const [subPath, node] of Object.entries(resolvedTree.nodesByPath)) {
+          const fullPath = basePath + subPath
+          if (fullPath.length <= MAX_LEVELS && node && node.isRegistered && node.name && node.name !== 'INDEFINIDO' && node.name !== 'INDEFINIDA') {
+            if (!onlyEmpty || !acc[fullPath]?.name) {
+              acc[fullPath] = {
+                id: node.id.startsWith('empty-') || node.id.startsWith('gen') || node.id.startsWith('anc-') ? undefined : node.id,
+                name: node.name,
+                ringNumber: node.ringNumber && node.ringNumber !== '—' ? node.ringNumber : '',
+                sex: pathGender(fullPath)
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Erro ao resolver pedigree:', e)
+    }
+
+    // 1. Herda diretamente o mapa de linhagem salvo (bird.ancestry) com prefixo do caminho
+    if (bird.ancestry) {
+      for (const [subPath, n] of Object.entries(bird.ancestry)) {
+        const fullPath = basePath + subPath
+        if (fullPath.length <= MAX_LEVELS && n && n.name && n.name !== 'INDEFINIDO' && n.name !== 'INDEFINIDA') {
+          if (!onlyEmpty || !acc[fullPath]?.name) {
+            acc[fullPath] = {
+              id: n.id,
+              name: n.name,
+              ringNumber: n.ringNumber || '',
+              sex: pathGender(fullPath)
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Herda campos legados de avós
+    const legacy: Array<[string, string | undefined]> = [
+      ['FF', bird.paternalGrandfatherId],
+      ['FM', bird.paternalGrandmotherId],
+      ['MF', bird.maternalGrandfatherId],
+      ['MM', bird.maternalGrandmotherId]
+    ]
+    for (const [p, nm] of legacy) {
+      const fullPath = basePath + p
+      if (fullPath.length <= MAX_LEVELS && nm && nm !== 'INDEFINIDO' && nm !== 'INDEFINIDA' && (!onlyEmpty || !acc[fullPath]?.name)) {
+        const f = findBird(undefined, undefined, nm)
+        acc[fullPath] = { id: f?.id, name: f?.name || nm, ringNumber: f?.ringNumber || '', sex: pathGender(fullPath) }
+      }
+    }
+
+    // 3. Continua recursão para pais no plantel
     const parents: Array<['F' | 'M', string | undefined, string | undefined, string | undefined]> = [
       ['F', bird.fatherId, bird.fatherRing, bird.fatherName],
       ['M', bird.motherId, bird.motherRing, bird.motherName]
@@ -423,13 +489,83 @@ export function NovaGenealogiaEnvironment({
     } else {
       const acc: Record<string, NodeData> = { ...nodes }
       acc[target] = { ...data, sex: pathGender(target) }
-      // Preenche gerações mais antigas vazias com os ancestrais da ave escolhida
-      resolveAncestors(bird, target, acc, true, new Set())
+      // Herda automaticamente toda a linhagem ancestral do pássaro selecionado
+      resolveAncestors(bird, target, acc, false, new Set())
       setNodes(acc)
       setLevels(l => Math.max(l, deepestLevel(acc)))
+      
+      setCoupleSuccessMsg(`Linhagem de ${bird.name} herdada com sucesso para o nó ${ancestorLabel(target)}!`)
+      setTimeout(() => setCoupleSuccessMsg(null), 4000)
     }
 
     setModalTarget(null)
+  }
+
+  // Gera árvore de filhote a partir de um casal do plantel
+  const handleApplyCouple = () => {
+    if (!coupleFatherId && !coupleMotherId) return
+
+    const fatherBird = allBirds.find(b => b.id === coupleFatherId)
+    const motherBird = allBirds.find(b => b.id === coupleMotherId)
+
+    const childName = filhoteName.trim() || `Filhote (${fatherBird?.name?.split(' ')[0] || 'Pai'} x ${motherBird?.name?.split(' ')[0] || 'Mãe'})`
+    const childData: NodeData = {
+      name: childName,
+      ringNumber: filhoteRing.trim() || '',
+      sex: filhoteSex
+    }
+
+    setMainBird(childData)
+    setSelectedFullBird(null) // Novo filhote a ser salvo no plantel
+
+    const acc: Record<string, NodeData> = {}
+
+    // 1. Puxa árvore ancestral completa do Pai para 'F', 'FF', 'FM', 'FFF', etc.
+    if (fatherBird) {
+      acc['F'] = {
+        id: fatherBird.id,
+        name: fatherBird.name,
+        ringNumber: fatherBird.ringNumber || '',
+        sex: 'MALE'
+      }
+      resolveAncestors(fatherBird, 'F', acc, false, new Set())
+    }
+
+    // 2. Puxa árvore ancestral completa da Mãe para 'M', 'MF', 'MM', 'MFF', etc.
+    if (motherBird) {
+      acc['M'] = {
+        id: motherBird.id,
+        name: motherBird.name,
+        ringNumber: motherBird.ringNumber || '',
+        sex: 'FEMALE'
+      }
+      resolveAncestors(motherBird, 'M', acc, false, new Set())
+    }
+
+    // 3. Herança profunda direta via inheritFullAncestryFromCouple (garante todas as 5 gerações)
+    const fullAncestry = inheritFullAncestryFromCouple(fatherBird, motherBird, allBirds)
+    for (const [p, n] of Object.entries(fullAncestry)) {
+      if (p.length <= MAX_LEVELS && n && n.name && n.name !== 'INDEFINIDO' && n.name !== 'INDEFINIDA') {
+        if (!acc[p]?.name) {
+          acc[p] = {
+            id: n.id,
+            name: n.name,
+            ringNumber: n.ringNumber || '',
+            sex: pathGender(p)
+          }
+        }
+      }
+    }
+
+    setNodes(acc)
+    const maxGen = Math.max(1, deepestLevel(acc))
+    setLevels(maxGen)
+    setIsCoupleModalOpen(false)
+
+    setCoupleSuccessMsg(
+      `Árvore do filhote "${childName}" gerada com sucesso! ${maxGen} gerações herdadas do casal (${fatherBird?.name || 'Pai'} & ${motherBird?.name || 'Mãe'}). Clique em "Salvar Genealogia" para gravar no plantel.`
+    )
+    setTimeout(() => setCoupleSuccessMsg(null), 8000)
   }
 
   // Quick Ring Search Handler
@@ -612,6 +748,9 @@ export function NovaGenealogiaEnvironment({
           maternalGrandmotherId: nodes.MM?.name || undefined,
           ancestry,
         })
+        const updated = db.getBirdById(currentBirdId)
+        if (updated) setSelectedFullBird(updated)
+        setAllBirds(db.getBirds())
       }
 
       // Sincroniza na nuvem
@@ -973,7 +1112,35 @@ export function NovaGenealogiaEnvironment({
             <Search className="w-3.5 h-3.5" />
             <span>Buscar Árvore</span>
           </button>
+
+          {/* Couple Inheritance Button */}
+          <button
+            type="button"
+            onClick={() => setIsCoupleModalOpen(true)}
+            className="px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+            title="Selecione um pai e mãe do plantel para herdar automaticamente as árvores ancestrais de ambos para um filhote"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Puxar de Casal do Plantel</span>
+          </button>
         </div>
+
+        {/* Couple Success Feedback Alert */}
+        {coupleSuccessMsg && (
+          <div className="mt-2.5 p-3 bg-emerald-50 border border-emerald-300 rounded-lg text-emerald-950 text-xs flex items-center justify-between animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{coupleSuccessMsg}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCoupleSuccessMsg(null)}
+              className="text-emerald-700 hover:text-emerald-950 p-1 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Not Found Alert */}
         {ringNotFound && (
@@ -1502,6 +1669,176 @@ export function NovaGenealogiaEnvironment({
           isOpen={isBadgeOpen}
           onClose={() => setIsBadgeOpen(false)}
         />
+      )}
+
+      {/* Modal: Puxar Árvore de Casal do Plantel */}
+      {isCoupleModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-xl w-full p-5 space-y-4 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center font-bold">
+                  🐣
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-slate-900">
+                    Puxar Genealogia de Casal do Plantel
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Selecione o pai e a mãe cadastrados para herdar automaticamente todas as gerações da árvore deles para o novo filhote.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCoupleModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Seleção do Pai */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+                  <span className="text-sky-600 font-bold">♂ Pai (Macho):</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Herdará toda a linhagem paterna (avós, bisavós, trisavós...)</span>
+                </label>
+                <select
+                  value={coupleFatherId}
+                  onChange={(e) => setCoupleFatherId(e.target.value)}
+                  className="w-full text-xs border border-gray-300 rounded-lg p-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500 font-medium"
+                >
+                  <option value="">-- Selecione o Pai do Plantel --</option>
+                  {allBirds
+                    .filter(b => b.sex !== 'FEMALE')
+                    .map(b => {
+                      const hasAncestry = !!(b.ancestry && Object.keys(b.ancestry).length > 0) || !!(b.fatherName || b.motherName)
+                      return (
+                        <option key={b.id} value={b.id}>
+                          ♂ {b.name || 'Sem Nome'} {b.ringNumber ? `(${b.ringNumber})` : ''} {hasAncestry ? '★ (com árvore)' : ''}
+                        </option>
+                      )
+                    })}
+                </select>
+              </div>
+
+              {/* Seleção da Mãe */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+                  <span className="text-rose-600 font-bold">♀ Mãe (Fêmea):</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Herdará toda a linhagem materna (avós, bisavós, trisavós...)</span>
+                </label>
+                <select
+                  value={coupleMotherId}
+                  onChange={(e) => setCoupleMotherId(e.target.value)}
+                  className="w-full text-xs border border-gray-300 rounded-lg p-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500 font-medium"
+                >
+                  <option value="">-- Selecione a Mãe do Plantel --</option>
+                  {allBirds
+                    .filter(b => b.sex !== 'MALE')
+                    .map(b => {
+                      const hasAncestry = !!(b.ancestry && Object.keys(b.ancestry).length > 0) || !!(b.fatherName || b.motherName)
+                      return (
+                        <option key={b.id} value={b.id}>
+                          ♀ {b.name || 'Sem Nome'} {b.ringNumber ? `(${b.ringNumber})` : ''} {hasAncestry ? '★ (com árvore)' : ''}
+                        </option>
+                      )
+                    })}
+                </select>
+              </div>
+
+              {/* Dados do Filhote */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                <span className="text-[11px] font-bold text-slate-700 block uppercase tracking-wider">
+                  Dados do Novo Filhote (Opcional ou preencha agora)
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block mb-1">Nome do Filhote</label>
+                    <input
+                      type="text"
+                      value={filhoteName}
+                      onChange={e => setFilhoteName(e.target.value)}
+                      placeholder="Ex: Trovão Jr, Princesa..."
+                      className="w-full text-xs p-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block mb-1">Anilha do Filhote</label>
+                    <input
+                      type="text"
+                      value={filhoteRing}
+                      onChange={e => setFilhoteRing(e.target.value)}
+                      placeholder="Ex: 2026-001..."
+                      className="w-full text-xs p-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 block mb-1">Sexo do Filhote</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFilhoteSex('MALE')}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition cursor-pointer ${
+                        filhoteSex === 'MALE'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-slate-700 border-gray-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      ♂ Macho
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFilhoteSex('FEMALE')}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition cursor-pointer ${
+                        filhoteSex === 'FEMALE'
+                          ? 'bg-rose-600 text-white border-rose-600'
+                          : 'bg-white text-slate-700 border-gray-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      ♀ Fêmea
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFilhoteSex('UNKNOWN')}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition cursor-pointer ${
+                        filhoteSex === 'UNKNOWN'
+                          ? 'bg-slate-700 text-white border-slate-700'
+                          : 'bg-white text-slate-700 border-gray-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      ? A Definir
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Ações */}
+            <div className="pt-2 flex items-center justify-end gap-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setIsCoupleModalOpen(false)}
+                className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 rounded-lg transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyCouple}
+                disabled={!coupleFatherId && !coupleMotherId}
+                className="px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Puxar Árvores e Gerar Genealogia</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

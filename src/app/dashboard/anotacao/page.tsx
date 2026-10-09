@@ -28,6 +28,7 @@ import { db } from '@/lib/db';
 import { useAuth } from '@/lib/auth-context';
 import { NoteItem, NotePriority } from '@/types';
 import { Button } from '@/components/ui/button';
+import { DateManualInput } from '@/components/ui/date-manual-input';
 
 const PRIORITY_CONFIG: Record<NotePriority, { label: string; bgBar: string; border: string; text: string; bgCard: string; dot: string }> = {
   HIGH: {
@@ -315,11 +316,10 @@ export default function AnotacoesPage() {
               {noteType === 'CALENDAR_REMINDER' ? (
                 <div className="space-y-2 p-3 bg-sky-50/60 rounded-xl border border-sky-200 animate-in fade-in">
                   <div className="relative">
-                    <input
-                      type="date"
+                    <DateManualInput
                       required={noteType === 'CALENDAR_REMINDER'}
                       value={agendaDate}
-                      onChange={(e) => setAgendaDate(e.target.value)}
+                      onChange={(val) => setAgendaDate(val)}
                       className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-md text-xs text-slate-800 focus:outline-none focus:border-[#0284c7]"
                     />
                   </div>
