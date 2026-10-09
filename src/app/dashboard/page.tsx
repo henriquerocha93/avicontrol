@@ -23,7 +23,9 @@ import {
   HelpCircle,
   ExternalLink,
   ChevronRight,
-  Gift
+  Gift,
+  Timer,
+  Trophy
 } from 'lucide-react';
 import { 
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, 
@@ -237,10 +239,16 @@ function CriatorioDashboard() {
               Cadastrar Ave
             </Button>
           </Link>
-          <Link href="/dashboard/importacao">
-            <Button variant="outline" size="md" className="border-emerald-400/40 text-white hover:bg-emerald-950/50">
-              <UploadCloud className="w-4 h-4 mr-1.5" />
-              Importar Anilhas
+          <Link href="/dashboard/torneio">
+            <Button 
+              size="md" 
+              className="bg-emerald-950/70 hover:bg-emerald-900 text-emerald-200 hover:text-white border border-emerald-400/50 shadow-lg font-bold flex items-center gap-2 group transition-all"
+            >
+              <div className="relative flex items-center justify-center">
+                <Timer className="w-4 h-4 text-emerald-400 group-hover:rotate-45 transition-transform" />
+                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-amber-400 rounded-full animate-ping" />
+              </div>
+              <span>Marcador de Canto</span>
             </Button>
           </Link>
         </div>

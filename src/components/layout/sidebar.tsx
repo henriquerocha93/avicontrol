@@ -38,7 +38,8 @@ import {
   Target,
   Edit3,
   Award,
-  Trophy
+  Trophy,
+  Timer
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
@@ -327,6 +328,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         ? 'bg-[#00c853] text-white font-semibold' 
                         : item.name === 'Criar Crachá'
                         ? 'text-amber-300 font-bold hover:text-white'
+                        : item.name === 'Torneio'
+                        ? 'text-emerald-300 font-bold hover:text-white'
                         : 'text-[#8b949e]'
                     )}
                   >
@@ -353,11 +356,46 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                             <path d="M12 4.2L13.6 7.6L17.2 8.1L14.6 10.7L15.2 14.3L12 12.6L8.8 14.3L9.4 10.7L6.8 8.1L10.4 7.6L12 4.2Z" fill="#ffffff" />
                           </svg>
                         </div>
+                      ) : item.name === 'Torneio' ? (
+                        <div className="relative w-4 h-4 shrink-0 flex items-center justify-center">
+                          {/* Cronômetro Animado */}
+                          <svg className="w-4 h-4 shrink-0 drop-shadow-[0_0_6px_rgba(16,185,129,0.9)]" viewBox="0 0 24 24" fill="none">
+                            {/* Botão Superior & Coroa */}
+                            <path d="M10 2h4M12 2v2" stroke="#34d399" strokeWidth="1.8" strokeLinecap="round" />
+                            <path d="M19 5.5l-1.5 1.5M5 5.5l1.5 1.5" stroke="#fbbf24" strokeWidth="1.4" strokeLinecap="round" />
+                            {/* Caixa / Mostrador */}
+                            <circle cx="12" cy="14" r="7.5" stroke="#10b981" strokeWidth="1.8" fill="#13231b" />
+                            {/* Marcações de Minutos */}
+                            <line x1="12" y1="8" x2="12" y2="9.5" stroke="#6ee7b7" strokeWidth="1" strokeLinecap="round" />
+                            <line x1="12" y1="18.5" x2="12" y2="20" stroke="#6ee7b7" strokeWidth="1" strokeLinecap="round" />
+                            <line x1="6" y1="14" x2="7.5" y2="14" stroke="#6ee7b7" strokeWidth="1" strokeLinecap="round" />
+                            <line x1="16.5" y1="14" x2="18" y2="14" stroke="#6ee7b7" strokeWidth="1" strokeLinecap="round" />
+                            {/* Pino Central */}
+                            <circle cx="12" cy="14" r="1.3" fill="#fbbf24" />
+                            {/* Ponteiro Rotativo de Cronômetro (Gira suavemente) */}
+                            <g style={{ transformOrigin: '12px 14px', animation: 'spin 2.4s linear infinite' }}>
+                              <line x1="12" y1="14" x2="12" y2="8" stroke="#fbbf24" strokeWidth="1.8" strokeLinecap="round" />
+                            </g>
+                          </svg>
+                          {/* Radar Ping no Cronômetro */}
+                          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400 animate-ping opacity-80" />
+                        </div>
                       ) : (
                         <Icon className={cn('w-4 h-4 shrink-0', isActive ? 'text-white' : 'text-[#8b949e]')} />
                       )}
                       <span>{item.name}</span>
                     </div>
+                    {item.name === 'Torneio' && (
+                      <span className={cn(
+                        'px-2 py-0.5 text-[9px] font-mono font-black uppercase rounded-full tracking-wider flex items-center gap-1 shadow-xs',
+                        isActive 
+                          ? 'bg-white text-emerald-800' 
+                          : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 animate-pulse'
+                      )}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping inline-block" />
+                        <span>10&apos; / 15&apos;</span>
+                      </span>
+                    )}
                     {item.name === 'Treinamento' && (
                       <span className={cn(
                         'px-2 py-0.5 text-[9px] font-black uppercase rounded-full tracking-wider animate-pulse flex items-center gap-1 shadow-xs',
