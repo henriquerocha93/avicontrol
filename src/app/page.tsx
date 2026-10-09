@@ -42,7 +42,9 @@ import {
   Timer,
   WifiOff,
   Flame,
-  Share2
+  Share2,
+  Volume2,
+  Vibrate
 } from 'lucide-react';
 import { Logo } from '@/components/ui/logo';
 import { Button } from '@/components/ui/button';
@@ -577,81 +579,122 @@ export default function LandingPage() {
                     </div>
                   </div>
 
-                  {/* Chamada para Ação */}
+                  {/* Selo Informativo sem o botão */}
                   <div className="pt-2 flex flex-wrap items-center gap-3">
-                    <Link href="/dashboard/torneio">
-                      <Button size="md" className="bg-gradient-to-r from-[#00c853] to-emerald-600 hover:from-emerald-500 hover:to-emerald-700 text-white font-black text-xs sm:text-sm px-6 py-3 shadow-[0_0_20px_rgba(0,200,83,0.4)] rounded-2xl flex items-center gap-2 border border-emerald-300/40 cursor-pointer">
-                        <Timer className="w-4 h-4 animate-spin" style={{ animationDuration: '4s' }} />
-                        <span>Abrir Marcador de Cantos Agora →</span>
-                      </Button>
-                    </Link>
-                    <span className="text-[11px] text-emerald-400/90 font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Incluso em todos os planos BIRDPRO
+                    <span className="text-xs text-emerald-300 font-bold flex items-center gap-2 bg-emerald-950/70 px-4 py-2 rounded-2xl border border-emerald-700/50 shadow-sm">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Incluso em todos os planos BIRDPRO • 100% Offline na Roda</span>
                     </span>
                   </div>
                 </div>
 
-                {/* LADO DIREITO: MOCKUP INTERATIVO E CHAMATIVO DO MARCADOR */}
-                <div className="lg:col-span-5">
-                  <div className="relative mx-auto max-w-sm rounded-3xl p-5 bg-gradient-to-b from-[#0c1e17] to-[#06100c] border border-emerald-500/40 shadow-2xl space-y-4">
-                    
-                    {/* Topo do Mockup Celular */}
-                    <div className="flex items-center justify-between pb-3 border-b border-emerald-900/60">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                        <span className="text-[11px] font-black text-emerald-300 uppercase tracking-wider">
-                          RODA AO VIVO • 10 MIN
+                {/* LADO DIREITO: CONTADOR MANUAL MECÂNICO 4 DÍGITOS (IDÊNTICO AO SEGUNDO PRINT) */}
+                <div className="lg:col-span-5 flex justify-center">
+                  <div className="relative w-full max-w-sm">
+                    {/* Glow de Fundo Neon */}
+                    <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/25 via-cyan-500/20 to-emerald-500/25 rounded-[44px] blur-xl opacity-80" />
+
+                    {/* Chassi do Contador */}
+                    <div className="relative bg-gradient-to-b from-[#1c2430] via-[#0f141c] to-[#080b0f] rounded-[40px] p-5 sm:p-6 border-4 border-slate-600/60 shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_2px_4px_rgba(255,255,255,0.25),inset_0_-8px_16px_rgba(0,0,0,0.95)] text-white overflow-hidden select-none">
+                      
+                      {/* ALAVANCA SUPERIOR METÁLICA DE DISPARO */}
+                      <div className="flex justify-center -mt-2 mb-3">
+                        <div className="relative group">
+                          {/* Base da Alavanca */}
+                          <div className="w-24 sm:w-28 h-6 bg-gradient-to-b from-slate-200 via-slate-400 to-slate-600 rounded-t-xl border-t-2 border-x-2 border-white/60 shadow-lg flex items-center justify-center">
+                            {/* Textura serrilhada antiderrapante */}
+                            <div className="flex gap-1">
+                              <span className="w-1.5 h-3 bg-slate-700/80 rounded-full" />
+                              <span className="w-1.5 h-3 bg-slate-700/80 rounded-full" />
+                              <span className="w-1.5 h-3 bg-slate-700/80 rounded-full" />
+                              <span className="w-1.5 h-3 bg-slate-700/80 rounded-full" />
+                              <span className="w-1.5 h-3 bg-slate-700/80 rounded-full" />
+                            </div>
+                          </div>
+                          <div className="text-[9px] text-center font-mono font-bold tracking-widest text-slate-400 mt-1 uppercase">
+                            Alavanca de Disparo
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* CABEÇALHO DO CHASSIS DE TITÂNIO */}
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-700/60">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#00c853]" />
+                          <span className="font-mono text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-emerald-400">
+                            BIRDPRO • TALLY V-4 CYBER
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[9px] sm:text-[10px] font-mono font-bold text-slate-300">
+                            100% OFFLINE
+                          </span>
+                          <div className="p-1 rounded-md bg-slate-800 border border-slate-700 text-slate-300">
+                            <Volume2 className="w-3 h-3 text-emerald-400" />
+                          </div>
+                          <div className="p-1 rounded-md bg-slate-800 border border-slate-700 text-slate-300">
+                            <Vibrate className="w-3 h-3 text-emerald-400" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* VISOR ANALÓGICO COM 4 ROLETAS MECÂNICAS */}
+                      <div className="relative my-4 sm:my-5">
+                        {/* Botão Serrilhado Lateral (Knurled Reset Knob) */}
+                        <div className="absolute -right-6 top-1/2 -translate-y-1/2 w-4.5 h-16 bg-gradient-to-r from-slate-400 via-slate-200 to-slate-500 rounded-r-lg border border-slate-600 shadow-md flex flex-col justify-between py-1 px-0.5">
+                          <div className="w-full h-0.5 bg-slate-700" />
+                          <div className="w-full h-0.5 bg-slate-700" />
+                          <div className="w-full h-0.5 bg-slate-700" />
+                          <div className="w-full h-0.5 bg-slate-700" />
+                          <div className="w-full h-0.5 bg-slate-700" />
+                          <div className="w-full h-0.5 bg-slate-700" />
+                        </div>
+
+                        {/* Moldura Biselada de Aço */}
+                        <div className="bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 p-2 sm:p-3 rounded-3xl border-2 border-slate-500 shadow-[inset_0_4px_8px_rgba(0,0,0,0.8),0_10px_25px_rgba(0,0,0,0.5)]">
+                          {/* Abertura Escura do Visor */}
+                          <div className="bg-black/95 rounded-2xl p-2.5 sm:p-3.5 border-2 border-slate-800 shadow-[inset_0_10px_20px_rgba(0,0,0,0.95)]">
+                            <div className="flex items-center justify-center gap-1.5 sm:gap-2.5">
+                              {['0', '0', '0', '0'].map((digit, idx) => (
+                                <div
+                                  key={idx}
+                                  className="relative w-12 sm:w-15 h-20 sm:h-24 rounded-xl overflow-hidden bg-gradient-to-b from-[#0a0a0a] via-[#1f1f1f] to-[#080808] border border-slate-700 flex items-center justify-center shadow-[inset_0_12px_14px_rgba(0,0,0,0.95),inset_0_-12px_14px_rgba(0,0,0,0.95)]"
+                                >
+                                  {/* Ranhura e curvatura 3D de tambor mecânico */}
+                                  <div className="absolute top-0 left-0 right-0 h-1/4 bg-gradient-to-b from-black/90 to-transparent pointer-events-none" />
+                                  <div className="absolute bottom-0 left-0 right-0 h-1/4 bg-gradient-to-t from-black/90 to-transparent pointer-events-none" />
+                                  <div className="absolute top-1/2 left-0 right-0 h-px bg-white/5 pointer-events-none" />
+                                  
+                                  {/* Dígito branco nítido */}
+                                  <span className="text-4xl sm:text-5xl font-mono font-black text-white tracking-tighter drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] select-none">
+                                    {digit}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Linha de Calibração Inferior */}
+                        <div className="flex items-center justify-between px-2 mt-2 text-[9px] sm:text-[10px] font-mono text-slate-400">
+                          <span className="flex items-center gap-1 text-slate-300">
+                            <span className="w-1.5 h-1.5 bg-rose-500 rounded-full inline-block" />
+                            CALIBRADO 0000
+                          </span>
+                          <span className="text-slate-400">MODALIDADE SELECIONADA: 10 MIN</span>
+                        </div>
+                      </div>
+
+                      {/* BARRA INFERIOR DE ESTADO DO CRONÔMETRO */}
+                      <div className="bg-slate-900/90 rounded-2xl p-2.5 sm:p-3 border border-slate-800 flex items-center justify-between text-[11px] sm:text-xs">
+                        <span className="text-slate-400 font-medium">Estado do Cronômetro:</span>
+                        <span className="font-mono font-bold text-emerald-400 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                          PRONTO PARA A RODA
                         </span>
                       </div>
-                      <div className="px-2 py-0.5 rounded-lg bg-emerald-950 border border-emerald-800 text-[10px] font-mono text-emerald-400 font-bold">
-                        ⏱️ 10:00 OFICIAL
-                      </div>
                     </div>
-
-                    {/* Ave e Cronômetro */}
-                    <div className="text-center space-y-1">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                        Coleiro Trovão (Anilha 041738)
-                      </span>
-                      <div className="text-6xl sm:text-7xl font-black text-[#00e676] font-mono tracking-tight drop-shadow-[0_0_25px_rgba(0,230,118,0.5)]">
-                        134
-                      </div>
-                      <div className="flex items-center justify-center gap-1 text-xs font-bold text-emerald-300">
-                        <Flame className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Ritmo: 13.4 cantos por minuto</span>
-                      </div>
-                    </div>
-
-                    {/* Botão de Toque Touch Pad com Ondas */}
-                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-[#00c853] to-teal-600 text-white text-center shadow-lg shadow-emerald-500/30 border border-emerald-400/50 space-y-0.5 animate-pulse">
-                      <div className="text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>TOQUE PARA MARCAR CANTO</span>
-                      </div>
-                      <span className="text-[10px] text-emerald-100 font-medium block opacity-90">
-                        Resposta tátil (vibração) + som sem internet
-                      </span>
-                    </div>
-
-                    {/* Projeção & Mexida Validada */}
-                    <div className="grid grid-cols-2 gap-2 text-center pt-1">
-                      <div className="p-2.5 rounded-xl bg-[#091711] border border-emerald-900/60">
-                        <span className="text-[9px] text-slate-400 uppercase font-bold block">10 Minutos</span>
-                        <span className="text-lg font-black text-white font-mono">134 cantos</span>
-                      </div>
-                      <div className="p-2.5 rounded-xl bg-emerald-950/80 border border-emerald-500/50">
-                        <span className="text-[9px] text-emerald-400 uppercase font-black block">Projeção 15 Min 🏆</span>
-                        <span className="text-lg font-black text-emerald-300 font-mono">201 cantos</span>
-                      </div>
-                    </div>
-
-                    {/* Badge de Mexida Validada */}
-                    <div className="p-2 rounded-xl bg-emerald-950/60 border border-emerald-500/30 flex items-center gap-2 text-[10px] text-emerald-200">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span><strong>Mexida Validada:</strong> Cantada sustentada com máxima fibra!</span>
-                    </div>
-
                   </div>
                 </div>
 
