@@ -1313,8 +1313,8 @@ export function NovaGenealogiaEnvironment({
 
             <div className="h-4 w-[1px] bg-gray-300 hidden sm:block" />
 
-            {/* Quantidade de gerações e botões + / - */}
-            <div className="flex items-center gap-1">
+            {/* Quantidade de gerações e botões + / - (visível no desktop/tablet sm:) */}
+            <div className="hidden sm:flex items-center gap-1">
               <span className="text-[11px] font-semibold text-slate-600 mr-1 tabular-nums whitespace-nowrap">
                 {levels} {levels === 1 ? 'geração' : 'gerações'}
               </span>
@@ -1374,8 +1374,8 @@ export function NovaGenealogiaEnvironment({
             </div>
           )}
 
-          {/* Painel Flutuante de Zoom & Lupa no Canto Inferior Direito do Canvas */}
-          <div className="absolute bottom-4 right-4 z-30 flex items-center gap-1 bg-white/95 backdrop-blur-xs border border-gray-300 rounded-lg shadow-md p-1">
+          {/* Painel Flutuante de Zoom & Lupa no Canto Inferior Direito do Canvas (visível apenas em telas maiores; no mobile fica no rodapé fixo) */}
+          <div className="hidden sm:flex absolute bottom-4 right-4 z-30 items-center gap-1 bg-white/95 backdrop-blur-xs border border-gray-300 rounded-lg shadow-md p-1">
             <button
               type="button"
               onClick={handleToggleMagnifier}
@@ -1508,11 +1508,53 @@ export function NovaGenealogiaEnvironment({
             <div />
           )}
 
+          {/* Controles Exclusivos Mobile: Aumentar/Diminuir Gerações da Árvore e Zoom (fora do canvas para não cobrir os cards) */}
+          <div className="flex sm:hidden items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-2 py-1 shadow-2xs">
+            <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap tabular-nums">
+              {levels} {levels === 1 ? 'geração' : 'gerações'}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleAddLevel}
+                disabled={levels >= MAX_LEVELS}
+                className="w-7 h-7 bg-[#94a3b8] hover:bg-[#64748b] active:bg-[#475569] disabled:opacity-30 text-white rounded flex items-center justify-center shadow-xs transition cursor-pointer"
+                title="Adicionar mais uma geração de parentes"
+                aria-label="Adicionar geração"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRemoveLevel}
+                disabled={levels <= 1}
+                className="w-7 h-7 bg-[#94a3b8] hover:bg-[#64748b] active:bg-[#475569] disabled:opacity-30 text-white rounded flex items-center justify-center shadow-xs transition cursor-pointer"
+                title="Remover a última geração"
+                aria-label="Remover geração"
+              >
+                <Minus className="w-3.5 h-3.5 stroke-[2.5]" />
+              </button>
+
+              <div className="h-4 w-[1px] bg-gray-200 mx-0.5" />
+
+              <button
+                type="button"
+                onClick={handleResetFit}
+                className="w-7 h-7 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded flex items-center justify-center transition cursor-pointer"
+                title="Enquadrar árvore na tela"
+                aria-label="Enquadrar tela"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
           {/* Salvar Button (Cyan/Cerulean Blue matching screenshot) */}
           <button
             type="button"
             onClick={handleSave}
-            className="px-5 py-1.5 bg-[#009fe3] hover:bg-[#008ac7] active:bg-[#007cb3] text-white font-bold text-xs rounded shadow-xs flex items-center gap-1.5 transition cursor-pointer"
+            className="px-5 py-1.5 bg-[#009fe3] hover:bg-[#008ac7] active:bg-[#007cb3] text-white font-bold text-xs rounded shadow-xs flex items-center gap-1.5 transition cursor-pointer shrink-0"
           >
             <Check className="w-3.5 h-3.5 stroke-[3]" />
             <span>Salvar</span>
