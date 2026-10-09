@@ -33,7 +33,9 @@ import {
   Search,
   Filter,
   Eye,
-  Info
+  Info,
+  Activity,
+  Zap
 } from 'lucide-react';
 import { db } from '@/lib/db';
 import { useAuth } from '@/lib/auth-context';
@@ -651,184 +653,284 @@ export default function TorneioPage() {
       {activeTab === 'MARKER' && (
         <div className="space-y-5">
           
-          {/* ESTADO 1: CONFIGURAÇÃO ANTES DE INICIAR */}
+          {/* ESTADO 1: CONFIGURAÇÃO ANTES DE INICIAR (COCKPIT CYBER-FUTURISTA COM O CONTADOR EM STANDBY) */}
           {sessionState === 'IDLE' && !completedSession && (
-            <div className="bg-white rounded-3xl p-5 sm:p-7 border border-slate-200/90 shadow-sm space-y-6">
+            <div className="space-y-6">
               
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-[#00c853] flex items-center justify-center font-black">
-                    <Trophy className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-base font-black text-slate-800">Preparar Marcação de Roda</h2>
-                    <p className="text-xs text-slate-500">Selecione a ave do seu plantel e a modalidade de disputa</p>
-                  </div>
-                </div>
+              {/* DISPOSITIVO MARCADOR MANUAL 4 DÍGITOS - MODO STANDBY FUTURISTA */}
+              <div className="relative mx-auto max-w-lg">
+                {/* Glow de fundo neon */}
+                <div className="absolute -inset-1.5 bg-gradient-to-r from-emerald-500/20 via-cyan-500/15 to-emerald-500/20 rounded-[48px] blur-xl opacity-75" />
 
-                {/* Toggles de Som e Vibração */}
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSoundEnabled(!soundEnabled)}
-                    title={soundEnabled ? 'Som Ativado' : 'Som Desativado'}
-                    className={`p-2.5 rounded-xl border transition cursor-pointer ${
-                      soundEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'
-                    }`}
-                  >
-                    {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setVibrateEnabled(!vibrateEnabled)}
-                    title={vibrateEnabled ? 'Vibração Ativada' : 'Vibração Desativada'}
-                    className={`p-2.5 rounded-xl border transition cursor-pointer ${
-                      vibrateEnabled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'
-                    }`}
-                  >
-                    <Vibrate className="w-4 h-4" />
-                  </button>
+                <div className="relative bg-gradient-to-b from-[#1c2430] via-[#0f141c] to-[#080b0f] rounded-[44px] p-6 sm:p-8 border-4 border-slate-600/60 shadow-[0_25px_60px_rgba(0,0,0,0.8),inset_0_2px_4px_rgba(255,255,255,0.25),inset_0_-8px_16px_rgba(0,0,0,0.9)] text-white overflow-hidden">
+                  
+                  {/* ALAVANCA SUPERIOR METÁLICA (INSPIRADA NO CONTADOR MANUAL DA FOTO 3) */}
+                  <div className="flex justify-center -mt-2 mb-3">
+                    <div className="relative group cursor-pointer">
+                      {/* Base da alavanca */}
+                      <div className="w-24 sm:w-28 h-6 bg-gradient-to-b from-slate-200 via-slate-400 to-slate-600 rounded-t-xl border-t-2 border-x-2 border-white/60 shadow-lg flex items-center justify-center">
+                        {/* Textura serrilhada antiderrapante para o polegar */}
+                        <div className="flex gap-1">
+                          <span className="w-1.5 h-3 bg-slate-700/80 rounded-full" />
+                          <span className="w-1.5 h-3 bg-slate-700/80 rounded-full" />
+                          <span className="w-1.5 h-3 bg-slate-700/80 rounded-full" />
+                          <span className="w-1.5 h-3 bg-slate-700/80 rounded-full" />
+                          <span className="w-1.5 h-3 bg-slate-700/80 rounded-full" />
+                        </div>
+                      </div>
+                      <div className="text-[9px] text-center font-mono font-bold tracking-widest text-slate-400 mt-1 uppercase">
+                        Alavanca de Disparo
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CABEÇALHO DO CHASSIS DE TITÂNIO */}
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-700/60">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#00c853]" />
+                      <span className="font-mono text-[11px] font-black uppercase tracking-wider text-emerald-400">
+                        BIRDPRO • TALLY V-4 CYBER
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[10px] font-mono font-bold text-slate-300">
+                        100% OFFLINE
+                      </span>
+                      {/* Toggles Som & Vibração */}
+                      <button
+                        type="button"
+                        onClick={() => setSoundEnabled(!soundEnabled)}
+                        title={soundEnabled ? 'Som Ativado' : 'Som Desativado'}
+                        className={`p-1.5 rounded-lg border transition ${
+                          soundEnabled ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-slate-800 text-slate-500 border-slate-700'
+                        }`}
+                      >
+                        {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVibrateEnabled(!vibrateEnabled)}
+                        title={vibrateEnabled ? 'Vibração Ativada' : 'Vibração Desativada'}
+                        className={`p-1.5 rounded-lg border transition ${
+                          vibrateEnabled ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-slate-800 text-slate-500 border-slate-700'
+                        }`}
+                      >
+                        <Vibrate className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* VISOR ANALÓGICO-DIGITAL DE 4 ROLOS (ROLETAS MECÂNICAS IDÊNTICAS AO CONTADOR MANUAL) */}
+                  <div className="relative my-6">
+                    {/* Botão Serrilhado Lateral (Knurled Reset Knob à direita) */}
+                    <div className="absolute -right-7 top-1/2 -translate-y-1/2 w-5 h-16 bg-gradient-to-r from-slate-400 via-slate-200 to-slate-500 rounded-r-lg border border-slate-600 shadow-md flex flex-col justify-between py-1 px-0.5 hidden sm:flex">
+                      <div className="w-full h-0.5 bg-slate-700" />
+                      <div className="w-full h-0.5 bg-slate-700" />
+                      <div className="w-full h-0.5 bg-slate-700" />
+                      <div className="w-full h-0.5 bg-slate-700" />
+                      <div className="w-full h-0.5 bg-slate-700" />
+                      <div className="w-full h-0.5 bg-slate-700" />
+                    </div>
+
+                    {/* Moldura Biselada de Aço Escovado */}
+                    <div className="bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 p-2.5 sm:p-3.5 rounded-3xl border-2 border-slate-500 shadow-[inset_0_4px_8px_rgba(0,0,0,0.8),0_10px_25px_rgba(0,0,0,0.5)]">
+                      {/* Vidro Interno Profundo */}
+                      <div className="bg-black/95 rounded-2xl p-3 sm:p-4 border-2 border-slate-800 shadow-[inset_0_10px_20px_rgba(0,0,0,0.95)]">
+                        <div className="flex items-center justify-center gap-2 sm:gap-3">
+                          {['0', '0', '0', '0'].map((digit, idx) => (
+                            <div
+                              key={idx}
+                              className="relative w-14 sm:w-18 h-24 sm:h-28 rounded-xl overflow-hidden bg-gradient-to-b from-[#0a0a0a] via-[#1f1f1f] to-[#080808] border border-slate-700 flex items-center justify-center shadow-[inset_0_14px_16px_rgba(0,0,0,0.95),inset_0_-14px_16px_rgba(0,0,0,0.95)]"
+                            >
+                              {/* Ranhura / Linha de junção do cilindro mecânico */}
+                              <div className="absolute top-0 left-0 right-0 h-1/4 bg-gradient-to-b from-black/90 to-transparent pointer-events-none" />
+                              <div className="absolute bottom-0 left-0 right-0 h-1/4 bg-gradient-to-t from-black/90 to-transparent pointer-events-none" />
+                              <div className="absolute top-1/2 left-0 right-0 h-px bg-white/5 pointer-events-none" />
+                              
+                              {/* Dígito branco mecânico de alto contraste */}
+                              <span className="text-5xl sm:text-6xl font-mono font-black text-white tracking-tighter drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] select-none">
+                                {digit}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Marcador de alinhamento ótico vermelho (detalhe autêntico do contador mecânico) */}
+                    <div className="flex items-center justify-between px-3 mt-2 text-[10px] font-mono text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-rose-500 rounded-full inline-block" />
+                        CALIBRADO 0000
+                      </span>
+                      <span>MODALIDADE SELECIONADA: {targetMode === '10_MIN' ? '10 MIN' : '15 MIN'}</span>
+                    </div>
+                  </div>
+
+                  {/* STATUS BAR INFORMATIVA */}
+                  <div className="bg-slate-900/80 rounded-2xl p-3 border border-slate-800 flex items-center justify-between text-xs">
+                    <span className="text-slate-400 font-medium">Estado do Cronômetro:</span>
+                    <span className="font-mono font-bold text-emerald-400 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                      PRONTO PARA A RODA
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Seletor de Ave do Plantel */}
-              <div className="space-y-2">
-                <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
-                  Ave em Disputa (Plantel) *
-                </label>
+              {/* CARD DE CONFIGURAÇÃO DA AVE & DISPUTA (DESIGN TITÂNIO MODERNO) */}
+              <div className="bg-white rounded-3xl p-5 sm:p-7 border border-slate-200/90 shadow-sm space-y-6">
+                
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-[#00c853] flex items-center justify-center font-black">
+                      <Trophy className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-black text-slate-800">Parâmetros da Roda de Canto</h2>
+                      <p className="text-xs text-slate-500">Selecione a ave do plantel para sincronizar o histórico</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Seletor de Ave do Plantel */}
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
+                    Ave em Disputa (Plantel) *
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <select
+                        value={selectedBirdId}
+                        onChange={(e) => {
+                          setSelectedBirdId(e.target.value);
+                          if (e.target.value) setCustomBirdName('');
+                        }}
+                        className="w-full px-3.5 py-3 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-[#00c853]"
+                      >
+                        <option value="">Selecione ave do seu plantel...</option>
+                        {birds.map(b => (
+                          <option key={b.id} value={b.id}>
+                            {b.name} {b.ringNumber ? `• Anilha: ${b.ringNumber}` : ''} {b.species ? `(${b.species.split('(')[0].trim()})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Ou digite o nome de ave externa / convidada..."
+                        value={customBirdName}
+                        disabled={!!selectedBirdId}
+                        onChange={(e) => setCustomBirdName(e.target.value)}
+                        className="w-full px-3.5 py-3 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00c853] disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modalidade de Tempo (10 Min ou 15 Min) */}
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
+                    Modalidade do Canto (Regulamento de Silvestres)
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setTargetMode('10_MIN')}
+                      className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                        targetMode === '10_MIN'
+                          ? 'border-[#00c853] bg-emerald-50/70 shadow-xs'
+                          : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-black text-slate-900">10 Minutos</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
+                          Classificação
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Tempo regulamentar com botão para prorrogar +5 min na final.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setTargetMode('15_MIN')}
+                      className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                        targetMode === '15_MIN'
+                          ? 'border-[#00c853] bg-emerald-50/70 shadow-xs'
+                          : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-black text-slate-900">15 Minutos (10 + 5)</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800">
+                          Final Oficial
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Marcação completa de fechamento de roda com telemetria total.
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tipo de Evento & Local */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
+                    <label className="text-xs font-black text-slate-700 uppercase tracking-wider mb-1 block">
+                      Tipo de Evento
+                    </label>
                     <select
-                      value={selectedBirdId}
-                      onChange={(e) => {
-                        setSelectedBirdId(e.target.value);
-                        if (e.target.value) setCustomBirdName('');
-                      }}
-                      className="w-full px-3.5 py-3 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-[#00c853]"
+                      value={sessionType}
+                      onChange={(e) => setSessionType(e.target.value as any)}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-[#00c853]"
                     >
-                      <option value="">Selecione ave do seu plantel...</option>
-                      {birds.map(b => (
-                        <option key={b.id} value={b.id}>
-                          {b.name} {b.ringNumber ? `• Anilha: ${b.ringNumber}` : ''} {b.species ? `(${b.species.split('(')[0].trim()})` : ''}
-                        </option>
-                      ))}
+                      <option value="RODA">Roda Oficial</option>
+                      <option value="TREINO">Treino / Mexida</option>
+                      <option value="TORNEIO">Torneio Regional / Nacional</option>
+                      <option value="BADERNA">Baderna / Esquenta</option>
+                      <option value="EM_CASA">Avaliação em Casa</option>
                     </select>
                   </div>
 
                   <div>
+                    <label className="text-xs font-black text-slate-700 uppercase tracking-wider mb-1 block">
+                      Local / Clube (Opcional)
+                    </label>
                     <input
                       type="text"
-                      placeholder="Ou digite o nome de ave externa / convidada..."
-                      value={customBirdName}
-                      disabled={!!selectedBirdId}
-                      onChange={(e) => setCustomBirdName(e.target.value)}
-                      className="w-full px-3.5 py-3 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00c853] disabled:opacity-50"
+                      placeholder="Ex: Clube dos Criadores, Galpão..."
+                      value={locationName}
+                      onChange={(e) => setLocationName(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#00c853]"
                     />
                   </div>
                 </div>
+
+                {/* Botão de Disparo Principal: Iniciar Marcação */}
+                <button
+                  type="button"
+                  onClick={handleStartSession}
+                  className="w-full py-4.5 bg-gradient-to-r from-[#00c853] via-emerald-500 to-[#00b84a] hover:brightness-105 text-white text-base font-black rounded-2xl shadow-xl shadow-emerald-500/30 transition-all transform active:scale-98 flex items-center justify-center gap-2.5 cursor-pointer uppercase tracking-wider border-t border-emerald-300/40"
+                >
+                  <Play className="w-5 h-5 fill-current" />
+                  <span>Ativar Marcador de Canto Ao Vivo</span>
+                </button>
               </div>
-
-              {/* Modalidade de Tempo (10 Min ou 15 Min) */}
-              <div className="space-y-2">
-                <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
-                  Modalidade do Canto
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setTargetMode('10_MIN')}
-                    className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-                      targetMode === '10_MIN'
-                        ? 'border-[#00c853] bg-emerald-50/70 shadow-xs'
-                        : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-black text-slate-900">10 Minutos</span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
-                        Classificação
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500">
-                      Padrão de 10 min com opção de estender +5 min na final.
-                    </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setTargetMode('15_MIN')}
-                    className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-                      targetMode === '15_MIN'
-                        ? 'border-[#00c853] bg-emerald-50/70 shadow-xs'
-                        : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-black text-slate-900">15 Minutos (10 + 5)</span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800">
-                        Final Oficial
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500">
-                      Disputa final completa com todas as parciais e projeções.
-                    </p>
-                  </button>
-                </div>
-              </div>
-
-              {/* Tipo de Evento & Local */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider mb-1 block">
-                    Tipo de Evento
-                  </label>
-                  <select
-                    value={sessionType}
-                    onChange={(e) => setSessionType(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-[#00c853]"
-                  >
-                    <option value="RODA">Roda Oficial</option>
-                    <option value="TREINO">Treino / Mexida</option>
-                    <option value="TORNEIO">Torneio Regional / Nacional</option>
-                    <option value="BADERNA">Baderna / Esquenta</option>
-                    <option value="EM_CASA">Avaliação em Casa</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider mb-1 block">
-                    Local / Clube (Opcional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Clube dos Criadores, Galpão..."
-                    value={locationName}
-                    onChange={(e) => setLocationName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#00c853]"
-                  />
-                </div>
-              </div>
-
-              {/* Botão de Ação: Iniciar Marcação */}
-              <button
-                type="button"
-                onClick={handleStartSession}
-                className="w-full py-4 bg-[#00c853] hover:bg-[#00b84a] text-white text-base font-black rounded-2xl shadow-lg shadow-emerald-500/25 transition-all transform active:scale-98 flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider"
-              >
-                <Play className="w-5 h-5 fill-current" />
-                <span>Iniciar Marcação Ao Vivo</span>
-              </button>
             </div>
           )}
 
-          {/* ESTADO 2: SESSÃO AO VIVO EM ANDAMENTO (CRONÔMETRO + TOUCH PAD GIGANTE) */}
+          {/* ESTADO 2: SESSÃO AO VIVO (CONTADOR MECÂNICO 4 DÍGITOS REALISTA COM ALAVANCA E VISOR DE ROLETAS) */}
           {(sessionState === 'RUNNING' || sessionState === 'PAUSED') && (
             <div className="space-y-4">
               
-              {/* Header da Marcação Ao Vivo */}
-              <div className="bg-slate-900 text-white rounded-3xl p-4 sm:p-6 shadow-xl border border-slate-800 space-y-4">
-                
-                {/* Info Ave & Modalidade */}
+              {/* TELEMETRIA HUD TOPO */}
+              <div className="bg-slate-950 text-white rounded-3xl p-4 sm:p-5 shadow-2xl border border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold">
@@ -838,144 +940,297 @@ export default function TorneioPage() {
                       <h3 className="text-base font-black text-white leading-tight">
                         {birdDisplayName}
                       </h3>
-                      <p className="text-[11px] text-slate-400">
-                        {sessionType} • Modalidade {targetMode === '10_MIN' ? '10 Minutos' : '15 Minutos'}
+                      <p className="text-[11px] text-slate-400 font-mono">
+                        {sessionType} • {targetMode === '10_MIN' ? '10 Minutos' : '15 Minutos'}
                       </p>
                     </div>
                   </div>
 
-                  {/* Badge de Status */}
-                  <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
-                    sessionState === 'RUNNING'
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse'
-                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                  }`}>
-                    {sessionState === 'RUNNING' ? 'AO VIVO' : 'PAUSADO'}
-                  </span>
-                </div>
-
-                {/* Mostrador de Tempo e Minuto Atual */}
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800">
-                  <div className="bg-slate-800/80 p-3 rounded-2xl">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Tempo Decorrido
+                  <div className="flex items-center gap-2">
+                    <span className={`px-3 py-1 rounded-full text-xs font-mono font-black uppercase tracking-wider flex items-center gap-1.5 ${
+                      sessionState === 'RUNNING'
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${sessionState === 'RUNNING' ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
+                      {sessionState === 'RUNNING' ? 'AO VIVO' : 'PAUSADO'}
                     </span>
-                    <div className="text-2xl sm:text-3xl font-mono font-black text-white mt-0.5">
-                      {formatTime(elapsedSeconds)} <span className="text-xs text-slate-500">/ {formatTime(maxSessionSeconds)}</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-800/80 p-3 rounded-2xl">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Minuto Atual
-                    </span>
-                    <div className="text-2xl sm:text-3xl font-black text-emerald-400 mt-0.5 flex items-baseline gap-2">
-                      <span>{currentMinuteIndex + 1}º min</span>
-                      <span className="text-xs font-bold text-slate-300 font-mono">({currentMinuteCount} cantos)</span>
-                    </div>
                   </div>
                 </div>
 
-                {/* Barra de Progresso do Tempo Total */}
-                <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                {/* Cronômetro e Minuto Atual HUD */}
+                <div className="grid grid-cols-3 gap-2.5 pt-2 border-t border-slate-800/80 text-center">
+                  <div className="bg-slate-900/90 p-2.5 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+                      Cronômetro
+                    </span>
+                    <div className="text-xl sm:text-2xl font-mono font-black text-white mt-0.5">
+                      {formatTime(elapsedSeconds)}
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900/90 p-2.5 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+                      Minuto
+                    </span>
+                    <div className="text-xl sm:text-2xl font-mono font-black text-emerald-400 mt-0.5">
+                      {currentMinuteIndex + 1}º / {targetMode === '10_MIN' ? '10' : '15'}
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900/90 p-2.5 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+                      Ritmo Atual
+                    </span>
+                    <div className="text-xl sm:text-2xl font-mono font-black text-cyan-400 mt-0.5">
+                      {elapsedSeconds > 0 ? ((totalSongs / elapsedSeconds) * 60).toFixed(1) : '0.0'}
+                      <span className="text-[10px] text-slate-400 font-sans ml-1">/min</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Barra Laser de Progresso do Tempo */}
+                <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
                   <div 
-                    className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                    className="bg-gradient-to-r from-emerald-500 to-cyan-400 h-full rounded-full transition-all duration-300 shadow-[0_0_8px_#00c853]"
                     style={{ width: `${Math.min(100, (elapsedSeconds / maxSessionSeconds) * 100)}%` }}
                   />
                 </div>
               </div>
 
-              {/* ÁREA DE TOQUE GIGANTE PARA O MARCADOR */}
-              <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-lg text-center space-y-6">
+              {/* O MARCADOR FÍSICO-CYBER MANUAL 4 DÍGITOS (IDÊNTICO À FOTO 3) */}
+              <div className="relative mx-auto max-w-lg">
                 
-                {/* NÚMERO TOTAL DE CANTOS GIGANTE */}
-                <div className="space-y-1">
-                  <span className="text-xs font-black uppercase tracking-wider text-slate-400 block">
-                    Total de Cantos Marcados
-                  </span>
-                  <div className="text-7xl sm:text-8xl font-black text-slate-900 tracking-tight font-mono select-none">
-                    {totalSongs}
-                  </div>
-                  <p className="text-xs font-bold text-emerald-600">
-                    Média: {elapsedSeconds > 0 ? ((totalSongs / elapsedSeconds) * 60).toFixed(1) : '0.0'} cantos/min
-                  </p>
-                </div>
+                {/* Efeito Glow reativo ao toque */}
+                <div className={`absolute -inset-2 rounded-[52px] blur-2xl transition-opacity duration-150 pointer-events-none ${
+                  touchPulse 
+                    ? 'opacity-100 bg-emerald-500/40' 
+                    : 'opacity-40 bg-gradient-to-r from-emerald-500/20 via-cyan-500/10 to-emerald-500/20'
+                }`} />
 
-                {/* BOTÃO DE TOQUE GIGANTE (Touch Pad com Feedback) */}
-                <button
-                  type="button"
-                  onClick={handleCountSong}
-                  disabled={sessionState !== 'RUNNING'}
-                  className={`w-full py-16 sm:py-20 rounded-3xl font-black text-white text-2xl sm:text-3xl shadow-xl transition-all select-none touch-manipulation transform active:scale-95 cursor-pointer flex flex-col items-center justify-center gap-2 ${
-                    touchPulse 
-                      ? 'bg-emerald-400 scale-98 shadow-emerald-500/50' 
-                      : 'bg-gradient-to-b from-[#00c853] to-[#00a844] shadow-emerald-600/30 hover:brightness-105'
-                  }`}
-                  style={{ minHeight: '220px' }}
-                >
-                  <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-white mb-1 shadow-inner">
-                    <Plus className="w-10 h-10 stroke-[3]" />
-                  </div>
-                  <span className="tracking-wider uppercase">TOQUE PARA CONTAR CANTO</span>
-                  <span className="text-xs font-medium text-emerald-100 opacity-90">
-                    +1 canto registrado com vibração e som
-                  </span>
-                </button>
-
-                {/* AÇÕES SECUNDÁRIAS: DESFAZER (-1), PAUSAR E FINALIZAR */}
-                <div className="grid grid-cols-3 gap-2.5 pt-2">
-                  <button
-                    type="button"
-                    onClick={handleUndoSong}
-                    disabled={totalSongs <= 0 || sessionState !== 'RUNNING'}
-                    className="py-3 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black rounded-2xl transition disabled:opacity-40 flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Minus className="w-4 h-4 text-rose-500" />
-                    <span>Desfazer (-1)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleTogglePause}
-                    className="py-3 px-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-black rounded-2xl transition flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    {sessionState === 'RUNNING' ? (
-                      <>
-                        <Pause className="w-4 h-4 text-amber-600" />
-                        <span>Pausar</span>
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-4 h-4 text-emerald-600" />
-                        <span>Retomar</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleFinalizeSession()}
-                    className="py-3 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-black rounded-2xl border border-rose-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <CheckCircle2 className="w-4 h-4 text-rose-600" />
-                    <span>Concluir</span>
-                  </button>
-                </div>
-
-                {/* Opção se estiver no modo 10 min e já passou dos 5 min: pode estender para 15 min */}
-                {targetMode === '10_MIN' && (
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-medium">Vai continuar para a final?</span>
+                {/* CORPO DO CONTADOR MANUAL METÁLICO */}
+                <div className="relative bg-gradient-to-b from-[#263242] via-[#121922] to-[#070b0f] rounded-[48px] p-6 sm:p-8 border-4 border-slate-500/80 shadow-[0_30px_70px_rgba(0,0,0,0.9),inset_0_3px_6px_rgba(255,255,255,0.35),inset_0_-10px_20px_rgba(0,0,0,0.95)] text-white select-none">
+                  
+                  {/* ALAVANCA SUPERIOR DE DISPARO (PRESSIONA PARA BAIXO COM ANIMAÇÃO MECÂNICA) */}
+                  <div className="flex justify-center -mt-3 mb-4">
                     <button
                       type="button"
-                      onClick={handleExtendTo15Minutes}
-                      className="text-emerald-700 hover:text-emerald-800 font-black flex items-center gap-1 cursor-pointer"
+                      onClick={handleCountSong}
+                      disabled={sessionState !== 'RUNNING'}
+                      className={`group relative cursor-pointer outline-none transition-transform duration-75 ${
+                        touchPulse ? 'translate-y-2.5 scale-95' : 'hover:-translate-y-0.5 active:translate-y-2'
+                      }`}
+                      title="Toque na alavanca para marcar canto"
                     >
-                      <span>+5 Minutos (Final 15 min) →</span>
+                      {/* Haste metálica da alavanca */}
+                      <div className="w-28 sm:w-36 h-8 sm:h-9 bg-gradient-to-b from-slate-100 via-slate-300 to-slate-500 rounded-t-2xl border-t-2 border-x-2 border-white shadow-[0_8px_16px_rgba(0,0,0,0.6)] flex items-center justify-center">
+                        {/* Textura serrilhada antiderrapante de apoio do polegar */}
+                        <div className="flex gap-1.5">
+                          <span className="w-2 h-4 bg-slate-700/80 rounded-full" />
+                          <span className="w-2 h-4 bg-slate-700/80 rounded-full" />
+                          <span className="w-2 h-4 bg-slate-700/80 rounded-full" />
+                          <span className="w-2 h-4 bg-slate-700/80 rounded-full" />
+                          <span className="w-2 h-4 bg-slate-700/80 rounded-full" />
+                          <span className="w-2 h-4 bg-slate-700/80 rounded-full" />
+                        </div>
+                      </div>
+                      <div className="text-[10px] text-center font-mono font-black tracking-widest text-emerald-400 mt-1 uppercase flex items-center justify-center gap-1">
+                        <Zap className="w-3 h-3 fill-current" />
+                        <span>ALAVANCA POLEGAR (+1)</span>
+                      </div>
                     </button>
                   </div>
-                )}
+
+                  {/* CABEÇALHO DO CHASSIS COM IDENTIFICAÇÃO BIRDPRO */}
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-700/70">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#00c853] animate-pulse" />
+                      <span className="font-mono text-[11px] font-black uppercase tracking-wider text-slate-300">
+                        CONTADOR MECÂNICO 4 DÍGITOS
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-800">
+                      <span>MIN {currentMinuteIndex + 1}: {currentMinuteCount} CANTOS</span>
+                    </div>
+                  </div>
+
+                  {/* VISOR ANALÓGICO COM 4 ROLETAS MECÂNICAS */}
+                  <div className="relative my-6">
+                    {/* Botão Serrilhado Lateral Direito (Knob de Ajuste) */}
+                    <div className="absolute -right-8 top-1/2 -translate-y-1/2 w-5 sm:w-6 h-20 bg-gradient-to-r from-slate-400 via-slate-200 to-slate-500 rounded-r-xl border border-slate-600 shadow-xl flex flex-col justify-between py-1 px-0.5 hidden sm:flex">
+                      <div className="w-full h-0.5 bg-slate-800" />
+                      <div className="w-full h-0.5 bg-slate-800" />
+                      <div className="w-full h-0.5 bg-slate-800" />
+                      <div className="w-full h-0.5 bg-slate-800" />
+                      <div className="w-full h-0.5 bg-slate-800" />
+                      <div className="w-full h-0.5 bg-slate-800" />
+                      <div className="w-full h-0.5 bg-slate-800" />
+                    </div>
+
+                    {/* Moldura Biselada Cromada do Visor */}
+                    <div 
+                      onClick={handleCountSong}
+                      className="bg-gradient-to-b from-slate-600 via-slate-700 to-slate-900 p-3 sm:p-4 rounded-3xl border-2 border-slate-400 shadow-[inset_0_4px_10px_rgba(0,0,0,0.9),0_15px_35px_rgba(0,0,0,0.6)] cursor-pointer touch-manipulation transform active:scale-98 transition-all"
+                    >
+                      {/* Abertura do Visor Fundo Preto */}
+                      <div className="bg-black/95 rounded-2xl p-3 sm:p-4 border-2 border-slate-800 shadow-[inset_0_12px_24px_rgba(0,0,0,0.95)]">
+                        <div className="flex items-center justify-center gap-2 sm:gap-3.5">
+                          {String(Math.min(9999, Math.max(0, totalSongs)))
+                            .padStart(4, '0')
+                            .split('')
+                            .map((digit, idx) => (
+                              <div
+                                key={idx}
+                                className={`relative w-14 sm:w-20 h-24 sm:h-32 rounded-xl overflow-hidden bg-gradient-to-b from-[#080808] via-[#202020] to-[#050505] border border-slate-700 flex items-center justify-center shadow-[inset_0_16px_18px_rgba(0,0,0,0.95),inset_0_-16px_18px_rgba(0,0,0,0.95)] transition-transform duration-75 ${
+                                  touchPulse ? 'scale-98' : ''
+                                }`}
+                              >
+                                {/* Curvatura 3D e sombras cilíndricas do tambor mecânico */}
+                                <div className="absolute top-0 left-0 right-0 h-1/4 bg-gradient-to-b from-black/95 to-transparent pointer-events-none" />
+                                <div className="absolute bottom-0 left-0 right-0 h-1/4 bg-gradient-to-t from-black/95 to-transparent pointer-events-none" />
+                                <div className="absolute top-1/2 left-0 right-0 h-px bg-white/10 pointer-events-none" />
+                                
+                                {/* Dígito mecânico branco nítido de alta visibilidade */}
+                                <span className="text-5xl sm:text-7xl font-mono font-black text-white tracking-tighter drop-shadow-[0_4px_8px_rgba(0,0,0,0.9)] select-none">
+                                  {digit}
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Marcação de calibração e guia ótico */}
+                    <div className="flex items-center justify-between px-3 mt-2 text-[10px] font-mono text-slate-400">
+                      <span className="flex items-center gap-1 text-rose-400">
+                        <span className="w-1.5 h-1.5 bg-rose-500 rounded-full inline-block animate-pulse" />
+                        SISTEMA EM REGISTRO
+                      </span>
+                      <span>TOQUE NO VISOR OU NA ALAVANCA</span>
+                    </div>
+                  </div>
+
+                  {/* BOTÃO DE TOQUE GIGANTE INTEGRADO (TOUCH PAD RÁPIDO PARA A RODA) */}
+                  <button
+                    type="button"
+                    onClick={handleCountSong}
+                    disabled={sessionState !== 'RUNNING'}
+                    className={`w-full py-8 sm:py-10 rounded-2xl font-black text-white text-xl sm:text-2xl shadow-xl transition-all select-none touch-manipulation transform cursor-pointer flex flex-col items-center justify-center gap-1.5 border-t border-white/20 ${
+                      touchPulse 
+                        ? 'bg-emerald-400 scale-95 shadow-emerald-500/60' 
+                        : 'bg-gradient-to-b from-[#00c853] via-emerald-600 to-[#00963e] shadow-emerald-600/40 hover:brightness-105 active:scale-95'
+                    }`}
+                  >
+                    <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white mb-0.5 shadow-inner">
+                      <Plus className="w-8 h-8 stroke-[3]" />
+                    </div>
+                    <span className="tracking-wider uppercase font-mono">MARCAR CANTO (+1)</span>
+                    <span className="text-[11px] font-sans font-medium text-emerald-100 opacity-90">
+                      Disparo rápido com clique sonoro e vibração
+                    </span>
+                  </button>
+
+                  {/* CONTROLES SECUNDÁRIOS MECÂNICOS */}
+                  <div className="grid grid-cols-3 gap-2 pt-4">
+                    <button
+                      type="button"
+                      onClick={handleUndoSong}
+                      disabled={totalSongs <= 0 || sessionState !== 'RUNNING'}
+                      className="py-3 px-2 bg-slate-800/90 hover:bg-slate-700 text-rose-300 text-xs font-mono font-bold rounded-xl border border-slate-700 transition disabled:opacity-30 flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Minus className="w-3.5 h-3.5 text-rose-400" />
+                      <span>Desfazer (-1)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleTogglePause}
+                      className="py-3 px-2 bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-mono font-bold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      {sessionState === 'RUNNING' ? (
+                        <>
+                          <Pause className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Pausar</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Retomar</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleFinalizeSession()}
+                      className="py-3 px-2 bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-mono font-bold rounded-xl border border-rose-500 transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                      <span>Concluir</span>
+                    </button>
+                  </div>
+
+                  {/* Prorrogação +5 Minutos (Final Oficial Silvestres) */}
+                  {targetMode === '10_MIN' && (
+                    <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
+                      <span className="text-slate-400 font-mono text-[11px]">Passou para a final?</span>
+                      <button
+                        type="button"
+                        onClick={handleExtendTo15Minutes}
+                        className="text-emerald-400 hover:text-emerald-300 font-black font-mono flex items-center gap-1 cursor-pointer bg-emerald-950/70 px-3 py-1.5 rounded-xl border border-emerald-800/80 text-[11px]"
+                      >
+                        <span>+5 Min (Final 15 min) →</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* TELEMETRIA AO VIVO: GRÁFICO EQUALIZADOR MINUTO A MINUTO */}
+              {minuteSongs.length > 0 && (
+                <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-2">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                      <Activity className="w-4 h-4 text-emerald-600" />
+                      <span>TELEMETRIA MINUTO A MINUTO EM TEMPO REAL</span>
+                    </span>
+                    <span className="text-slate-400 text-[11px]">
+                      {minuteSongs.length}º minuto ativo
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5 pt-1">
+                    {Array.from({ length: targetMode === '10_MIN' ? 10 : 15 }).map((_, mIdx) => {
+                      const count = minuteSongs[mIdx] ?? (mIdx === currentMinuteIndex ? currentMinuteCount : 0);
+                      const isCurrent = mIdx === currentMinuteIndex && sessionState === 'RUNNING';
+                      const isPast = mIdx < currentMinuteIndex;
+
+                      return (
+                        <div
+                          key={mIdx}
+                          className={`p-2 rounded-xl border text-center transition-all ${
+                            isCurrent
+                              ? 'bg-emerald-50 border-emerald-400 shadow-xs'
+                              : isPast
+                              ? 'bg-slate-50 border-slate-200 text-slate-700'
+                              : 'bg-slate-50/40 border-slate-100 text-slate-300 opacity-60'
+                          }`}
+                        >
+                          <span className="text-[9px] font-mono text-slate-400 block">
+                            {mIdx + 1}m
+                          </span>
+                          <span className={`text-base font-mono font-black ${
+                            isCurrent ? 'text-emerald-600' : isPast ? 'text-slate-800' : 'text-slate-300'
+                          }`}>
+                            {count}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

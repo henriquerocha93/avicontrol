@@ -37,7 +37,12 @@ import {
   Thermometer,
   Shield,
   FileCheck,
-  HelpCircle
+  HelpCircle,
+  Trophy,
+  Timer,
+  WifiOff,
+  Flame,
+  Share2
 } from 'lucide-react';
 import { Logo } from '@/components/ui/logo';
 import { Button } from '@/components/ui/button';
@@ -482,25 +487,176 @@ export default function LandingPage() {
             <span className="flex items-center gap-1.5"><Check className="w-4 h-4 text-emerald-400" /> Compatível FOB &amp; SISPASS</span>
           </div>
 
-          {/* Compact Clean Metrics Bar */}
-          <div className="pt-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 sm:p-5 bg-[#0c1813]/85 rounded-2xl border border-emerald-800/40 shadow-xl backdrop-blur-md max-w-4xl mx-auto">
-              <div className="text-center p-2 border-r border-emerald-900/40 last:border-none">
-                <span className="text-xl sm:text-2xl font-black text-white block tracking-tight">+48.500</span>
-                <span className="text-[11px] text-emerald-400 font-bold block">Aves Cadastradas</span>
+          {/* ========================================================================= */}
+          {/* PROPAGANDA DE ALTO IMPACTO: MARCADOR DE CANTO AO VIVO (OFFLINE FIRST)     */}
+          {/* ========================================================================= */}
+          <div className="pt-8 max-w-5xl mx-auto">
+            <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-br from-[#06160f] via-[#091f16] to-[#040e0a] border-2 border-emerald-500/50 shadow-[0_0_50px_rgba(0,200,83,0.25)] overflow-hidden text-left">
+              
+              {/* Efeitos de Luz e Brilho Neon */}
+              <div className="absolute -top-24 -right-24 w-80 h-80 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-500/10 via-transparent to-transparent pointer-events-none" />
+
+              <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
+                
+                {/* LADO ESQUERDO: COPYWRITING MAGNÉTICO & BENEFÍCIOS */}
+                <div className="lg:col-span-7 space-y-4">
+                  
+                  {/* Badges de Destaque */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-amber-600/30 border border-amber-400/50 text-amber-300 text-[11px] font-black uppercase tracking-wider shadow-xs">
+                      <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                      <span>NOVO NO BIRDPRO • OFICIAL</span>
+                    </div>
+
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 text-[11px] font-black uppercase tracking-wider animate-pulse">
+                      <WifiOff className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>100% OFFLINE NA RODA</span>
+                    </div>
+                  </div>
+
+                  {/* Headline Forte e Desejável */}
+                  <div className="space-y-2">
+                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight leading-tight">
+                      O Marcador de Canto mais{' '}
+                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00e676] via-emerald-300 to-teal-300 drop-shadow-[0_2px_15px_rgba(0,230,118,0.4)]">
+                        Rápido, Preciso e Fluido
+                      </span>{' '}
+                      do Brasil
+                    </h2>
+                    
+                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-normal">
+                      Chega de aplicativos que travam ou dependem de internet no clube. 
+                      Marque ao vivo na roda de torneios com <strong>zero latência</strong>, 
+                      <strong>resposta tátil por vibração</strong>, cliques sintetizados no celular 
+                      e diagnóstico inteligente na hora para saber se a mexida da sua ave está no caminho certo!
+                    </p>
+                  </div>
+
+                  {/* 4 Pontos Fortes em Chips Modernos */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-[#0e241b]/80 border border-emerald-800/60 text-xs text-slate-200">
+                      <div className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                        <WifiOff className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <strong className="block text-white text-[11px]">Funciona Sem Internet</strong>
+                        <span className="text-[10px] text-slate-400">Em modo avião ou sem sinal</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-[#0e241b]/80 border border-emerald-800/60 text-xs text-slate-200">
+                      <div className="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                        <Timer className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <strong className="block text-white text-[11px]">10 min &amp; +5 min Final</strong>
+                        <span className="text-[10px] text-slate-400">Modalidades oficiais silvestres</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-[#0e241b]/80 border border-emerald-800/60 text-xs text-slate-200">
+                      <div className="w-7 h-7 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center shrink-0">
+                        <Flame className="w-4 h-4 text-amber-400" />
+                      </div>
+                      <div>
+                        <strong className="block text-white text-[11px]">Telemetria por Minuto</strong>
+                        <span className="text-[10px] text-slate-400">Melhor e pior minuto + ritmo</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-[#0e241b]/80 border border-emerald-800/60 text-xs text-slate-200">
+                      <div className="w-7 h-7 rounded-xl bg-[#25D366]/20 text-[#25D366] flex items-center justify-center shrink-0">
+                        <Share2 className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <strong className="block text-white text-[11px]">Direto no WhatsApp</strong>
+                        <span className="text-[10px] text-slate-400">1 toque com emojis e dados</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Chamada para Ação */}
+                  <div className="pt-2 flex flex-wrap items-center gap-3">
+                    <Link href="/dashboard/torneio">
+                      <Button size="md" className="bg-gradient-to-r from-[#00c853] to-emerald-600 hover:from-emerald-500 hover:to-emerald-700 text-white font-black text-xs sm:text-sm px-6 py-3 shadow-[0_0_20px_rgba(0,200,83,0.4)] rounded-2xl flex items-center gap-2 border border-emerald-300/40 cursor-pointer">
+                        <Timer className="w-4 h-4 animate-spin" style={{ animationDuration: '4s' }} />
+                        <span>Abrir Marcador de Cantos Agora →</span>
+                      </Button>
+                    </Link>
+                    <span className="text-[11px] text-emerald-400/90 font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Incluso em todos os planos BIRDPRO
+                    </span>
+                  </div>
+                </div>
+
+                {/* LADO DIREITO: MOCKUP INTERATIVO E CHAMATIVO DO MARCADOR */}
+                <div className="lg:col-span-5">
+                  <div className="relative mx-auto max-w-sm rounded-3xl p-5 bg-gradient-to-b from-[#0c1e17] to-[#06100c] border border-emerald-500/40 shadow-2xl space-y-4">
+                    
+                    {/* Topo do Mockup Celular */}
+                    <div className="flex items-center justify-between pb-3 border-b border-emerald-900/60">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                        <span className="text-[11px] font-black text-emerald-300 uppercase tracking-wider">
+                          RODA AO VIVO • 10 MIN
+                        </span>
+                      </div>
+                      <div className="px-2 py-0.5 rounded-lg bg-emerald-950 border border-emerald-800 text-[10px] font-mono text-emerald-400 font-bold">
+                        ⏱️ 10:00 OFICIAL
+                      </div>
+                    </div>
+
+                    {/* Ave e Cronômetro */}
+                    <div className="text-center space-y-1">
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Coleiro Trovão (Anilha 041738)
+                      </span>
+                      <div className="text-6xl sm:text-7xl font-black text-[#00e676] font-mono tracking-tight drop-shadow-[0_0_25px_rgba(0,230,118,0.5)]">
+                        134
+                      </div>
+                      <div className="flex items-center justify-center gap-1 text-xs font-bold text-emerald-300">
+                        <Flame className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Ritmo: 13.4 cantos por minuto</span>
+                      </div>
+                    </div>
+
+                    {/* Botão de Toque Touch Pad com Ondas */}
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-[#00c853] to-teal-600 text-white text-center shadow-lg shadow-emerald-500/30 border border-emerald-400/50 space-y-0.5 animate-pulse">
+                      <div className="text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>TOQUE PARA MARCAR CANTO</span>
+                      </div>
+                      <span className="text-[10px] text-emerald-100 font-medium block opacity-90">
+                        Resposta tátil (vibração) + som sem internet
+                      </span>
+                    </div>
+
+                    {/* Projeção & Mexida Validada */}
+                    <div className="grid grid-cols-2 gap-2 text-center pt-1">
+                      <div className="p-2.5 rounded-xl bg-[#091711] border border-emerald-900/60">
+                        <span className="text-[9px] text-slate-400 uppercase font-bold block">10 Minutos</span>
+                        <span className="text-lg font-black text-white font-mono">134 cantos</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-emerald-950/80 border border-emerald-500/50">
+                        <span className="text-[9px] text-emerald-400 uppercase font-black block">Projeção 15 Min 🏆</span>
+                        <span className="text-lg font-black text-emerald-300 font-mono">201 cantos</span>
+                      </div>
+                    </div>
+
+                    {/* Badge de Mexida Validada */}
+                    <div className="p-2 rounded-xl bg-emerald-950/60 border border-emerald-500/30 flex items-center gap-2 text-[10px] text-emerald-200">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span><strong>Mexida Validada:</strong> Cantada sustentada com máxima fibra!</span>
+                    </div>
+
+                  </div>
+                </div>
+
               </div>
-              <div className="text-center p-2 border-r border-emerald-900/40 last:border-none">
-                <span className="text-xl sm:text-2xl font-black text-white block tracking-tight">+3.900</span>
-                <span className="text-[11px] text-emerald-400 font-bold block">Criatórios Ativos</span>
-              </div>
-              <div className="text-center p-2 border-r border-emerald-900/40 last:border-none">
-                <span className="text-xl sm:text-2xl font-black text-white block tracking-tight">+190.000</span>
-                <span className="text-[11px] text-emerald-400 font-bold block">Anilhas Rastreadas</span>
-              </div>
-              <div className="text-center p-2">
-                <span className="text-xl sm:text-2xl font-black text-white block tracking-tight">99.8%</span>
-                <span className="text-[11px] text-emerald-400 font-bold block">Satisfação &amp; Retenção</span>
-              </div>
+
             </div>
           </div>
 
