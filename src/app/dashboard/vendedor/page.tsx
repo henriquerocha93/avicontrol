@@ -59,6 +59,9 @@ export default function VendedorDashboardPage() {
 
   useEffect(() => {
     loadSellerData()
+    db.syncCloudData().then(() => {
+      loadSellerData()
+    }).catch(() => {})
   }, [user])
 
   const loadSellerData = () => {

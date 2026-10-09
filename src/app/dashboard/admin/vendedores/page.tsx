@@ -105,6 +105,9 @@ export default function AdminVendedoresPage() {
 
   useEffect(() => {
     refreshSellers()
+    db.syncCloudData().then(() => {
+      refreshSellers()
+    }).catch(() => {})
   }, [])
 
   const refreshSellers = () => {

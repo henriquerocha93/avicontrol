@@ -48,6 +48,7 @@ import {
 } from 'lucide-react';
 import { Logo } from '@/components/ui/logo';
 import { Button } from '@/components/ui/button';
+import { db } from '@/lib/db';
 import { DynamicDaytimeAmbience } from '@/components/landing/dynamic-daytime-ambience';
 import { LiveBreedingStatus } from '@/components/landing/live-breeding-status';
 import { DailyProofsSection } from '@/components/landing/daily-proofs-section';
@@ -131,6 +132,28 @@ export default function LandingPage() {
   const [billingPeriod, setBillingPeriod] = useState<'anual' | 'mensal'>('anual');
   const [activePedigreeTab, setActivePedigreeTab] = useState<'a4' | 'cracha' | 'qr'>('a4');
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [refCode, setRefCode] = useState<string>('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get('ref') || params.get('cupom') || params.get('r') || '';
+      if (ref) {
+        setRefCode(ref);
+        localStorage.setItem('birdpro_referral_code', ref);
+        localStorage.setItem('birdpro_coupon_code', ref.toUpperCase());
+        db.recordAffiliateClick(ref);
+      } else {
+        const stored = localStorage.getItem('birdpro_referral_code') || '';
+        if (stored) setRefCode(stored);
+      }
+    }
+  }, []);
+
+  const getCheckoutUrl = (cycle: 'anual' | 'mensal') => {
+    const base = `/checkout?plano=${cycle}`;
+    return refCode ? `${base}&ref=${encodeURIComponent(refCode)}` : base;
+  };
 
   const sectionRef = useRef<HTMLDivElement>(null);
 
@@ -340,7 +363,7 @@ export default function LandingPage() {
                 Entrar
               </Button>
             </Link>
-            <Link href="/checkout?plano=anual" className="shrink-0">
+            <Link href={getCheckoutUrl('anual')} className="shrink-0">
               <Button size="sm" className="bg-[#00c853] hover:bg-emerald-600 text-white font-black text-xs shadow-lg shadow-emerald-950/50 transition-all hover:scale-105 active:scale-95 whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 h-9 px-4 rounded-xl">
                 <span>Assinar Agora</span>
                 <ArrowRight className="w-3.5 h-3.5 shrink-0" />
@@ -360,7 +383,7 @@ export default function LandingPage() {
               </Button>
             </Link>
 
-            <Link href="/checkout?plano=anual" className="shrink-0">
+            <Link href={getCheckoutUrl('anual')} className="shrink-0">
               <Button size="sm" className="bg-[#00c853] hover:bg-emerald-600 text-white font-black text-[11px] px-3 py-1.5 shadow-md rounded-xl whitespace-nowrap shrink-0">
                 Assinar
               </Button>
@@ -419,7 +442,7 @@ export default function LandingPage() {
                   Fazer Login
                 </Button>
               </Link>
-              <Link href="/checkout?plano=anual" onClick={() => setIsMobileMenuOpen(false)}>
+              <Link href={getCheckoutUrl('anual')} onClick={() => setIsMobileMenuOpen(false)}>
                 <Button className="w-full bg-[#00c853] hover:bg-emerald-600 text-white font-black py-2.5 text-xs shadow-lg shadow-emerald-950/60">
                   Assinar BIRDPRO Agora →
                 </Button>
@@ -801,7 +824,7 @@ export default function LandingPage() {
               </div>
 
               <div className="pt-6">
-                <Link href="/checkout?plano=mensal" className="block">
+                <Link href={getCheckoutUrl('mensal')} className="block">
                   <Button 
                     className={`w-full py-3.5 text-xs sm:text-sm font-black rounded-xl cursor-pointer transition shadow-md ${
                       billingPeriod === 'mensal'
@@ -858,7 +881,7 @@ export default function LandingPage() {
               </div>
 
               <div className="pt-6">
-                <Link href="/checkout?plano=anual" className="block">
+                <Link href={getCheckoutUrl('anual')} className="block">
                   <Button 
                     className={`w-full py-3.5 text-xs sm:text-sm font-black rounded-xl cursor-pointer transition shadow-xl ${
                       billingPeriod === 'anual'
@@ -1116,7 +1139,7 @@ export default function LandingPage() {
 
                   {/* Module CTA */}
                   <div className="pt-2 flex items-center justify-between">
-                    <Link href="/checkout?plano=anual">
+                    <Link href={getCheckoutUrl('anual')}>
                       <Button size="sm" className="bg-[#00c853] hover:bg-emerald-600 font-black text-xs text-white shadow-lg cursor-pointer">
                         Começar a Usar Este Módulo →
                       </Button>
@@ -1187,7 +1210,7 @@ export default function LandingPage() {
                 </div>
 
                 <div className="pt-2">
-                  <Link href="/checkout?plano=anual" className="block">
+                  <Link href={getCheckoutUrl('anual')} className="block">
                     <Button className="w-full bg-[#00c853] hover:bg-emerald-600 text-white font-black py-3 text-xs sm:text-sm shadow-xl shadow-emerald-950/80 cursor-pointer">
                       Migrar Meu Criatório para o BIRDPRO Agora →
                     </Button>
@@ -1287,7 +1310,7 @@ export default function LandingPage() {
                 </div>
 
                 <div className="pt-4 flex flex-wrap items-center gap-3">
-                  <Link href="/checkout?plano=anual">
+                  <Link href={getCheckoutUrl('anual')}>
                     <Button className="bg-[#00c853] hover:bg-emerald-600 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-950/60 px-6 py-2.5 cursor-pointer">
                       Emitir Meus Pedigrees →
                     </Button>
@@ -1480,7 +1503,7 @@ export default function LandingPage() {
                 <ChevronRight className="w-4 h-4 text-emerald-400" />
               </button>
             ) : (
-              <Link href="/checkout?plano=anual" className="w-full sm:w-auto">
+              <Link href={getCheckoutUrl('anual')} className="w-full sm:w-auto">
                 <Button size="sm" className="w-full bg-[#00c853] hover:bg-emerald-600 text-white font-black text-xs px-5 py-2.5 cursor-pointer shadow-md">
                   Assinar BIRDPRO Agora →
                 </Button>

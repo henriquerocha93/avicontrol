@@ -2,7 +2,8 @@ import {
   Bird, Cage, Ring, BreedingPair, Clutch, Egg, DiseaseRecord, Medication, 
   Treatment, SexingRecord, GenotypingRecord, BirdTimelineEvent, 
   NotificationItem, Tenant, User, SupportTicket, BirdDocument, BirdPhoto,
-  CalendarEvent, NoteItem, UserReferralProgram, SellerAffiliate, AffiliateCommission, AffiliatePayout, GlobalSystemConfig
+  CalendarEvent, NoteItem, UserReferralProgram, SellerAffiliate, AffiliateCommission, AffiliatePayout, GlobalSystemConfig,
+  BreedingObservation
 } from '@/types';
 
 export const INITIAL_TENANT: Tenant = {
@@ -367,3 +368,5 @@ export const INITIAL_USER_REFERRALS: Record<string, UserReferralProgram> = {
     payouts: []
   }
 };
+
+export const INITIAL_BREEDING_OBSERVATIONS: BreedingObservation[] = [];

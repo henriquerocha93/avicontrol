@@ -428,6 +428,41 @@ export interface Egg {
   createdAt: string;
 }
 
+export type BreedingEventType = 
+  | 'GALA'          // Gala / Cobertura / Cópula (ex: 1ª Gala, 2ª Gala...)
+  | 'POSTURA'       // Postura de ovos no ninho
+  | 'OVOSCOPIA'     // Ovoscopia / Verificação de fecundação
+  | 'NASCIMENTO'    // Nascimento do filhote dessa genética
+  | 'ANILHAMENTO'   // Anilhamento do filhote
+  | 'DESMAME'       // Desmame / Separação dos filhotes
+  | 'TRATAMENTO'    // Suplementação / Vitaminas da reprodução
+  | 'OBSERVACAO';   // Observação geral de manejo / Comportamento
+
+export interface BreedingObservation {
+  id: string;
+  tenantId: string;
+  pairId?: string;
+  pairName?: string;
+  maleId: string;
+  maleName: string;
+  maleRing?: string;
+  maleSpecies?: string;
+  femaleId: string;
+  femaleName: string;
+  femaleRing?: string;
+  femaleSpecies?: string;
+  type: BreedingEventType;
+  title: string;
+  date: string;
+  time?: string;
+  galaNumber?: number;
+  offspringName?: string;
+  offspringRing?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface DiseaseRecord {
   id: string;
   tenantId: string;

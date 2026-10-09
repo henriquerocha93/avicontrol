@@ -4,7 +4,7 @@ import {
   NotificationItem, Tenant, User, SupportTicket, BirdDocument, BirdPhoto, AuditLog,
   SellerAffiliate, AffiliateCommission, AffiliatePayout, GlobalSystemConfig,
   CalendarEvent, NoteItem, AiLearnedInsight, UserReferralProgram, ReferredFriend, PlanType,
-  CouponValidationResult, TournamentSession
+  CouponValidationResult, TournamentSession, BreedingObservation
 } from '@/types';
 import { 
   INITIAL_TENANT, INITIAL_ALL_TENANTS, INITIAL_USERS, INITIAL_BIRDS, INITIAL_CAGES, 
@@ -13,7 +13,7 @@ import {
   INITIAL_SEXINGS, INITIAL_GENOTYPING, INITIAL_TIMELINE, 
   INITIAL_NOTIFICATIONS, INITIAL_DOCUMENTS, INITIAL_TICKETS,
   INITIAL_SELLERS, INITIAL_COMMISSIONS, INITIAL_PAYOUTS, INITIAL_GLOBAL_CONFIG, INITIAL_CALENDAR_EVENTS, INITIAL_NOTES,
-  INITIAL_USER_REFERRALS
+  INITIAL_USER_REFERRALS, INITIAL_BREEDING_OBSERVATIONS
 } from './seed-data';
 import { firebaseSync } from './firebase-service';
 
@@ -46,6 +46,7 @@ interface DatabaseState {
   notes: NoteItem[];
   insights: AiLearnedInsight[];
   tournaments: TournamentSession[];
+  breedingObservations: BreedingObservation[];
 }
 
 const STORAGE_KEY = 'birdpro_production_db_v2';
@@ -59,7 +60,7 @@ class DataService {
   private static SYNC_COLLECTIONS = [
     'birds', 'cages', 'rings', 'pairs', 'clutches', 'eggs', 'medications', 'treatments',
     'diseases', 'sexings', 'genotyping', 'timeline', 'notifications', 'documents',
-    'photos', 'events', 'notes', 'tournaments'
+    'photos', 'events', 'notes', 'tournaments', 'breedingObservations'
   ];
   private syncTenantId: string | null = null;
   private syncReady = false;
@@ -133,7 +134,8 @@ class DataService {
       notes: [...INITIAL_NOTES],
       insights: [],
       auditLogs: [],
-      tournaments: []
+      tournaments: [],
+      breedingObservations: [...INITIAL_BREEDING_OBSERVATIONS]
     };
   }
 
@@ -468,10 +470,13 @@ class DataService {
   public async syncCloudData(): Promise<void> {
     if (!this.isBrowser || !firebaseSync.isAvailable()) return;
     try {
-      // 1. Fetch remote tenants & users from Firestore
-      const [cloudTenants, cloudUsers] = await Promise.all([
+      // 1. Fetch remote tenants, users, sellers, commissions & payouts from Firestore
+      const [cloudTenants, cloudUsers, cloudSellers, cloudCommissions, cloudPayouts] = await Promise.all([
         firebaseSync.fetchAllTenants(),
-        firebaseSync.fetchAllUsers()
+        firebaseSync.fetchAllUsers(),
+        firebaseSync.fetchAllSellers(),
+        firebaseSync.fetchAllCommissions(),
+        firebaseSync.fetchAllPayouts()
       ]);
 
       let stateChanged = false;
@@ -523,7 +528,89 @@ class DataService {
         });
       }
 
-      // 4. AUTOMATIC MIGRATION: Push any local tenants that are NOT in Firestore to Firestore!
+      // 4. Merge cloud commissions into local state
+      if (cloudCommissions && cloudCommissions.length > 0) {
+        if (!this.state.commissions) this.state.commissions = [];
+        cloudCommissions.forEach(cc => {
+          const idx = this.state.commissions.findIndex(c => c.id === cc.id);
+          if (idx >= 0) {
+            this.state.commissions[idx] = { ...this.state.commissions[idx], ...cc };
+          } else {
+            this.state.commissions.unshift(cc);
+            stateChanged = true;
+          }
+        });
+      }
+
+      // 5. Merge cloud payouts into local state
+      if (cloudPayouts && cloudPayouts.length > 0) {
+        if (!this.state.payouts) this.state.payouts = [];
+        cloudPayouts.forEach(cp => {
+          const idx = this.state.payouts.findIndex(p => p.id === cp.id);
+          if (idx >= 0) {
+            this.state.payouts[idx] = { ...this.state.payouts[idx], ...cp };
+          } else {
+            this.state.payouts.unshift(cp);
+            stateChanged = true;
+          }
+        });
+      }
+
+      // 6. Merge cloud sellers into local state
+      if (cloudSellers && cloudSellers.length > 0) {
+        if (!this.state.sellers) this.state.sellers = [];
+        cloudSellers.forEach(cs => {
+          const cleanEmail = (cs.email || '').toLowerCase().trim();
+          const cleanCode = (cs.affiliateCode || '').toLowerCase().trim();
+          const idx = this.state.sellers.findIndex(s => 
+            s.id === cs.id || 
+            (cleanCode && s.affiliateCode && s.affiliateCode.toLowerCase().trim() === cleanCode) ||
+            (cleanEmail && s.email && s.email.toLowerCase().trim() === cleanEmail)
+          );
+          if (idx >= 0) {
+            const current = this.state.sellers[idx];
+            const merged: SellerAffiliate = {
+              ...current,
+              ...cs,
+              totalSalesValue: Math.max(current.totalSalesValue || 0, cs.totalSalesValue || 0),
+              totalCommissionsEarned: Math.max(current.totalCommissionsEarned || 0, cs.totalCommissionsEarned || 0),
+              totalSignups: Math.max(current.totalSignups || 0, cs.totalSignups || 0),
+              balanceAvailable: Math.max(current.balanceAvailable || 0, cs.balanceAvailable || 0),
+            };
+            this.state.sellers[idx] = merged;
+          } else {
+            this.state.sellers.unshift(cs);
+            stateChanged = true;
+          }
+        });
+      }
+
+      // 7. Recalculate seller balances dynamically based on commissions and payouts
+      if (this.state.sellers && this.state.sellers.length > 0 && this.state.commissions) {
+        this.state.sellers.forEach(s => {
+          const sComms = (this.state.commissions || []).filter(c => 
+            c.affiliateId === s.id || 
+            (s.affiliateCode && c.affiliateId.toLowerCase() === s.affiliateCode.toLowerCase())
+          );
+          if (sComms.length > 0) {
+            const sumSales = sComms.reduce((acc, c) => acc + (c.saleValue || 0), 0);
+            const sumComms = sComms.reduce((acc, c) => acc + (c.commissionAmount || 0), 0);
+            const sPayouts = (this.state.payouts || []).filter(p => p.affiliateId === s.id && p.status === 'COMPLETED');
+            const sumPaid = sPayouts.reduce((acc, p) => acc + (p.amount || 0), 0);
+
+            if (sumSales > s.totalSalesValue || sumComms > s.totalCommissionsEarned || sumSales !== s.totalSalesValue) {
+              s.totalSalesValue = Math.max(s.totalSalesValue, sumSales);
+              s.totalCommissionsEarned = Math.max(s.totalCommissionsEarned, sumComms);
+              s.totalSignups = Math.max(s.totalSignups, sComms.length);
+              s.balanceAvailable = Math.max(0, s.totalCommissionsEarned - sumPaid);
+              stateChanged = true;
+              firebaseSync.saveSeller(s).catch(() => {});
+            }
+          }
+        });
+      }
+
+      // 8. AUTOMATIC MIGRATION: Push any local tenants that are NOT in Firestore to Firestore!
       if (this.state.tenants && this.state.tenants.length > 0) {
         for (const localTenant of this.state.tenants) {
           if (this.deletedTenantIds.has(localTenant.id)) continue;
@@ -536,7 +623,7 @@ class DataService {
         }
       }
 
-      // 5. AUTOMATIC MIGRATION: Push any local users that are NOT in Firestore to Firestore!
+      // 9. AUTOMATIC MIGRATION: Push any local users that are NOT in Firestore to Firestore!
       if (this.state.users && this.state.users.length > 0) {
         for (const localUser of this.state.users) {
           if (localUser.tenantId && this.deletedTenantIds.has(localUser.tenantId)) continue;
@@ -548,6 +635,18 @@ class DataService {
             if (!existsInCloud) {
               await firebaseSync.saveUser(localUser);
             }
+          }
+        }
+      }
+
+      // 10. AUTOMATIC MIGRATION: Push any local sellers that are NOT in Firestore to Firestore!
+      if (this.state.sellers && this.state.sellers.length > 0) {
+        for (const localSeller of this.state.sellers) {
+          const existsInCloud = cloudSellers.some(cs => 
+            cs.id === localSeller.id || (cs.affiliateCode && cs.affiliateCode.toLowerCase().trim() === (localSeller.affiliateCode || '').toLowerCase().trim())
+          );
+          if (!existsInCloud) {
+            await firebaseSync.saveSeller(localSeller);
           }
         }
       }
@@ -1463,6 +1562,91 @@ class DataService {
     return undefined;
   }
 
+  // --- BREEDING OBSERVATIONS, GALAS & GENETIC TIMELINE ---
+  getBreedingObservations(
+    tenantId = 'tenant-demo-01',
+    pairId?: string,
+    maleId?: string,
+    femaleId?: string
+  ): BreedingObservation[] {
+    if (!this.state.breedingObservations) {
+      this.state.breedingObservations = [];
+    }
+    return this.state.breedingObservations
+      .filter(obs => {
+        if (obs.tenantId && obs.tenantId !== tenantId) return false;
+        if (pairId && obs.pairId && obs.pairId !== pairId) return false;
+        if (maleId && obs.maleId !== maleId) return false;
+        if (femaleId && obs.femaleId !== femaleId) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(b.date + ' ' + (b.time || '00:00')).getTime() - new Date(a.date + ' ' + (a.time || '00:00')).getTime());
+  }
+
+  addBreedingObservation(
+    obs: Omit<BreedingObservation, 'id' | 'createdAt'>
+  ): BreedingObservation {
+    if (!this.state.breedingObservations) this.state.breedingObservations = [];
+    const newObs: BreedingObservation = {
+      ...obs,
+      id: `brobs-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      createdAt: new Date().toISOString()
+    };
+    this.state.breedingObservations.unshift(newObs);
+    this.logAction(
+      obs.tenantId || 'tenant-demo-01',
+      'CREATE_BREEDING_OBS',
+      'REPRODUCAO',
+      `Anotação de reprodução: ${newObs.title} (${newObs.maleName} x ${newObs.femaleName}) em ${newObs.date}`
+    );
+    this.saveToStorage();
+    if (this.isBrowser && firebaseSync.isAvailable()) {
+      firebaseSync.saveBreedingObservation(newObs).catch(e => console.error('Cloud save breeding observation error:', e));
+    }
+    return newObs;
+  }
+
+  updateBreedingObservation(obs: BreedingObservation): void {
+    if (!this.state.breedingObservations) return;
+    const idx = this.state.breedingObservations.findIndex(o => o.id === obs.id);
+    if (idx >= 0) {
+      this.state.breedingObservations[idx] = {
+        ...obs,
+        updatedAt: new Date().toISOString()
+      };
+      this.logAction(
+        obs.tenantId || 'tenant-demo-01',
+        'UPDATE_BREEDING_OBS',
+        'REPRODUCAO',
+        `Anotação de reprodução atualizada: ${obs.title}`
+      );
+      this.saveToStorage();
+      if (this.isBrowser && firebaseSync.isAvailable()) {
+        firebaseSync.saveBreedingObservation(this.state.breedingObservations[idx]).catch(e => console.error('Cloud update breeding observation error:', e));
+      }
+    }
+  }
+
+  deleteBreedingObservation(id: string): boolean {
+    if (!this.state.breedingObservations) return false;
+    const obs = this.state.breedingObservations.find(o => o.id === id);
+    if (obs) {
+      this.state.breedingObservations = this.state.breedingObservations.filter(o => o.id !== id);
+      this.logAction(
+        obs.tenantId || 'tenant-demo-01',
+        'DELETE_BREEDING_OBS',
+        'REPRODUCAO',
+        `Anotação de reprodução excluída: ${obs.title}`
+      );
+      this.saveToStorage();
+      if (this.isBrowser && firebaseSync.isAvailable()) {
+        firebaseSync.deleteBreedingObservation(id).catch(e => console.error('Cloud delete breeding observation error:', e));
+      }
+      return true;
+    }
+    return false;
+  }
+
   // --- MEDICATIONS & HEALTH ---
   getMedications(tenantId = 'tenant-demo-01'): Medication[] {
     return this.state.medications.filter(m => m.tenantId === tenantId);
@@ -1875,6 +2059,7 @@ class DataService {
 
     this.logAction('tenant-demo-01', 'CREATE', 'VENDEDORES', `Vendedor/Afiliado ${seller.name} cadastrado com código ${seller.affiliateCode}`);
     this.saveToStorage();
+    firebaseSync.saveSeller(seller).catch(() => {});
   }
 
   updateSeller(seller: SellerAffiliate): void {
@@ -1895,6 +2080,7 @@ class DataService {
 
       this.logAction('tenant-demo-01', 'UPDATE', 'VENDEDORES', `Dados do vendedor/afiliado ${seller.name} atualizados`);
       this.saveToStorage();
+      firebaseSync.saveSeller(seller).catch(() => {});
     }
   }
 
@@ -1953,6 +2139,7 @@ class DataService {
       this.logAction('tenant-demo-01', 'DELETE', 'VENDEDORES', `Vendedor/Afiliado ${s.name} excluído`);
     }
     this.saveToStorage();
+    firebaseSync.deleteSeller(id).catch(() => {});
   }
 
   recordAffiliateClick(code: string): void {
@@ -1960,6 +2147,7 @@ class DataService {
     if (s) {
       s.totalClicks = (s.totalClicks || 0) + 1;
       this.saveToStorage();
+      firebaseSync.saveSeller(s).catch(() => {});
     }
   }
 
@@ -1980,8 +2168,10 @@ class DataService {
       seller.totalCommissionsEarned += comm.commissionAmount;
       seller.balanceAvailable += comm.commissionAmount;
       seller.totalSignups += 1;
+      firebaseSync.saveSeller(seller).catch(() => {});
     }
     this.saveToStorage();
+    firebaseSync.saveCommission(comm).catch(() => {});
   }
 
   getPayouts(sellerId?: string): AffiliatePayout[] {
@@ -1997,8 +2187,10 @@ class DataService {
     if (seller) {
       seller.balanceAvailable = Math.max(0, seller.balanceAvailable - payout.amount);
       seller.totalCommissionsPaid += payout.amount;
+      firebaseSync.saveSeller(seller).catch(() => {});
     }
     this.saveToStorage();
+    firebaseSync.savePayout(payout).catch(() => {});
   }
 
   updatePayoutStatus(id: string, status: 'PROCESSING' | 'COMPLETED' | 'REJECTED', receiptUrl?: string): void {
@@ -2040,10 +2232,12 @@ class DataService {
         } else if (status === 'COMPLETED') {
           seller.totalCommissionsPaid += p.amount;
         }
+        firebaseSync.saveSeller(seller).catch(() => {});
       }
 
       this.logAction(p.affiliateId, 'PAYOUT_STATUS_UPDATED', 'FINANCEIRO', `Status do repasse de R$ ${p.amount.toFixed(2)} atualizado para: ${status}`);
       this.saveToStorage();
+      firebaseSync.savePayout(p).catch(() => {});
     }
   }
 
@@ -2210,6 +2404,7 @@ class DataService {
 
     this.logAction(tenantId, 'PAYOUT_REQUESTED', 'INDIQUE_E_GANHE', `Solicitação de saque PIX de R$ ${amount.toFixed(2)} registrada. Prazo de 24 horas para efetivação.`);
     this.saveToStorage();
+    firebaseSync.savePayout(payout).catch(() => {});
     return payout;
   }
 

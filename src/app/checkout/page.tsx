@@ -123,14 +123,21 @@ function CheckoutContent() {
   const discountAmount = (basePrice * discountPercent) / 100
   const finalPrice = Math.max(1, basePrice - discountAmount)
 
-  // Initialize coupon validation if initialRef is provided
+  // Initialize coupon validation if initialRef or localStorage referral is provided
   useEffect(() => {
-    if (initialRef) {
-      const result = db.validateCoupon(initialRef)
-      if (result.valid) {
-        setAppliedCoupon(result)
+    db.syncCloudData().then(() => {
+      let refToTry = initialRef
+      if (!refToTry && typeof window !== 'undefined') {
+        refToTry = localStorage.getItem('birdpro_referral_code') || localStorage.getItem('birdpro_coupon_code') || ''
       }
-    }
+      if (refToTry) {
+        setFormData(prev => ({ ...prev, promoCode: prev.promoCode || refToTry }))
+        const result = db.validateCoupon(refToTry)
+        if (result.valid) {
+          setAppliedCoupon(result)
+        }
+      }
+    }).catch(() => {})
   }, [initialRef])
 
   // ViaCEP Lookup
@@ -370,18 +377,40 @@ function CheckoutContent() {
       lastPaymentDate: new Date().toISOString()
     }, createdResult.tenant.id)
 
-    // 3. If partner coupon was applied, record real commission
-    if (appliedCoupon?.sellerId) {
+    // 3. Record commission if partner coupon was applied or seller referral was saved
+    let targetSellerId = appliedCoupon?.sellerId
+    let targetSellerName = appliedCoupon?.sellerName
+    let commissionPercent = 20
+
+    if (!targetSellerId) {
+      const storedRef = initialRef || (typeof window !== 'undefined' ? localStorage.getItem('birdpro_referral_code') || localStorage.getItem('birdpro_coupon_code') || '' : '')
+      if (storedRef) {
+        const foundSeller = db.getSellerByCode(storedRef)
+        if (foundSeller) {
+          targetSellerId = foundSeller.id
+          targetSellerName = foundSeller.name
+          commissionPercent = foundSeller.commissionPercent || 20
+        }
+      }
+    } else {
+      const sellerObj = db.getSellerById(targetSellerId)
+      if (sellerObj?.commissionPercent) {
+        commissionPercent = sellerObj.commissionPercent
+      }
+    }
+
+    if (targetSellerId) {
+      const commissionAmount = (finalPrice * commissionPercent) / 100
       db.addCommission({
         id: `comm-${Date.now()}`,
-        affiliateId: appliedCoupon.sellerId,
-        affiliateName: appliedCoupon.sellerName || 'Parceiro Comercial BirdPro',
+        affiliateId: targetSellerId,
+        affiliateName: targetSellerName || 'Parceiro Comercial BirdPro',
         tenantId: createdResult.tenant.id,
         tenantName: createdResult.tenant.name,
         planName: `Plano Completo BirdPro (${selectedCycle === 'ANUAL' ? 'Anual' : 'Mensal'})`,
         saleValue: finalPrice,
-        commissionPercent: 20,
-        commissionAmount: (finalPrice * 20) / 100,
+        commissionPercent,
+        commissionAmount,
         status: 'APPROVED',
         createdAt: new Date().toISOString()
       })

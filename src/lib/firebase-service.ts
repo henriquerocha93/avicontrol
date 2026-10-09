@@ -14,7 +14,8 @@ import {
 import { 
   Bird, Cage, Ring, BreedingPair, Clutch, Egg, DiseaseRecord, Medication, 
   Treatment, SexingRecord, GenotypingRecord, BirdTimelineEvent, 
-  NotificationItem, Tenant, User, SupportTicket, CalendarEvent, NoteItem 
+  NotificationItem, Tenant, User, SupportTicket, CalendarEvent, NoteItem,
+  SellerAffiliate, AffiliateCommission, AffiliatePayout, BreedingObservation
 } from '@/types';
 
 export class FirebaseSyncService {
@@ -234,6 +235,150 @@ export class FirebaseSyncService {
     } catch (err) {
       console.error('Failed to subscribe to users:', err);
       return () => {};
+    }
+  }
+
+  // --- SELLERS / AFFILIATES CLOUD CRUD ---
+  public async saveSeller(seller: SellerAffiliate): Promise<boolean> {
+    if (!this.isAvailable() || !dbFirestore) return false;
+    try {
+      const clean = JSON.parse(JSON.stringify(seller));
+      const docRef = doc(dbFirestore, 'sellers', seller.id);
+      await setDoc(docRef, clean, { merge: true });
+      return true;
+    } catch (err) {
+      console.error(`Error saving seller ${seller.id} to Firebase:`, err);
+      return false;
+    }
+  }
+
+  public async fetchAllSellers(): Promise<SellerAffiliate[]> {
+    if (!this.isAvailable() || !dbFirestore) return [];
+    try {
+      const colRef = collection(dbFirestore, 'sellers');
+      const snap = await getDocs(colRef);
+      const list: SellerAffiliate[] = [];
+      snap.forEach(d => {
+        list.push({ id: d.id, ...d.data() } as SellerAffiliate);
+      });
+      return list;
+    } catch (err) {
+      console.error('Error fetching all sellers from Firebase:', err);
+      return [];
+    }
+  }
+
+  public async deleteSeller(id: string): Promise<boolean> {
+    if (!this.isAvailable() || !dbFirestore) return false;
+    try {
+      const docRef = doc(dbFirestore, 'sellers', id);
+      await deleteDoc(docRef);
+      return true;
+    } catch (err) {
+      console.error(`Error deleting seller ${id} from Firebase:`, err);
+      return false;
+    }
+  }
+
+  // --- COMMISSIONS CLOUD CRUD ---
+  public async saveCommission(commission: AffiliateCommission): Promise<boolean> {
+    if (!this.isAvailable() || !dbFirestore) return false;
+    try {
+      const clean = JSON.parse(JSON.stringify(commission));
+      const docRef = doc(dbFirestore, 'commissions', commission.id);
+      await setDoc(docRef, clean, { merge: true });
+      return true;
+    } catch (err) {
+      console.error(`Error saving commission ${commission.id} to Firebase:`, err);
+      return false;
+    }
+  }
+
+  public async fetchAllCommissions(): Promise<AffiliateCommission[]> {
+    if (!this.isAvailable() || !dbFirestore) return [];
+    try {
+      const colRef = collection(dbFirestore, 'commissions');
+      const snap = await getDocs(colRef);
+      const list: AffiliateCommission[] = [];
+      snap.forEach(d => {
+        list.push({ id: d.id, ...d.data() } as AffiliateCommission);
+      });
+      return list;
+    } catch (err) {
+      console.error('Error fetching all commissions from Firebase:', err);
+      return [];
+    }
+  }
+
+  // --- PAYOUTS CLOUD CRUD ---
+  public async savePayout(payout: AffiliatePayout): Promise<boolean> {
+    if (!this.isAvailable() || !dbFirestore) return false;
+    try {
+      const clean = JSON.parse(JSON.stringify(payout));
+      const docRef = doc(dbFirestore, 'payouts', payout.id);
+      await setDoc(docRef, clean, { merge: true });
+      return true;
+    } catch (err) {
+      console.error(`Error saving payout ${payout.id} to Firebase:`, err);
+      return false;
+    }
+  }
+
+  public async fetchAllPayouts(): Promise<AffiliatePayout[]> {
+    if (!this.isAvailable() || !dbFirestore) return [];
+    try {
+      const colRef = collection(dbFirestore, 'payouts');
+      const snap = await getDocs(colRef);
+      const list: AffiliatePayout[] = [];
+      snap.forEach(d => {
+        list.push({ id: d.id, ...d.data() } as AffiliatePayout);
+      });
+      return list;
+    } catch (err) {
+      console.error('Error fetching all payouts from Firebase:', err);
+      return [];
+    }
+  }
+
+  // --- BREEDING OBSERVATIONS (GALAS, NASCIMENTOS, EVENTOS) ---
+  public async saveBreedingObservation(obs: BreedingObservation): Promise<boolean> {
+    if (!this.isAvailable() || !dbFirestore) return false;
+    try {
+      const docRef = doc(dbFirestore, 'breedingObservations', obs.id);
+      await setDoc(docRef, JSON.parse(JSON.stringify(obs)), { merge: true });
+      return true;
+    } catch (err) {
+      console.error('Error saving breeding observation to Firebase:', err);
+      return false;
+    }
+  }
+
+  public async fetchAllBreedingObservations(tenantId?: string): Promise<BreedingObservation[]> {
+    if (!this.isAvailable() || !dbFirestore) return [];
+    try {
+      const colRef = collection(dbFirestore, 'breedingObservations');
+      const q = tenantId ? query(colRef, where('tenantId', '==', tenantId)) : query(colRef);
+      const snap = await getDocs(q);
+      const list: BreedingObservation[] = [];
+      snap.forEach(d => {
+        list.push({ id: d.id, ...d.data() } as BreedingObservation);
+      });
+      return list;
+    } catch (err) {
+      console.error('Error fetching breeding observations from Firebase:', err);
+      return [];
+    }
+  }
+
+  public async deleteBreedingObservation(id: string): Promise<boolean> {
+    if (!this.isAvailable() || !dbFirestore) return false;
+    try {
+      const docRef = doc(dbFirestore, 'breedingObservations', id);
+      await deleteDoc(docRef);
+      return true;
+    } catch (err) {
+      console.error('Error deleting breeding observation from Firebase:', err);
+      return false;
     }
   }
 

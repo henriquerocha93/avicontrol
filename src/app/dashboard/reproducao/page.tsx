@@ -26,9 +26,13 @@ import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
 import { inheritFullAncestryFromCouple } from '@/lib/pedigree';
 import { DateManualInput } from '@/components/ui/date-manual-input';
+import { BreedingNotesAndTree } from '@/components/breeding/breeding-notes-and-tree';
 
 export default function BreedingPage() {
   const { tenant } = useAuth();
+
+  const [activeTab, setActiveTab] = useState<'notes' | 'pairs'>('notes');
+  const [selectedPairForNotes, setSelectedPairForNotes] = useState<string | null>(null);
 
   const [pairs, setPairs] = useState<BreedingPair[]>([]);
   const [clutches, setClutches] = useState<Clutch[]>([]);
@@ -269,122 +273,190 @@ export default function BreedingPage() {
         </div>
       </div>
 
-      {/* Incubating Eggs Highlight Banner */}
-      <div className="bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-teal-500/10 rounded-3xl p-6 border border-amber-500/20 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-amber-500 text-white rounded-xl shadow-sm">
-              <EggIcon className="w-5 h-5" />
+      {/* Navigation Tabs */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('notes')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition cursor-pointer ${
+            activeTab === 'notes'
+              ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 shadow-2xs'
+          }`}
+        >
+          <Heart className={`w-4 h-4 ${activeTab === 'notes' ? 'fill-white' : 'text-rose-500 fill-rose-500'}`} />
+          <span>Anotações, Galas & Árvore Genética</span>
+          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+            activeTab === 'notes' ? 'bg-rose-700 text-white' : 'bg-rose-100 text-rose-800'
+          }`}>
+            Principal ✨
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('pairs')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition cursor-pointer ${
+            activeTab === 'pairs'
+              ? 'bg-slate-900 text-white shadow-md'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 shadow-2xs'
+          }`}
+        >
+          <Bird className="w-4 h-4 text-emerald-600" />
+          <span>Casais Formados & Incubação</span>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+            {pairs.length} casais
+          </span>
+        </button>
+      </div>
+
+      {/* VIEW 1: ANOTAÇÕES, GALAS & ÁRVORE GENÉTICA */}
+      {activeTab === 'notes' && (
+        <BreedingNotesAndTree
+          tenantId={tenant?.id || 'tenant-demo-01'}
+          pairs={pairs}
+          birds={birds}
+          onRefreshData={loadData}
+          selectedPairIdFromProps={selectedPairForNotes}
+        />
+      )}
+
+      {/* VIEW 2: CASAIS & INCUBADORA */}
+      {activeTab === 'pairs' && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Incubating Eggs Highlight Banner */}
+          <div className="bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-teal-500/10 rounded-3xl p-6 border border-amber-500/20 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-amber-500 text-white rounded-xl shadow-sm">
+                  <EggIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900">Ovos em Incubação no Ninho</h3>
+                  <p className="text-xs text-slate-600">Contagem regressiva de dias para eclosão</p>
+                </div>
+              </div>
+              <span className="text-xs font-bold px-3 py-1 bg-white text-emerald-800 rounded-full border border-emerald-200 shadow-2xs">
+                {eggs.filter(e => e.status === 'FERTILE' || e.status === 'INCUBATING').length} ovos monitorados
+              </span>
             </div>
-            <div>
-              <h3 className="font-extrabold text-base text-slate-900">Ovos em Incubação no Ninho</h3>
-              <p className="text-xs text-slate-600">Contagem regressiva de dias para eclosão</p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              {eggs.filter(e => e.status === 'FERTILE' || e.status === 'INCUBATING').map((egg) => {
+                const pair = pairs.find(p => p.id === egg.pairId);
+                return (
+                  <div key={egg.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-2 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-slate-900">Ovo #{egg.eggNumber}</span>
+                        <Badge variant="success" size="sm">Fértil (Vivo)</Badge>
+                      </div>
+                      <p className="text-xs font-semibold text-emerald-800 mt-1">{pair?.name || 'Casal Reprodutor'}</p>
+                      <p className="text-[11px] text-slate-500">Postura em: {formatDate(egg.layDate)}</p>
+                      <div className="flex items-center gap-1.5 text-xs text-amber-700 font-bold mt-2">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Eclosão: {formatDate(egg.expectedHatchDate)}</span>
+                      </div>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700"
+                      onClick={() => {
+                        setSelectedEggToHatch(egg);
+                        setHatchForm({
+                          name: `Filhote ${pair?.maleName.split(' ')[0] || 'Junior'} #${egg.eggNumber}`,
+                          ringNumber: availableRings[0]?.number || `FOB-2026-BR-00${Math.floor(10 + Math.random() * 90)}`,
+                          sex: 'UNKNOWN',
+                          color: '',
+                          mutation: ''
+                        });
+                        setIsHatchModalOpen(true);
+                      }}
+                    >
+                      <Sparkles className="w-4 h-4 mr-1.5" />
+                      Registrar Nascimento
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           </div>
-          <span className="text-xs font-bold px-3 py-1 bg-white text-emerald-800 rounded-full border border-emerald-200 shadow-2xs">
-            {eggs.filter(e => e.status === 'FERTILE' || e.status === 'INCUBATING').length} ovos monitorados
-          </span>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-          {eggs.filter(e => e.status === 'FERTILE' || e.status === 'INCUBATING').map((egg) => {
-            const pair = pairs.find(p => p.id === egg.pairId);
-            return (
-              <div key={egg.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-2 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-slate-900">Ovo #{egg.eggNumber}</span>
-                    <Badge variant="success" size="sm">Fértil (Vivo)</Badge>
+          {/* Breeding Pairs Cards */}
+          <div className="space-y-4">
+            <h3 className="font-extrabold text-base text-slate-900">Casais em Reprodução</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {pairs.map((pair) => (
+                <div key={pair.id} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="font-mono text-xs font-bold px-2 py-0.5 bg-rose-100 text-rose-900 rounded-lg">
+                        {pair.code}
+                      </span>
+                      <h4 className="font-bold text-base text-slate-900">{pair.name}</h4>
+                    </div>
+                    <Badge variant="purple">{pair.status === 'ACTIVE' ? 'Casal Ativo' : pair.status}</Badge>
                   </div>
-                  <p className="text-xs font-semibold text-emerald-800 mt-1">{pair?.name || 'Casal Reprodutor'}</p>
-                  <p className="text-[11px] text-slate-500">Postura em: {formatDate(egg.layDate)}</p>
-                  <div className="flex items-center gap-1.5 text-xs text-amber-700 font-bold mt-2">
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>Eclosão: {formatDate(egg.expectedHatchDate)}</span>
+
+                  {/* Parents Matchup Grid */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="p-3 bg-blue-50/70 rounded-2xl border border-blue-200 space-y-1">
+                      <span className="text-[10px] font-bold text-blue-800 uppercase">♂ Macho</span>
+                      <p className="font-bold text-slate-900 truncate">{pair.maleName}</p>
+                      <p className="text-[10px] font-mono text-blue-700">{pair.maleRing}</p>
+                    </div>
+
+                    <div className="p-3 bg-rose-50/70 rounded-2xl border border-rose-200 space-y-1">
+                      <span className="text-[10px] font-bold text-rose-800 uppercase">♀ Fêmea</span>
+                      <p className="font-bold text-slate-900 truncate">{pair.femaleName}</p>
+                      <p className="text-[10px] font-mono text-rose-700">{pair.femaleRing}</p>
+                    </div>
+                  </div>
+
+                  {/* Metrics Summary */}
+                  <div className="grid grid-cols-3 gap-2 text-center p-3 bg-slate-50 rounded-2xl border border-slate-100 text-xs">
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Posturas</span>
+                      <span className="font-extrabold text-slate-800 text-sm">{pair.clutchesCount}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Total Ovos</span>
+                      <span className="font-extrabold text-slate-800 text-sm">{pair.totalEggs}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Filhotes</span>
+                      <span className="font-extrabold text-emerald-700 text-sm">{pair.hatchedCount}</span>
+                    </div>
+                  </div>
+
+                  {/* Footer info & Diary Action */}
+                  <div className="space-y-2 pt-1 border-t border-slate-100">
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>Acomodação: <strong>Gaiola {pair.cageCode || 'G-101'}</strong></span>
+                      <span>Formado em: {formatDate(pair.formedDate)}</span>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-rose-200 bg-rose-50/50 hover:bg-rose-100/80 text-rose-800 font-bold text-xs gap-1.5 transition"
+                      onClick={() => {
+                        setSelectedPairForNotes(pair.id);
+                        setActiveTab('notes');
+                      }}
+                    >
+                      <Heart className="w-3.5 h-3.5 fill-rose-500 text-rose-500" />
+                      <span>Abrir Diário de Galas & Linhagem Genética</span>
+                    </Button>
                   </div>
                 </div>
-
-                <Button
-                  size="sm"
-                  className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700"
-                  onClick={() => {
-                    setSelectedEggToHatch(egg);
-                    setHatchForm({
-                      name: `Filhote ${pair?.maleName.split(' ')[0] || 'Junior'} #${egg.eggNumber}`,
-                      ringNumber: availableRings[0]?.number || `FOB-2026-BR-00${Math.floor(10 + Math.random() * 90)}`,
-                      sex: 'UNKNOWN',
-                      color: '',
-                      mutation: ''
-                    });
-                    setIsHatchModalOpen(true);
-                  }}
-                >
-                  <Sparkles className="w-4 h-4 mr-1.5" />
-                  Registrar Nascimento
-                </Button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Breeding Pairs Cards */}
-      <div className="space-y-4">
-        <h3 className="font-extrabold text-base text-slate-900">Casais em Reprodução</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {pairs.map((pair) => (
-            <div key={pair.id} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="font-mono text-xs font-bold px-2 py-0.5 bg-rose-100 text-rose-900 rounded-lg">
-                    {pair.code}
-                  </span>
-                  <h4 className="font-bold text-base text-slate-900">{pair.name}</h4>
-                </div>
-                <Badge variant="purple">{pair.status === 'ACTIVE' ? 'Casal Ativo' : pair.status}</Badge>
-              </div>
-
-              {/* Parents Matchup Grid */}
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3 bg-blue-50/70 rounded-2xl border border-blue-200 space-y-1">
-                  <span className="text-[10px] font-bold text-blue-800 uppercase">♂ Macho</span>
-                  <p className="font-bold text-slate-900 truncate">{pair.maleName}</p>
-                  <p className="text-[10px] font-mono text-blue-700">{pair.maleRing}</p>
-                </div>
-
-                <div className="p-3 bg-rose-50/70 rounded-2xl border border-rose-200 space-y-1">
-                  <span className="text-[10px] font-bold text-rose-800 uppercase">♀ Fêmea</span>
-                  <p className="font-bold text-slate-900 truncate">{pair.femaleName}</p>
-                  <p className="text-[10px] font-mono text-rose-700">{pair.femaleRing}</p>
-                </div>
-              </div>
-
-              {/* Metrics Summary */}
-              <div className="grid grid-cols-3 gap-2 text-center p-3 bg-slate-50 rounded-2xl border border-slate-100 text-xs">
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Posturas</span>
-                  <span className="font-extrabold text-slate-800 text-sm">{pair.clutchesCount}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Total Ovos</span>
-                  <span className="font-extrabold text-slate-800 text-sm">{pair.totalEggs}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Filhotes</span>
-                  <span className="font-extrabold text-emerald-700 text-sm">{pair.hatchedCount}</span>
-                </div>
-              </div>
-
-              {/* Footer info */}
-              <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
-                <span>Acomodação: <strong>Gaiola {pair.cageCode || 'G-101'}</strong></span>
-                <span>Formado em: {formatDate(pair.formedDate)}</span>
-              </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Form Pair Modal */}
       <Modal
