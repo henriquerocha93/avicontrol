@@ -344,14 +344,15 @@ export default function TorneioPage() {
   const calculateMexidaEvaluation = (
     total: number,
     minuteCounts: MinuteCount[],
-    mode: TournamentMode
+    mode: TournamentMode,
+    secs: number = 600
   ): MexidaEvaluation => {
     const totalMinutes = minuteCounts.length || 1;
-    if (totalMinutes < 3) {
+    if (secs < 180 || totalMinutes < 3) {
       return {
         status: 'REGULAR',
-        title: 'Sessão em andamento',
-        description: 'Dados preliminares insuficientes para calcular consistência de mexida.'
+        title: 'Sessão Preliminar',
+        description: 'Menos de 3 minutos registrados. Conclua os 10 ou 15 minutos oficiais na roda para validar o ritmo e final de mexida.'
       };
     }
 
@@ -366,27 +367,27 @@ export default function TorneioPage() {
     if (secondHalfAvg >= firstHalfAvg * 0.95) {
       return {
         status: 'VALIDATED',
-        title: 'Mexida validada!',
+        title: 'Mexida Validada!',
         description: mode === '15_MIN'
-          ? 'Cantada de 15 min maior que 10 min — manejo no caminho certo.'
-          : 'Cantada consistente da metade pro final — ave com ótima estabilidade na roda.'
+          ? 'Cantada de 15 min com sustentação superior — manejo zootécnico aprovado com excelente resistência.'
+          : 'Ritmo constante da metade para o fim da marcação — ave com ótima fibra e estabilidade na roda.'
       };
     } else if (secondHalfAvg < firstHalfAvg * 0.70) {
       return {
         status: 'ATTENTION',
-        title: 'Queda de rendimento na reta final',
-        description: 'A ave perdeu ritmo nos últimos minutos. Mexida pode estar sobrecarregada ou faltou descanso.'
+        title: 'Queda de Rendimento na Reta Final',
+        description: 'A ave perdeu ritmo nos últimos minutos. A mexida pode ter sobrecarregado (fêmea em excesso) ou faltou descanso.'
       };
     } else {
       return {
         status: 'REGULAR',
-        title: 'Manejo estável',
-        description: 'Ave manteve cantadas regulares, com leve oscilação natural de final de roda.'
+        title: 'Manejo Equilibrado',
+        description: 'Ave manteve cantadas regulares, com leve oscilação natural típica de fechamento de roda.'
       };
     }
   };
 
-  // Finalizar e gerar Relatório Exato dos Prints
+  // Finalizar e gerar Relatório Exato e Realista
   const handleFinalizeSession = (finalSecs?: number) => {
     const actualSeconds = finalSecs !== undefined ? finalSecs : elapsedSeconds;
     setSessionState('FINISHED');
@@ -408,36 +409,54 @@ export default function TorneioPage() {
       });
     }
 
-    // Identifica Melhor e Pior Minuto
+    // Identifica Melhor e Pior Minuto de forma consistente
     let best = { minute: 1, count: minuteCountsList[0]?.count || 0 };
     let worst = { minute: 1, count: minuteCountsList[0]?.count || 0 };
 
-    minuteCountsList.forEach(m => {
-      if (m.count > best.count) {
-        best = { minute: m.minute, count: m.count };
-      }
-      if (m.count < worst.count) {
-        worst = { minute: m.minute, count: m.count };
-      }
-    });
+    if (minuteCountsList.length > 1) {
+      minuteCountsList.forEach(m => {
+        if (m.count > best.count) {
+          best = { minute: m.minute, count: m.count };
+        }
+        if (m.count < worst.count) {
+          worst = { minute: m.minute, count: m.count };
+        }
+      });
+    }
 
-    const averagePerMinute = actualSeconds > 0 
-      ? Number(((totalSongs / actualSeconds) * 60).toFixed(1)) 
-      : 0;
+    // Média real por minuto:
+    // Se durou menos de 60 segundos (sessão curta/teste), a média é o número de cantos registrados neste minuto
+    // Se completou 60 segundos ou mais, calcula com precisão totalSongs / minutos decorridos
+    let averagePerMinute = 0;
+    if (actualSeconds >= 60) {
+      averagePerMinute = Number((totalSongs / (actualSeconds / 60)).toFixed(1));
+    } else if (actualSeconds > 0) {
+      averagePerMinute = totalSongs;
+    }
 
-    // Projeções 10 min e 15 min
+    // Projeções oficiais 10 min e 15 min realistas:
     let proj10 = totalSongs;
     let proj15 = totalSongs;
 
-    if (actualSeconds <= 600) {
-      proj10 = actualSeconds >= 600 ? totalSongs : Math.round((totalSongs / actualSeconds) * 600);
-      proj15 = Math.round(proj10 * 1.5);
+    if (actualSeconds >= 900) {
+      // 15 minutos completos: 10 min são os cantos dos 10 primeiros minutos, e 15 min é o total final
+      proj10 = minuteCountsList.slice(0, 10).reduce((acc, m) => acc + m.count, 0);
+      proj15 = totalSongs;
+    } else if (actualSeconds >= 600) {
+      // 10 minutos completos (ex: 134 cantos): 10 min são os 134 reais, 15 min é a projeção oficial +5 min (134 * 1.5 = 201)
+      proj10 = totalSongs;
+      proj15 = Math.round(totalSongs * 1.5);
+    } else if (actualSeconds >= 180) {
+      // Entre 3 e 10 minutos (já há base estatística estabilizada)
+      proj10 = Math.round(averagePerMinute * 10);
+      proj15 = Math.round(averagePerMinute * 15);
     } else {
-      proj10 = Math.round((totalSongs / actualSeconds) * 600);
-      proj15 = actualSeconds >= 900 ? totalSongs : Math.round((totalSongs / actualSeconds) * 900);
+      // Sessão preliminar curta (< 3 min): calcula projeção proporcional sem extrapolações absurdas
+      proj10 = Math.round(averagePerMinute * 10);
+      proj15 = Math.round(averagePerMinute * 15);
     }
 
-    const evaluation = calculateMexidaEvaluation(totalSongs, minuteCountsList, targetMode);
+    const evaluation = calculateMexidaEvaluation(totalSongs, minuteCountsList, targetMode, actualSeconds);
 
     const sessionObj: TournamentSession = {
       id: `tourn-${Date.now()}`,
@@ -960,94 +979,185 @@ export default function TorneioPage() {
             </div>
           )}
 
-          {/* ESTADO 3: SESSÃO FINALIZADA (LAYOUT EXATAMENTE IGUAL AOS PRINTS DO USUÁRIO) */}
+          {/* ESTADO 3: SESSÃO FINALIZADA (DESIGN ULTRA MODERNO, ESPORTIVO & DE ALTA PERFORMANCE) */}
           {completedSession && sessionState === 'FINISHED' && (
-            <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="space-y-5 animate-in fade-in zoom-in-95 duration-200">
               
-              {/* Card de Sessão Finalizada */}
-              <div className="bg-slate-50/80 rounded-3xl p-6 border border-slate-200 text-center space-y-2">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 text-[#00c853] flex items-center justify-center mx-auto shadow-xs">
-                  <Check className="w-7 h-7 stroke-[3]" />
+              {/* CARD MASTER: CABEÇALHO DA SESSÃO FINALIZADA */}
+              <div className="bg-gradient-to-br from-slate-950 via-[#0a1914] to-[#07130e] text-white rounded-3xl p-6 sm:p-7 border border-emerald-500/30 shadow-2xl relative overflow-hidden">
+                {/* Efeitos de Luz / Glow Ambiental */}
+                <div className="absolute -top-16 -right-16 w-56 h-56 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-16 -left-16 w-56 h-56 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="relative z-10 space-y-4">
+                  {/* Linha de Status & Timer */}
+                  <div className="flex items-center justify-between flex-wrap gap-2.5">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-black uppercase tracking-wider shadow-xs">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Sessão Finalizada</span>
+                    </div>
+
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-900/90 border border-slate-700 text-slate-300 text-xs font-mono font-bold shadow-xs">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Tempo: <strong>{formatTime(completedSession.totalSeconds)}</strong></span>
+                      {completedSession.totalSeconds < 180 ? (
+                        <span className="text-[10px] text-amber-400 font-bold bg-amber-500/20 px-1.5 py-0.2 rounded">
+                          Parcial
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/20 px-1.5 py-0.2 rounded">
+                          Oficial
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Informações da Ave e Modalidade */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 border-t border-slate-800/80">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                          {completedSession.birdName}
+                        </h2>
+                        {completedSession.birdRing && (
+                          <span className="font-mono text-xs font-black px-2.5 py-0.5 bg-slate-800 border border-slate-700 text-emerald-400 rounded-lg">
+                            {completedSession.birdRing}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1 font-medium">
+                        Modalidade: <strong className="text-slate-200">{completedSession.type}</strong> •{' '}
+                        {completedSession.mode === '10_MIN' ? '10 Minutos (Classificação)' : '15 Minutos (Final)'}
+                        {completedSession.location ? ` • 📍 ${completedSession.location}` : ''}
+                      </p>
+                    </div>
+
+                    {completedSession.placement && (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-black text-xs shadow-md border border-amber-400/50 self-start sm:self-center">
+                        <Trophy className="w-4 h-4" />
+                        <span>{completedSession.placement}</span>
+                        {completedSession.trophy && <span>🏆</span>}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <h2 className="text-lg font-black text-slate-800 tracking-tight">Sessão Finalizada</h2>
-                <p className="text-xs font-bold text-slate-500">
-                  {completedSession.birdName} • {completedSession.type}
-                </p>
               </div>
 
-              {/* Cards de Métricas Principais (134 Total de Cantos / 13.4 por minuto) */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-white p-5 rounded-3xl border border-slate-200/90 text-center shadow-xs">
-                  <div className="text-3xl sm:text-4xl font-black text-[#00c853] font-mono">
+              {/* GRID PRINCIPAL DE MÉTRICAS (ESTILO TELEMETRIA ESPORTIVA) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                
+                {/* Card 1: TOTAL DE CANTOS */}
+                <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-md text-center relative overflow-hidden group hover:border-emerald-400 transition-all">
+                  <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600" />
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 block mb-1">
+                    Total de Cantos Marcados
+                  </span>
+                  <div className="text-6xl sm:text-7xl font-black text-emerald-600 font-mono tracking-tight">
                     {completedSession.totalSongs}
                   </div>
-                  <span className="text-[11px] font-bold text-slate-500 mt-1 block">Total de Cantos</span>
+                  <div className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Contagem Registrada na Roda</span>
+                  </div>
                 </div>
 
-                <div className="bg-white p-5 rounded-3xl border border-slate-200/90 text-center shadow-xs">
-                  <div className="text-3xl sm:text-4xl font-black text-slate-900 font-mono">
+                {/* Card 2: RITMO POR MINUTO */}
+                <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-md text-center relative overflow-hidden group hover:border-blue-400 transition-all">
+                  <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-sky-400 to-indigo-500" />
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 block mb-1">
+                    Cadência / Ritmo
+                  </span>
+                  <div className="text-6xl sm:text-7xl font-black text-slate-900 font-mono tracking-tight">
                     {completedSession.songsPerMinute.toFixed(1)}
                   </div>
-                  <span className="text-[11px] font-bold text-slate-500 mt-1 block">por minuto</span>
+                  <div className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
+                    <Clock className="w-3.5 h-3.5 text-slate-500" />
+                    <span>cantos por minuto (média)</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Linha com Melhor Minuto e Pior Minuto */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-emerald-50/70 p-4 rounded-2xl border border-emerald-200/80 text-center">
-                  <div className="flex items-center justify-center gap-1 text-[11px] font-extrabold text-emerald-800">
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    <span>Melhor minuto</span>
+              {/* LINHA COM MELHOR MINUTO E PIOR MINUTO / RITMO */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* Melhor Minuto */}
+                <div className="bg-gradient-to-br from-emerald-50 to-teal-50/70 p-5 rounded-3xl border border-emerald-300 text-center shadow-xs">
+                  <div className="flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-wider text-emerald-800">
+                    <TrendingUp className="w-4 h-4 text-emerald-600" />
+                    <span>Melhor minuto 🔥</span>
                   </div>
-                  <div className="text-2xl font-black text-emerald-700 font-mono mt-1">
-                    {completedSession.bestMinute.count}
+                  <div className="text-3xl sm:text-4xl font-black text-emerald-700 font-mono mt-1">
+                    {completedSession.bestMinute.count} <span className="text-sm font-bold text-emerald-600 font-sans">cantos</span>
                   </div>
-                  <span className="text-[10px] font-bold text-emerald-600 block">
-                    {completedSession.bestMinute.minute}º minuto
+                  <span className="text-xs font-bold text-emerald-700 mt-0.5 block">
+                    Registrado no {completedSession.bestMinute.minute}º minuto
                   </span>
                 </div>
 
-                <div className="bg-amber-50/70 p-4 rounded-2xl border border-amber-200/80 text-center">
-                  <div className="flex items-center justify-center gap-1 text-[11px] font-extrabold text-amber-800">
-                    <TrendingDown className="w-3.5 h-3.5" />
-                    <span>Pior minuto</span>
+                {/* Pior Minuto ou Ritmo Inicial */}
+                {completedSession.minuteCounts.length > 1 ? (
+                  <div className="bg-gradient-to-br from-amber-50 to-orange-50/70 p-5 rounded-3xl border border-amber-300 text-center shadow-xs">
+                    <div className="flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-wider text-amber-800">
+                      <TrendingDown className="w-4 h-4 text-amber-600" />
+                      <span>Pior minuto 📉</span>
+                    </div>
+                    <div className="text-3xl sm:text-4xl font-black text-amber-700 font-mono mt-1">
+                      {completedSession.worstMinute.count} <span className="text-sm font-bold text-amber-600 font-sans">cantos</span>
+                    </div>
+                    <span className="text-xs font-bold text-amber-700 mt-0.5 block">
+                      Registrado no {completedSession.worstMinute.minute}º minuto
+                    </span>
                   </div>
-                  <div className="text-2xl font-black text-amber-700 font-mono mt-1">
-                    {completedSession.worstMinute.count}
+                ) : (
+                  <div className="bg-slate-50 p-5 rounded-3xl border border-slate-200 text-center shadow-xs flex flex-col items-center justify-center">
+                    <div className="flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-wider text-slate-600">
+                      <Clock className="w-4 h-4 text-slate-500" />
+                      <span>Ritmo Inicial</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-800 font-mono mt-1">
+                      {completedSession.totalSongs} <span className="text-sm font-bold text-slate-500 font-sans">cantos</span>
+                    </div>
+                    <span className="text-xs font-medium text-slate-500 mt-0.5 block">
+                      1º minuto em andamento (requer 2+ min para pior minuto)
+                    </span>
                   </div>
-                  <span className="text-[10px] font-bold text-amber-600 block">
-                    {completedSession.worstMinute.minute}º minuto
-                  </span>
-                </div>
+                )}
               </div>
 
-              {/* RELATÓRIO POR MINUTO (BARRAS HORIZONTAIS IDÊNTICAS AO PRINT) */}
-              <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-3">
-                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 block">
-                  RELATÓRIO POR MINUTO
-                </span>
+              {/* RELATÓRIO MINUTO A MINUTO (BARRAS DE EQUALIZADOR ESPORTIVO) */}
+              <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-md space-y-3.5">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-emerald-600" />
+                    <span>Relatório Minuto a Minuto</span>
+                  </span>
+                  <span className="text-xs text-slate-400 font-bold">
+                    {completedSession.minuteCounts.length} {completedSession.minuteCounts.length === 1 ? 'minuto' : 'minutos'}
+                  </span>
+                </div>
 
                 <div className="space-y-2.5">
                   {completedSession.minuteCounts.map((m) => {
+                    const hasMultiple = completedSession.minuteCounts.length > 1;
                     const isBest = m.minute === completedSession.bestMinute.minute && m.count > 0;
-                    const isWorst = m.minute === completedSession.worstMinute.minute && m.count > 0 && !isBest;
+                    const isWorst = hasMultiple && m.minute === completedSession.worstMinute.minute && m.count > 0 && !isBest;
 
-                    // Cor da barra de acordo com o print
-                    let barColor = 'bg-[#407a68] text-white'; // verde escuro elegante padrão
-                    if (isBest) barColor = 'bg-[#00c853] text-white font-black shadow-xs'; // verde vivo destaque
-                    if (isWorst) barColor = 'bg-[#f59e0b] text-white font-black shadow-xs'; // amarelo/laranja destaque
+                    // Gradientes modernos elegantes
+                    let barColor = 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white';
+                    if (isBest) barColor = 'bg-gradient-to-r from-emerald-500 to-[#00c853] text-white shadow-sm shadow-emerald-500/30';
+                    if (isWorst) barColor = 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/30';
 
                     const maxInBar = Math.max(completedSession.bestMinute.count, 15);
-                    const widthPercent = Math.max(18, Math.min(100, Math.round((m.count / maxInBar) * 100)));
+                    const widthPercent = Math.max(16, Math.min(100, Math.round((m.count / maxInBar) * 100)));
 
                     return (
                       <div key={m.minute} className="flex items-center gap-3 text-xs">
-                        <span className="w-14 text-slate-600 font-bold shrink-0 text-left">
+                        <span className="w-16 font-mono font-bold text-slate-700 shrink-0 text-left">
                           {m.minute}º min
                         </span>
 
-                        {/* Barra horizontal com valor no canto direito */}
-                        <div className="flex-1 bg-slate-100 rounded-full h-7 overflow-hidden relative flex items-center p-0.5">
+                        {/* Barra horizontal com valor no interior */}
+                        <div className="flex-1 bg-slate-100 rounded-full h-7 overflow-hidden relative flex items-center p-0.5 border border-slate-200/60">
                           <div 
                             className={`h-full rounded-full transition-all flex items-center justify-end pr-2.5 font-bold font-mono text-[11px] ${barColor}`}
                             style={{ width: `${widthPercent}%` }}
@@ -1057,7 +1167,7 @@ export default function TorneioPage() {
                         </div>
 
                         {/* Ritmo por minuto à direita */}
-                        <span className="w-16 text-slate-400 font-medium text-right text-[11px] shrink-0 font-mono">
+                        <span className="w-16 text-slate-500 font-bold text-right text-[11px] shrink-0 font-mono">
                           {m.pace ? `${m.pace}/min` : `${m.count}/min`}
                         </span>
                       </div>
@@ -1066,74 +1176,97 @@ export default function TorneioPage() {
                 </div>
               </div>
 
-              {/* PROJEÇÕES (134 Projeção 10 min / 201 Projeção 15 min + Mexida Validada) */}
-              <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
-                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 block">
-                  PROJEÇÕES
-                </span>
+              {/* PROJEÇÕES DE TORNEIO E DIAGNÓSTICO DA MEXIDA */}
+              <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-md space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-600" />
+                    <span>Projeções de Roda (10 Min vs 15 Min)</span>
+                  </span>
+                  <span className="text-xs text-slate-400 font-bold">Oficial Silvestres</span>
+                </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-4 bg-slate-50 rounded-2xl text-center border border-slate-200/60">
-                    <div className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
+                {/* Aviso se a marcação for curta */}
+                {completedSession.totalSeconds < 180 && (
+                  <div className="p-3 bg-amber-50 border border-amber-200/80 rounded-2xl text-xs text-amber-800 flex items-start gap-2">
+                    <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Sessão preliminar ({formatTime(completedSession.totalSeconds)}):</strong> Projeção estimada com base no ritmo inicial. Em torneios oficiais, conclua os 10 minutos regulamentares.
+                    </span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="p-5 bg-slate-50 rounded-2xl text-center border border-slate-200/80">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 block">
+                      Projeção 10 min (Classificação)
+                    </span>
+                    <div className="text-3xl sm:text-4xl font-black text-slate-900 font-mono mt-1">
                       {completedSession.projection10Min}
                     </div>
-                    <span className="text-[11px] font-bold text-slate-500 mt-0.5 block">
-                      Projeção 10 min
+                    <span className="text-[11px] text-slate-500 mt-1 block font-medium">
+                      {completedSession.totalSeconds >= 600 ? 'Cantada real da classificação' : 'Estimativa para 10 minutos'}
                     </span>
                   </div>
 
-                  <div className="p-4 bg-emerald-50/50 rounded-2xl text-center border-2 border-[#00c853]">
-                    <div className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
+                  <div className="p-5 bg-emerald-50/70 rounded-2xl text-center border-2 border-emerald-500 shadow-xs">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800 block">
+                      Projeção 15 min (Final) 🏆
+                    </span>
+                    <div className="text-3xl sm:text-4xl font-black text-emerald-800 font-mono mt-1">
                       {completedSession.projection15Min}
                     </div>
-                    <span className="text-[11px] font-bold text-emerald-800 mt-0.5 block">
-                      Projeção 15 min
+                    <span className="text-[11px] text-emerald-700 mt-1 block font-medium">
+                      {completedSession.totalSeconds >= 900 ? 'Cantada real da final' : 'Estimativa da final (+5 min)'}
                     </span>
                   </div>
                 </div>
 
                 {/* Card de Diagnóstico da Mexida */}
-                <div className="p-3.5 bg-emerald-50/80 rounded-2xl border border-emerald-200 flex items-start gap-2.5">
-                  <CheckCircle2 className="w-5 h-5 text-[#00c853] shrink-0 mt-0.5" />
+                <div className={`p-4 rounded-2xl border flex items-start gap-3 ${
+                  completedSession.mexidaEvaluation.status === 'VALIDATED'
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                    : completedSession.mexidaEvaluation.status === 'ATTENTION'
+                    ? 'bg-amber-50 border-amber-300 text-amber-950'
+                    : 'bg-slate-50 border-slate-200 text-slate-800'
+                }`}>
+                  <CheckCircle2 className={`w-5 h-5 shrink-0 mt-0.5 ${
+                    completedSession.mexidaEvaluation.status === 'VALIDATED'
+                      ? 'text-emerald-600'
+                      : completedSession.mexidaEvaluation.status === 'ATTENTION'
+                      ? 'text-amber-600'
+                      : 'text-slate-500'
+                  }`} />
                   <div className="space-y-0.5">
-                    <p className="text-xs font-black text-emerald-950">
+                    <p className="text-xs font-black">
                       {completedSession.mexidaEvaluation.title}
                     </p>
-                    <p className="text-[11px] text-emerald-800 leading-relaxed font-medium">
+                    <p className="text-xs leading-relaxed opacity-90">
                       {completedSession.mexidaEvaluation.description}
                     </p>
                   </div>
                 </div>
-
-                {/* Tempo Total */}
-                <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
-                  <span className="text-slate-500 font-bold">Tempo total</span>
-                  <span className="font-mono font-black text-slate-900">
-                    {formatTime(completedSession.totalSeconds)}
-                  </span>
-                </div>
               </div>
 
-              {/* BLOCO DE SALVAR SESSÃO & ANOTAÇÕES DE MANEJO */}
-              <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
-                <span className="text-sm font-black text-slate-800 block">
-                  Salvar sessão?
-                </span>
-
-                {/* Badge Vinculado a: Ave */}
-                <div className="w-full py-2.5 px-3 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5">
-                  <Check className="w-4 h-4 text-[#00c853]" />
-                  <span>Vinculado a: <strong>{completedSession.birdName}</strong></span>
+              {/* BLOCO DE SALVAR, CLASSIFICAÇÃO & MANEJO */}
+              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-md space-y-5">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <span className="text-sm font-black text-slate-800 block">
+                    Gravação da Rodada &amp; Pódio
+                  </span>
+                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    Vinculado: {completedSession.birdName}
+                  </span>
                 </div>
 
                 {/* Classificação / Colocação no Torneio no dia */}
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-                      <Trophy className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Classificação / Colocação no Torneio:</span>
+                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <Trophy className="w-4 h-4 text-amber-500" />
+                      <span>Classificação Oficial no Torneio:</span>
                     </label>
-                    <label className="flex items-center gap-1.5 text-[11px] font-bold text-amber-700 cursor-pointer select-none">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-amber-700 cursor-pointer select-none">
                       <input
                         type="checkbox"
                         checked={sessionTrophy}
@@ -1144,7 +1277,7 @@ export default function TorneioPage() {
                     </label>
                   </div>
 
-                  {/* Sugestões Rápidas de Classificação */}
+                  {/* Pódio VIP: Botões de 1 Toque */}
                   <div className="flex flex-wrap gap-1.5">
                     {['1º Lugar 🥇', '2º Lugar 🥈', '3º Lugar 🥉', '4º Lugar', '5º Lugar', 'Finalista', 'Classificado'].map((preset) => (
                       <button
@@ -1156,10 +1289,10 @@ export default function TorneioPage() {
                             setSessionTrophy(true);
                           }
                         }}
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
                           sessionPlacement === preset
-                            ? 'bg-amber-500 text-white shadow-xs'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md border border-amber-400'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200/60'
                         }`}
                       >
                         {preset}
@@ -1169,46 +1302,46 @@ export default function TorneioPage() {
 
                   <input
                     type="text"
-                    placeholder="Digite a colocação (ex: 1º Lugar, 7º Colocado, Campeão Geral...)"
+                    placeholder="Digite a colocação ex: 1º Lugar (Campeão), 7º Colocado, Finalista..."
                     value={sessionPlacement}
                     onChange={(e) => setSessionPlacement(e.target.value)}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#00c853]"
+                    className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
                   />
                 </div>
 
                 {/* Observações da Mexida */}
                 <div>
-                  <label className="text-[11px] font-bold text-slate-500 mb-1 block">
-                    Observações de manejo / Mexida realizada:
+                  <label className="text-xs font-bold text-slate-700 mb-1.5 block">
+                    Observações de Manejo / Mexida Realizada:
                   </label>
                   <textarea
                     rows={2}
-                    placeholder="Ex: 2 horas com a fêmea no voador, capa semi-aberta, sementeira de braquiária..."
+                    placeholder="Ex: 2 horas de fêmea no voador na divisória, sementeira de braquiária verde, banho pela manhã..."
                     value={sessionNotes}
                     onChange={(e) => setSessionNotes(e.target.value)}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#00c853]"
+                    className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
                   />
                 </div>
 
-                {/* Botões de Ação */}
-                <div className="space-y-2">
+                {/* Botões de Ação Principais */}
+                <div className="space-y-2.5 pt-2 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={handleSaveToDatabase}
-                    className="w-full py-3.5 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-black rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider"
+                    className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black rounded-2xl shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Gravar no Histórico da Ave</span>
+                    <span>Gravar Marcação no Histórico da Ave</span>
                   </button>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       onClick={handleShareWhatsapp}
-                      className="py-3 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="py-3.5 px-3 bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-black rounded-2xl shadow-md shadow-emerald-500/20 transition flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      <Share2 className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Compartilhar</span>
+                      <Share2 className="w-4 h-4" />
+                      <span>Compartilhar WhatsApp</span>
                     </button>
 
                     <button
@@ -1220,9 +1353,9 @@ export default function TorneioPage() {
                         setSessionTrophy(false);
                         setSessionNotes('');
                       }}
-                      className="py-3 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="py-3.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      <RotateCcw className="w-3.5 h-3.5" />
+                      <RotateCcw className="w-4 h-4 text-slate-600" />
                       <span>Nova Marcação</span>
                     </button>
                   </div>
