@@ -5,6 +5,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { Bird, Tenant } from '@/types'
 import { formatDate } from '@/lib/utils'
 import { db } from '@/lib/db'
+import { resolvePedigreeTree } from '@/lib/pedigree'
 
 export interface BadgeAncestors {
   fatherName?: string;
@@ -172,6 +173,8 @@ export function BadgeFrontAndBack({
     if (!name || !name.trim()) return isMale ? 'INDEFINIDO' : 'INDEFINIDA'
     return name.trim().toUpperCase()
   }
+
+  if (!bird) return null
 
   const pedigree = resolvePedigreeTree(bird)
 
