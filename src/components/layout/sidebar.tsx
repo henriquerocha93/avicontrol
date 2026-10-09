@@ -22,6 +22,7 @@ import {
   Settings, 
   Headphones, 
   LogOut, 
+  Heart,
   ChevronDown, 
   ChevronRight, 
   List, 
@@ -97,6 +98,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { name: 'Painel do Financeiro', href: '/dashboard/painel-financeiro', icon: DollarSign },
     { name: 'Criar Crachá', href: '/dashboard/criar-cracha', icon: Award },
     { name: 'Criar App', href: '#criar-app', icon: Smartphone },
+    { name: 'Diário de Galas & Linhagem Genética', href: '/dashboard/reproducao', icon: Heart, badge: 'NOVO' },
     { name: 'Torneio', href: '/dashboard/torneio', icon: Trophy, badge: 'NOVO' },
     { name: 'Treinamento', href: '/dashboard/treinamento', icon: GraduationCap },
     { name: 'Calendário', href: '/dashboard/calendario', icon: Calendar },
@@ -118,6 +120,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const adminMenuItems = [
     { name: 'Painel Master ADM', href: '/dashboard/admin', icon: ShieldCheck, badge: pendingPixCount > 0 ? 'PIX!' : undefined },
+    { name: 'Diário de Galas & Linhagem Genética', href: '/dashboard/reproducao', icon: Heart, badge: 'NOVO' },
     { name: 'Central de Chamados', href: '/dashboard/admin/chamados', icon: Headphones, badge: openTicketsCount > 0 ? `${openTicketsCount}` : undefined },
     { name: 'Vendedores & Afiliados', href: '/dashboard/admin/vendedores', icon: Users },
     { name: 'Criatórios & Licenças', href: '/dashboard/admin/criatorios', icon: Building2 },
@@ -369,6 +372,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         ? 'text-amber-300 font-bold hover:text-white'
                         : item.name === 'Torneio'
                         ? 'text-emerald-300 font-bold hover:text-white'
+                        : item.name === 'Diário de Galas & Linhagem Genética'
+                        ? 'text-rose-300 font-bold hover:text-white hover:bg-rose-950/40'
                         : 'text-[#8b949e]'
                     )}
                   >
@@ -419,11 +424,26 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                           {/* Radar Ping no Cronômetro */}
                           <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400 animate-ping opacity-80" />
                         </div>
+                      ) : item.name === 'Diário de Galas & Linhagem Genética' ? (
+                        <div className="relative w-4 h-4 shrink-0 flex items-center justify-center">
+                          <Heart className="w-4 h-4 text-rose-400 fill-rose-500/40 drop-shadow-[0_0_6px_rgba(244,63,94,0.9)] animate-pulse" />
+                        </div>
                       ) : (
                         <Icon className={cn('w-4 h-4 shrink-0', isActive ? 'text-white' : 'text-[#8b949e]')} />
                       )}
                       <span>{item.name}</span>
                     </div>
+                    {item.name === 'Diário de Galas & Linhagem Genética' && (
+                      <span className={cn(
+                        'px-2 py-0.5 text-[9px] font-black uppercase rounded-full tracking-wider flex items-center gap-1 shadow-xs',
+                        isActive 
+                          ? 'bg-white text-rose-700' 
+                          : 'bg-rose-500/25 text-rose-300 border border-rose-500/40 animate-pulse'
+                      )}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping inline-block" />
+                        <span>NOVO</span>
+                      </span>
+                    )}
                     {item.name === 'Torneio' && (
                       <span className={cn(
                         'px-2 py-0.5 text-[9px] font-mono font-black uppercase rounded-full tracking-wider flex items-center gap-1 shadow-xs',
