@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 import { 
   AlertTriangle, 
   Clock, 
@@ -16,7 +18,9 @@ import {
   QrCode,
   ShieldCheck,
   RefreshCw,
-  PhoneCall
+  PhoneCall,
+  CreditCard,
+  ArrowRight
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { db } from '@/lib/db';
@@ -28,7 +32,9 @@ interface PlanGuardProps {
 }
 
 export function PlanGuard({ children }: PlanGuardProps) {
-  const { tenant, user } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { tenant, user, refreshTenant } = useAuth();
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(null);
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
   const [copiedPix, setCopiedPix] = useState(false);
@@ -94,8 +100,11 @@ export function PlanGuard({ children }: PlanGuardProps) {
 
   // =========================================================================
   // CASE 1: EXPIRED FOR MORE THAN 10 DAYS -> FULL DASHBOARD LOCKOUT SCREEN
+  // Exception: If the user is on the Renewal page (/dashboard/renovar), allow them to view and pay!
   // =========================================================================
-  if (daysRemaining < -10) {
+  const isRenewalPage = pathname?.startsWith('/dashboard/renovar');
+
+  if (daysRemaining < -10 && !isRenewalPage) {
     const daysPastDue = Math.abs(daysRemaining);
 
     return (
@@ -139,11 +148,21 @@ export function PlanGuard({ children }: PlanGuardProps) {
             </div>
           </div>
 
-          {/* PIX Payment Section */}
+          {/* Direct Link to Dedicated Renewal Area */}
+          <Link
+            href="/dashboard/renovar"
+            className="w-full py-3.5 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-black rounded-xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider"
+          >
+            <CreditCard className="w-4 h-4" />
+            <span>Acessar Área Oficial de Renovação &amp; Pagamento</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+
+          {/* PIX Quick Section */}
           <div className="p-4 bg-slate-900/90 rounded-xl border border-emerald-500/30 space-y-3">
             <div className="flex items-center justify-center gap-2 text-xs font-bold text-emerald-300">
               <QrCode className="w-4 h-4 text-emerald-400" />
-              <span>Pagamento Instantâneo via PIX (Liberação Imediata)</span>
+              <span>PIX Rápido Copia e Cola (Chave Oficial)</span>
             </div>
 
             {/* PIX Copy & Paste */}
@@ -217,7 +236,7 @@ export function PlanGuard({ children }: PlanGuardProps) {
   return (
     <div className="w-full">
       {/* Grace Period Warning (0 to 10 days past due) */}
-      {isPastDueGracePeriod && (
+      {isPastDueGracePeriod && !isRenewalPage && (
         <div className="mb-3 px-4 py-3 bg-gradient-to-r from-red-600 via-rose-600 to-orange-600 text-white rounded-xl shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-pulse">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-white/20 rounded-lg shrink-0">
@@ -232,23 +251,25 @@ export function PlanGuard({ children }: PlanGuardProps) {
               </div>
               <p className="text-[11px] text-white/90">
                 Sua assinatura {cycleLabel.toLowerCase()} do BIRDPRO venceu em {formatDate(currentTenant.expiresAt)}. 
-                Efetue o pagamento para evitar o bloqueio total do acesso ao criatório.
+                Efetue o pagamento na área de renovação para evitar o bloqueio total do acesso.
               </p>
             </div>
           </div>
 
-          <button
-            onClick={() => setIsRenewModalOpen(true)}
-            className="px-4 py-2 bg-white hover:bg-slate-100 text-red-700 text-xs font-black rounded-lg shadow-sm shrink-0 transition flex items-center justify-center gap-1.5 cursor-pointer uppercase"
-          >
-            <DollarSign className="w-3.5 h-3.5" />
-            <span>Pagar Mensalidade (PIX)</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/renovar"
+              className="px-4 py-2 bg-white hover:bg-slate-100 text-red-700 text-xs font-black rounded-lg shadow-sm shrink-0 transition flex items-center justify-center gap-1.5 cursor-pointer uppercase"
+            >
+              <CreditCard className="w-3.5 h-3.5" />
+              <span>Renovar Plano Agora</span>
+            </Link>
+          </div>
         </div>
       )}
 
       {/* 10 Days Warning Banner (Before Expiration) */}
-      {isExpiringSoon && (
+      {isExpiringSoon && !isRenewalPage && (
         <div className="mb-3 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-white/20 rounded-lg shrink-0">
@@ -260,18 +281,18 @@ export function PlanGuard({ children }: PlanGuardProps) {
               </div>
               <p className="text-[11px] text-amber-50">
                 Sua assinatura {cycleLabel.toLowerCase()} vence no dia <strong>{formatDate(currentTenant.expiresAt)}</strong>. 
-                Renove antecipadamente com PIX para manter seu acesso sem interrupções.
+                Renove antecipadamente para manter o criatório ativo sem interrupções.
               </p>
             </div>
           </div>
 
-          <button
-            onClick={() => setIsRenewModalOpen(true)}
+          <Link
+            href="/dashboard/renovar"
             className="px-4 py-2 bg-white hover:bg-amber-50 text-amber-900 text-xs font-black rounded-lg shadow-sm shrink-0 transition flex items-center justify-center gap-1.5 cursor-pointer uppercase"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            <span>Renovar com PIX</span>
-          </button>
+            <span>Renovar Plano</span>
+          </Link>
         </div>
       )}
 

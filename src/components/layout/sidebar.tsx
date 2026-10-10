@@ -41,7 +41,9 @@ import {
   Award,
   Trophy,
   Timer,
-  Smartphone
+  Smartphone,
+  CreditCard,
+  RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
@@ -66,6 +68,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
   const isSeller = user?.role === 'SELLER';
   const pendingAlertsCount = db.getNotifications(tenant?.id).filter(n => n.status !== 'COMPLETED').length;
+
+  // Plan Expiration / Renewal Calculation
+  const currentTenant = tenant ? (db.getTenant(tenant.id) || tenant) : null;
+  let planDaysRemaining = 999;
+  let isPlanExpiringSoon = false;
+  let isPlanExpired = false;
+  if (currentTenant && currentTenant.billingCycle !== 'ISENTO' && currentTenant.expiresAt) {
+    const expDate = new Date(currentTenant.expiresAt);
+    if (!isNaN(expDate.getTime())) {
+      const diffMs = expDate.getTime() - Date.now();
+      planDaysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      isPlanExpired = planDaysRemaining <= 0;
+      isPlanExpiringSoon = planDaysRemaining > 0 && planDaysRemaining <= 10;
+    }
+  }
 
   // Seller exclusive menu
   const sellerMenuItems = [
@@ -111,6 +128,16 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { name: 'Reserva de Pássaro', href: '/dashboard/reserva', icon: Bookmark },
     { name: 'Venda de Pássaro', href: '/dashboard/venda', icon: Tag },
     { name: 'Compra', href: '/dashboard/compra', icon: ShoppingCart },
+    { 
+      name: 'Renovar Planos', 
+      href: '/dashboard/renovar', 
+      icon: CreditCard, 
+      badge: isPlanExpired 
+        ? 'EXPIRADO' 
+        : isPlanExpiringSoon 
+        ? `${planDaysRemaining}d` 
+        : undefined 
+    },
     { name: 'Indique & Ganhe', href: '/dashboard/indique-e-ganhe', icon: Gift },
   ];
 
@@ -120,6 +147,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const adminMenuItems = [
     { name: 'Painel Master ADM', href: '/dashboard/admin', icon: ShieldCheck, badge: pendingPixCount > 0 ? 'PIX!' : undefined },
+    { name: 'Renovar Planos', href: '/dashboard/renovar', icon: CreditCard },
     { name: 'Diário de Galas & Linhagem Genética', href: '/dashboard/reproducao', icon: Heart, badge: 'NOVO' },
     { name: 'Central de Chamados', href: '/dashboard/admin/chamados', icon: Headphones, badge: openTicketsCount > 0 ? `${openTicketsCount}` : undefined },
     { name: 'Vendedores & Afiliados', href: '/dashboard/admin/vendedores', icon: Users },
@@ -368,6 +396,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       'flex items-center justify-between px-4 py-2.5 text-xs font-medium transition-colors hover:bg-[#2d333b] hover:text-white',
                       isActive 
                         ? 'bg-[#00c853] text-white font-semibold' 
+                        : item.name === 'Renovar Planos'
+                        ? isPlanExpired
+                          ? 'bg-rose-500/20 text-rose-300 font-bold border-l-2 border-rose-500'
+                          : isPlanExpiringSoon
+                          ? 'bg-amber-500/15 text-amber-300 font-bold border-l-2 border-amber-400'
+                          : 'text-emerald-300 font-bold hover:text-white'
                         : item.name === 'Criar Crachá'
                         ? 'text-amber-300 font-bold hover:text-white'
                         : item.name === 'Torneio'
@@ -378,7 +412,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     )}
                   >
                     <div className="flex items-center gap-3">
-                      {item.name === 'Criar Crachá' ? (
+                      {item.name === 'Renovar Planos' ? (
+                        <div className="relative w-4 h-4 shrink-0 flex items-center justify-center">
+                          <CreditCard className={cn(
+                            'w-4 h-4',
+                            isPlanExpired 
+                              ? 'text-rose-400 animate-pulse' 
+                              : isPlanExpiringSoon 
+                              ? 'text-amber-400 animate-bounce' 
+                              : 'text-emerald-400'
+                          )} />
+                        </div>
+                      ) : item.name === 'Criar Crachá' ? (
                         <div className="relative w-4 h-4 shrink-0 flex items-center justify-center">
                           <svg className="w-4 h-4 shrink-0 drop-shadow-[0_0_5px_rgba(251,191,36,0.9)]" viewBox="0 0 24 24" fill="none">
                             <defs>
@@ -464,6 +509,24 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       )}>
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping inline-block" />
                         Em Breve
+                      </span>
+                    )}
+                    {item.name === 'Renovar Planos' && item.badge && (
+                      <span className={cn(
+                        'px-2 py-0.5 text-[9px] font-black uppercase rounded-full tracking-wider flex items-center gap-1 shadow-xs',
+                        isActive 
+                          ? 'bg-white text-emerald-800' 
+                          : isPlanExpired
+                          ? 'bg-rose-500 text-white animate-pulse'
+                          : isPlanExpiringSoon
+                          ? 'bg-amber-400 text-slate-950 font-black animate-pulse'
+                          : 'bg-emerald-500/20 text-emerald-300'
+                      )}>
+                        <span className={cn(
+                          'w-1.5 h-1.5 rounded-full inline-block',
+                          isPlanExpired ? 'bg-white animate-ping' : 'bg-slate-900 animate-ping'
+                        )} />
+                        <span>{item.badge}</span>
                       </span>
                     )}
                     {item.name === 'Indique & Ganhe' && (
