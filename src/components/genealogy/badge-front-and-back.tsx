@@ -78,14 +78,14 @@ function ResponsiveBadgeCard({
   return (
     <div
       ref={containerRef}
-      className={`w-full flex justify-center items-start overflow-visible print:w-auto print:block print:h-auto ${className}`}
+      className={`w-full flex justify-center items-start overflow-visible badge-print-card-wrapper ${className}`}
       style={{
         maxWidth: `${cardWidth}px`,
         height: scale < 1 ? `${Math.ceil(cardHeight * scale)}px` : `${cardHeight}px`,
       }}
     >
       <div
-        className="shrink-0 transition-transform duration-100 origin-top print:transform-none select-none"
+        className="shrink-0 transition-transform duration-100 origin-top select-none badge-print-card-inner"
         style={{
           width: `${cardWidth}px`,
           height: `${cardHeight}px`,
@@ -220,7 +220,7 @@ export function BadgeFrontAndBack({
       {/* ======================================================== */}
       {(mode === 'BOTH' || mode === 'FRONT_ONLY') && (
       <ResponsiveBadgeCard>
-      <div className="w-[530px] min-w-[530px] h-[340px] border-2 border-slate-800 relative bg-white flex flex-col justify-between p-3 overflow-hidden shadow-sm rounded-lg print:rounded-none">
+      <div className="w-[530px] min-w-[530px] h-[340px] border-2 border-slate-800 relative bg-white flex flex-col justify-between p-2.5 overflow-hidden shadow-sm rounded-lg print:rounded-none">
         {/* Background marca d'água */}
         {frontBg && (
           <div 
@@ -231,6 +231,22 @@ export function BadgeFrontAndBack({
             }}
           />
         )}
+
+        {/* Topo Oficial: Identificação BIRDPRO em Destaque */}
+        <div className="relative z-10 flex items-center justify-between border-b-2 border-[#00c853]/60 pb-1">
+          <div className="flex items-center gap-1.5">
+            <div className="px-2 py-0.5 rounded bg-slate-950 text-white font-black text-[9.5px] tracking-wider border border-[#00c853] flex items-center gap-1 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-[#00c853]"></span>
+              <span>BIRD<span className="text-[#00c853]">PRO</span></span>
+            </div>
+            <span className="text-[7.5px] font-black uppercase tracking-wider text-slate-800">
+              SISTEMA OFICIAL DE GESTÃO &amp; GENEALOGIA
+            </span>
+          </div>
+          <span className="text-[7.5px] font-mono font-black text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+            REGISTRO: {bird.ringNumber || 'SIMULAÇÃO'}
+          </span>
+        </div>
 
         {/* Linha 1: Brasão + Campos Principais */}
         <div className="relative z-10 flex gap-3">
@@ -370,14 +386,16 @@ export function BadgeFrontAndBack({
             </div>
           </div>
 
-          {/* BirdPro Logo Marca */}
-          <div className="flex items-center space-x-1 shrink-0">
-            <div className="w-5 h-5 rounded bg-[#00c853] text-white flex items-center justify-center font-black text-[9px] shadow-xs">
+          {/* BirdPro Logo Marca - Alto Destaque */}
+          <div className="shrink-0 flex items-center gap-2 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 text-white px-2.5 py-1 rounded-lg border-2 border-[#00c853] shadow-md">
+            <div className="w-7 h-7 rounded bg-[#00c853] text-slate-950 flex items-center justify-center font-black text-[11px] shadow-sm ring-1 ring-white/30">
               BP
             </div>
             <div className="leading-tight text-left">
-              <span className="font-black text-[8px] text-slate-900 block">BIRDPRO</span>
-              <span className="text-[6.5px] text-[#00c853] font-bold block">birdpro.com.br</span>
+              <span className="font-black text-[11px] tracking-wider text-white block">
+                BIRD<span className="text-[#00c853]">PRO</span>
+              </span>
+              <span className="text-[7px] text-emerald-400 font-bold block tracking-tight">birdpro.com.br</span>
             </div>
           </div>
         </div>
@@ -402,15 +420,21 @@ export function BadgeFrontAndBack({
           />
         )}
 
-        {/* Top Bar: BirdPro Brand & Official Certificate Title */}
-        <div className="relative z-10 flex items-center justify-between border-b border-black/10 pb-1 text-[8.5px] font-bold">
+        {/* Top Bar: BirdPro Brand & Official Certificate Title com Alto Destaque */}
+        <div className="relative z-10 flex items-center justify-between border-b-2 border-[#00c853]/60 pb-1 text-[8.5px] font-bold">
           <div className="flex items-center space-x-1.5">
-            <span className="w-4 h-4 rounded bg-[#00c853] text-white flex items-center justify-center font-black text-[8px]">
-              BP
+            <div className="px-2 py-0.5 rounded bg-slate-950 text-white font-black text-[9.5px] tracking-wider border border-[#00c853] flex items-center gap-1 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-[#00c853]"></span>
+              <span>BIRD<span className="text-[#00c853]">PRO</span></span>
+            </div>
+            <span className="font-black tracking-tight uppercase" style={{ color: labelBackText }}>
+              GENEALOGIA &amp; ORIGEM GENÉTICA
             </span>
-            <span className="font-black tracking-tight" style={{ color: labelBackText }}>GENEALOGIA &amp; ORIGEM GENÉTICA</span>
           </div>
-          <span className="text-[#00c853] font-mono text-[8px] font-bold">Autenticação: {bird.ringNumber}</span>
+          <div className="flex items-center gap-1 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+            <span className="text-[7px] text-emerald-800 font-bold uppercase">Autenticação:</span>
+            <span className="text-emerald-950 font-mono text-[8px] font-black">{bird.ringNumber || 'OFICIAL'}</span>
+          </div>
         </div>
 
         {/* Tree Body com Linhas Conectoras Sanguíneas em SVG Exatas (Estilo MyBirds) */}
@@ -431,8 +455,8 @@ export function BadgeFrontAndBack({
               className="my-auto p-1 rounded border border-slate-300 shadow-2xs flex flex-col items-center justify-center text-center"
               style={{ backgroundColor: fieldBg, color: fieldText }}
             >
-              <span className="text-[6.5px] font-black uppercase tracking-wider" style={{ color: labelBackText }}>
-                Validação:
+              <span className="text-[6.5px] font-black uppercase tracking-wider text-emerald-800">
+                VALIDAÇÃO BIRDPRO
               </span>
               <div className="w-9 h-9 p-0.5 bg-white border border-slate-400 rounded flex items-center justify-center my-0.5 shadow-2xs">
                 <QRCodeSVG value={publicUrl} size={32} level="M" />
@@ -547,17 +571,88 @@ export function BadgeFrontAndBack({
           </div>
         </div>
 
-        {/* Rodapé: Coeficiente & Autenticidade Digital */}
+        {/* Rodapé: Coeficiente & Autenticidade Digital com Destaque BIRDPRO */}
         <div className="relative z-10 border-t border-black/10 pt-1 flex items-center justify-between text-[7.5px] font-semibold" style={{ color: labelBackText }}>
           <div className="flex items-center gap-3">
             <span>Coef. Consanguinidade: <strong className="font-mono" style={{ color: labelBackText }}>0.0%</strong></span>
             <span>Parentesco: <strong className="font-mono" style={{ color: labelBackText }}>0.0%</strong></span>
           </div>
-          <span className="font-mono text-emerald-800 font-bold">Documento gerado eletronicamente pela plataforma BirdPro</span>
+          <div className="flex items-center gap-1 font-mono text-[7.5px]">
+            <span className="text-slate-600 font-medium">Documento emitido pelo sistema</span>
+            <span className="font-black text-slate-900 bg-emerald-100 text-emerald-950 px-1.5 py-0.5 rounded border border-emerald-300 font-sans">
+              BIRDPRO • birdpro.com.br
+            </span>
+          </div>
         </div>
       </div>
       </ResponsiveBadgeCard>
       )}
+
+      {/* Regras de Impressão Oficiais: Tamanho Exato do Crachá = 8.5 cm x 5.5 cm */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          @page {
+            size: auto;
+            margin: 8mm;
+          }
+          body {
+            background: #ffffff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          #printable-badge {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            gap: 8mm !important;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 0 !important;
+            margin: 10mm auto !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            max-width: none !important;
+            width: auto !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .badge-print-card-wrapper {
+            width: 8.5cm !important;
+            min-width: 8.5cm !important;
+            max-width: 8.5cm !important;
+            height: 5.5cm !important;
+            min-height: 5.5cm !important;
+            max-height: 5.5cm !important;
+            position: relative !important;
+            overflow: hidden !important;
+            display: block !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            box-sizing: border-box !important;
+            border: 1px dashed #94a3b8 !important;
+            border-radius: 3mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .badge-print-card-inner {
+            width: 530px !important;
+            height: 340px !important;
+            transform: scale(0.60615, 0.61139) !important;
+            transform-origin: top left !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .badge-print-card-inner > div {
+            border-radius: 0 !important;
+            box-shadow: none !important;
+          }
+        }
+      `}} />
     </div>
   )
 }

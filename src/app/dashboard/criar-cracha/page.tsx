@@ -841,11 +841,11 @@ export default function CriarCrachaPage() {
             <Layers className="w-4 h-4 text-emerald-600" />
             <span>Pré-visualização Oficial (Pronto para Impressão)</span>
             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-              Adaptável Mobile &amp; PC
+              Tamanho do Crachá: 8.5 cm x 5.5 cm
             </span>
           </div>
           <span className="text-[11px] text-slate-500 font-normal">
-            Imagens, fundo e cores aplicados automaticamente das configurações do criatório
+            Configurado no tamanho exato de 8.5 cm x 5.5 cm para corte e plastificação
           </span>
         </div>
 

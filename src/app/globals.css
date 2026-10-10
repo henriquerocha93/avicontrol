@@ -571,4 +571,62 @@ html.dark .shadow-xl {
     margin: 0 !important;
     padding: 0 !important;
   }
+
+  /* ======================================================== */
+  /* CRACHÁ / ETIQUETA OFICIAL - DIMENSÕES EXATAS: 8.5cm x 5.5cm */
+  /* ======================================================== */
+  #printable-badge {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 8mm !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding: 0 !important;
+    margin: 10mm auto !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    max-width: none !important;
+    width: auto !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .badge-print-card-wrapper {
+    width: 8.5cm !important;
+    min-width: 8.5cm !important;
+    max-width: 8.5cm !important;
+    height: 5.5cm !important;
+    min-height: 5.5cm !important;
+    max-height: 5.5cm !important;
+    position: relative !important;
+    overflow: hidden !important;
+    display: block !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-sizing: border-box !important;
+    border: 1px dashed #94a3b8 !important;
+    border-radius: 3mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .badge-print-card-inner {
+    width: 530px !important;
+    height: 340px !important;
+    transform: scale(0.60615, 0.61139) !important;
+    transform-origin: top left !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .badge-print-card-inner > div {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
 }
