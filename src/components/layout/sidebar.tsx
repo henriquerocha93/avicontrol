@@ -148,7 +148,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const adminMenuItems = [
     { name: 'Painel Master ADM', href: '/dashboard/admin', icon: ShieldCheck, badge: pendingPixCount > 0 ? 'PIX!' : undefined },
     { name: 'Renovar Planos', href: '/dashboard/renovar', icon: CreditCard },
-    { name: 'Diário de Galas & Linhagem Genética', href: '/dashboard/reproducao', icon: Heart, badge: 'NOVO' },
     { name: 'Central de Chamados', href: '/dashboard/admin/chamados', icon: Headphones, badge: openTicketsCount > 0 ? `${openTicketsCount}` : undefined },
     { name: 'Vendedores & Afiliados', href: '/dashboard/admin/vendedores', icon: Users },
     { name: 'Criatórios & Licenças', href: '/dashboard/admin/criatorios', icon: Building2 },

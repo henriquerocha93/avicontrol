@@ -70,6 +70,7 @@ class DataService {
   private pushing = false;
   private pushAgain = false;
   private deletedTenantIds: Set<string> = new Set();
+  private deletedSellerIds: Set<string> = new Set();
 
   private loadDeletedTenantIds() {
     if (!this.isBrowser) return;
@@ -91,11 +92,32 @@ class DataService {
     } catch {}
   }
 
+  private loadDeletedSellerIds() {
+    if (!this.isBrowser) return;
+    try {
+      const raw = localStorage.getItem('birdpro_deleted_sellers');
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          this.deletedSellerIds = new Set(arr);
+        }
+      }
+    } catch {}
+  }
+
+  private saveDeletedSellerIds() {
+    if (!this.isBrowser) return;
+    try {
+      localStorage.setItem('birdpro_deleted_sellers', JSON.stringify(Array.from(this.deletedSellerIds)));
+    } catch {}
+  }
+
   constructor() {
     this.isBrowser = typeof window !== 'undefined';
     this.state = this.getInitialState();
     if (this.isBrowser) {
       this.loadDeletedTenantIds();
+      this.loadDeletedSellerIds();
       this.loadFromStorage();
       if (typeof window !== 'undefined') {
         setTimeout(() => {
@@ -146,15 +168,38 @@ class DataService {
       if (stored) {
         const parsed = JSON.parse(stored);
         this.state = { ...this.getInitialState(), ...parsed };
-        if (!this.state.sellers || this.state.sellers.length === 0) {
-          this.state.sellers = [...INITIAL_SELLERS];
+        if (!this.state.sellers) {
+          this.state.sellers = [];
         }
-        if (!this.state.commissions || this.state.commissions.length === 0) {
-          this.state.commissions = [...INITIAL_COMMISSIONS];
+        if (!this.state.commissions) {
+          this.state.commissions = [];
         }
-        if (!this.state.payouts || this.state.payouts.length === 0) {
-          this.state.payouts = [...INITIAL_PAYOUTS];
+        if (!this.state.payouts) {
+          this.state.payouts = [];
         }
+
+        // Clean out legacy fake sellers, fake commissions and fake payouts from storage
+        const demoSellerIds = new Set(['seller-carlos-vendas', 'seller-mari-embaixadora']);
+        this.state.sellers = (this.state.sellers || []).filter(s => 
+          !demoSellerIds.has(s.id) && 
+          !this.deletedSellerIds.has(s.id) &&
+          s.email !== 'carlos.comercial@birdpro.com.br' &&
+          s.email !== 'mariana.aves@gmail.com' &&
+          s.name !== 'Carlos Eduardo Menezes' &&
+          !s.name.includes('Canal Canto & Fibra')
+        );
+        this.state.commissions = (this.state.commissions || []).filter(c => 
+          !demoSellerIds.has(c.affiliateId) && 
+          !this.deletedSellerIds.has(c.affiliateId) &&
+          c.affiliateName !== 'Carlos Eduardo Menezes' &&
+          !c.affiliateName?.includes('Canal Canto & Fibra')
+        );
+        this.state.payouts = (this.state.payouts || []).filter(p => 
+          !demoSellerIds.has(p.affiliateId) && 
+          !this.deletedSellerIds.has(p.affiliateId) &&
+          p.affiliateName !== 'Carlos Eduardo Menezes' &&
+          !p.affiliateName?.includes('Canal Canto & Fibra')
+        );
         if (!this.state.users || this.state.users.length === 0) {
           this.state.users = [...INITIAL_USERS];
         } else {
@@ -528,10 +573,20 @@ class DataService {
         });
       }
 
-      // 4. Merge cloud commissions into local state
+      // 4. Merge cloud commissions into local state (ignoring deleted/fake sellers)
+      const demoSellerIds = new Set(['seller-carlos-vendas', 'seller-mari-embaixadora']);
       if (cloudCommissions && cloudCommissions.length > 0) {
         if (!this.state.commissions) this.state.commissions = [];
         cloudCommissions.forEach(cc => {
+          if (
+            this.deletedSellerIds.has(cc.affiliateId) || 
+            demoSellerIds.has(cc.affiliateId) ||
+            cc.affiliateName === 'Carlos Eduardo Menezes' ||
+            cc.affiliateName?.includes('Canal Canto & Fibra')
+          ) {
+            firebaseSync.deleteCommission?.(cc.id).catch(() => {});
+            return;
+          }
           const idx = this.state.commissions.findIndex(c => c.id === cc.id);
           if (idx >= 0) {
             this.state.commissions[idx] = { ...this.state.commissions[idx], ...cc };
@@ -542,10 +597,19 @@ class DataService {
         });
       }
 
-      // 5. Merge cloud payouts into local state
+      // 5. Merge cloud payouts into local state (ignoring deleted/fake sellers)
       if (cloudPayouts && cloudPayouts.length > 0) {
         if (!this.state.payouts) this.state.payouts = [];
         cloudPayouts.forEach(cp => {
+          if (
+            this.deletedSellerIds.has(cp.affiliateId) || 
+            demoSellerIds.has(cp.affiliateId) ||
+            cp.affiliateName === 'Carlos Eduardo Menezes' ||
+            cp.affiliateName?.includes('Canal Canto & Fibra')
+          ) {
+            firebaseSync.deletePayout?.(cp.id).catch(() => {});
+            return;
+          }
           const idx = this.state.payouts.findIndex(p => p.id === cp.id);
           if (idx >= 0) {
             this.state.payouts[idx] = { ...this.state.payouts[idx], ...cp };
@@ -556,10 +620,21 @@ class DataService {
         });
       }
 
-      // 6. Merge cloud sellers into local state
+      // 6. Merge cloud sellers into local state (ignoring deleted/fake sellers)
       if (cloudSellers && cloudSellers.length > 0) {
         if (!this.state.sellers) this.state.sellers = [];
         cloudSellers.forEach(cs => {
+          if (
+            this.deletedSellerIds.has(cs.id) || 
+            demoSellerIds.has(cs.id) ||
+            cs.email === 'carlos.comercial@birdpro.com.br' ||
+            cs.email === 'mariana.aves@gmail.com' ||
+            cs.name === 'Carlos Eduardo Menezes' ||
+            cs.name.includes('Canal Canto & Fibra')
+          ) {
+            firebaseSync.deleteSeller(cs.id).catch(() => {});
+            return;
+          }
           const cleanEmail = (cs.email || '').toLowerCase().trim();
           const cleanCode = (cs.affiliateCode || '').toLowerCase().trim();
           const idx = this.state.sellers.findIndex(s => 
@@ -2131,7 +2206,17 @@ class DataService {
   deleteSeller(id: string): void {
     if (!this.state.sellers) return;
     const s = this.state.sellers.find(x => x.id === id);
+    this.deletedSellerIds.add(id);
+    this.saveDeletedSellerIds();
+
     this.state.sellers = this.state.sellers.filter(x => x.id !== id);
+    if (this.state.commissions) {
+      this.state.commissions = this.state.commissions.filter(c => c.affiliateId !== id);
+    }
+    if (this.state.payouts) {
+      this.state.payouts = this.state.payouts.filter(p => p.affiliateId !== id);
+    }
+
     if (s) {
       if (s.linkedTenantId && this.state.userReferrals && this.state.userReferrals[s.linkedTenantId]) {
         this.state.userReferrals[s.linkedTenantId].isOfficialPartner = false;
