@@ -573,7 +573,7 @@ html.dark .shadow-xl {
   }
 
   /* ======================================================== */
-  /* CRACHÁ / ETIQUETA OFICIAL - DIMENSÕES EXATAS: 8.5cm x 5.5cm */
+  /* CRACHÁ / ETIQUETA OFICIAL - DIMENSÕES EXATAS: 9cm x 6cm (QUALIDADE 4K ULTRA HD) */
   /* ======================================================== */
   #printable-badge {
     display: flex !important;
@@ -594,12 +594,12 @@ html.dark .shadow-xl {
   }
 
   .badge-print-card-wrapper {
-    width: 8.5cm !important;
-    min-width: 8.5cm !important;
-    max-width: 8.5cm !important;
-    height: 5.5cm !important;
-    min-height: 5.5cm !important;
-    max-height: 5.5cm !important;
+    width: 9cm !important;
+    min-width: 9cm !important;
+    max-width: 9cm !important;
+    height: 6cm !important;
+    min-height: 6cm !important;
+    max-height: 6cm !important;
     position: relative !important;
     overflow: hidden !important;
     display: block !important;
@@ -612,17 +612,27 @@ html.dark .shadow-xl {
     padding: 0 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    text-rendering: geometricPrecision !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+    image-rendering: -webkit-optimize-contrast !important;
+    image-rendering: high-quality !important;
   }
 
   .badge-print-card-inner {
-    width: 530px !important;
-    height: 340px !important;
-    transform: scale(0.60615, 0.61139) !important;
+    width: 540px !important;
+    height: 360px !important;
+    transform: scale(0.62992126) !important;
     transform-origin: top left !important;
     margin: 0 !important;
     border-radius: 0 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    text-rendering: geometricPrecision !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+    image-rendering: -webkit-optimize-contrast !important;
+    image-rendering: high-quality !important;
   }
 
   .badge-print-card-inner > div {

@@ -38,8 +38,8 @@ function ResponsiveBadgeCard({
   const [scale, setScale] = useState<number>(() => {
     if (typeof window !== 'undefined') {
       const w = window.innerWidth
-      if (w < 560) {
-        return Math.min(1, Math.max(0.35, (w - 36) / 530))
+      if (w < 570) {
+        return Math.min(1, Math.max(0.35, (w - 36) / 540))
       }
     }
     return 1
@@ -49,7 +49,7 @@ function ResponsiveBadgeCard({
     const updateScale = () => {
       if (!containerRef.current) return
       const availableWidth = containerRef.current.clientWidth
-      const targetWidth = 530
+      const targetWidth = 540
       if (availableWidth > 0 && availableWidth < targetWidth) {
         // Deixa margem de respiro para não encostar na borda da tela no mobile
         const nextScale = Math.min(1, Math.max(0.35, (availableWidth - 8) / targetWidth))
@@ -72,8 +72,8 @@ function ResponsiveBadgeCard({
     }
   }, [])
 
-  const cardWidth = 530
-  const cardHeight = 340
+  const cardWidth = 540
+  const cardHeight = 360
 
   return (
     <div
@@ -220,7 +220,7 @@ export function BadgeFrontAndBack({
       {/* ======================================================== */}
       {(mode === 'BOTH' || mode === 'FRONT_ONLY') && (
       <ResponsiveBadgeCard>
-      <div className="w-[530px] min-w-[530px] h-[340px] border-2 border-slate-800 relative bg-white flex flex-col justify-between p-2.5 overflow-hidden shadow-sm rounded-lg print:rounded-none">
+      <div className="w-[540px] min-w-[540px] h-[360px] border-2 border-slate-800 relative bg-white flex flex-col justify-between p-2.5 overflow-hidden shadow-sm rounded-lg print:rounded-none">
         {/* Background marca d'água */}
         {frontBg && (
           <div 
@@ -363,9 +363,9 @@ export function BadgeFrontAndBack({
 
         {/* Linha 3: Proprietário, WhatsApp e QR Code Oficial */}
         <div className="relative z-10 pt-1.5 border-t border-slate-300 flex items-center justify-between gap-2">
-          {/* QR Code de Autenticidade */}
+          {/* QR Code de Autenticidade em Alta Resolução (Nível H - 4K Print) */}
           <div className="w-12 h-12 bg-white p-0.5 border border-slate-400 rounded shrink-0 flex items-center justify-center">
-            <QRCodeSVG value={publicUrl} size={42} level="M" />
+            <QRCodeSVG value={publicUrl} size={44} level="H" />
           </div>
 
           <div className="flex-1">
@@ -408,7 +408,7 @@ export function BadgeFrontAndBack({
       {/* ======================================================== */}
       {(mode === 'BOTH' || mode === 'BACK_ONLY') && (
       <ResponsiveBadgeCard>
-      <div className="w-[530px] min-w-[530px] h-[340px] border-2 border-slate-800 relative bg-white flex flex-col justify-between p-2 overflow-hidden shadow-sm rounded-lg print:rounded-none">
+      <div className="w-[540px] min-w-[540px] h-[360px] border-2 border-slate-800 relative bg-white flex flex-col justify-between p-2.5 overflow-hidden shadow-sm rounded-lg print:rounded-none">
         {/* Background marca d'água */}
         {backBg && (
           <div 
@@ -459,7 +459,7 @@ export function BadgeFrontAndBack({
                 VALIDAÇÃO BIRDPRO
               </span>
               <div className="w-9 h-9 p-0.5 bg-white border border-slate-400 rounded flex items-center justify-center my-0.5 shadow-2xs">
-                <QRCodeSVG value={publicUrl} size={32} level="M" />
+                <QRCodeSVG value={publicUrl} size={32} level="H" />
               </div>
               <div className="w-full text-[6px] font-semibold leading-tight space-y-0.5 pt-0.5 border-t border-slate-200">
                 <p className="font-black truncate uppercase text-[6.5px]" style={{ color: fieldText }}>
@@ -490,7 +490,7 @@ export function BadgeFrontAndBack({
 
           {/* CONECTOR 1 -> 2 (Pais para Avós) */}
           <div className="w-[14px] h-full relative shrink-0">
-            <svg className="w-full h-full" viewBox="0 0 14 240" fill="none" preserveAspectRatio="none">
+            <svg className="w-full h-full" viewBox="0 0 14 240" fill="none" preserveAspectRatio="none" shapeRendering="geometricPrecision">
               {/* Conector Pai -> Avô & Avó Paternos */}
               <path d="M 0,60 H 7 V 30 H 14 M 7,60 V 90 H 14" stroke="#000000" strokeWidth="1.2" strokeLinecap="square" />
               {/* Conector Mãe -> Avô & Avó Maternos */}
@@ -516,7 +516,7 @@ export function BadgeFrontAndBack({
 
           {/* CONECTOR 2 -> 3 (Avós para Bisavós) */}
           <div className="w-[12px] h-full relative shrink-0">
-            <svg className="w-full h-full" viewBox="0 0 12 240" fill="none" preserveAspectRatio="none">
+            <svg className="w-full h-full" viewBox="0 0 12 240" fill="none" preserveAspectRatio="none" shapeRendering="geometricPrecision">
               <path d="M 0,30 H 6 V 15 H 12 M 6,30 V 45 H 12" stroke="#000000" strokeWidth="1" strokeLinecap="square" />
               <path d="M 0,90 H 6 V 75 H 12 M 6,90 V 105 H 12" stroke="#000000" strokeWidth="1" strokeLinecap="square" />
               <path d="M 0,150 H 6 V 135 H 12 M 6,150 V 165 H 12" stroke="#000000" strokeWidth="1" strokeLinecap="square" />
@@ -542,7 +542,7 @@ export function BadgeFrontAndBack({
 
           {/* CONECTOR 3 -> 4 (Bisavós para Trisavós) */}
           <div className="w-[10px] h-full relative shrink-0">
-            <svg className="w-full h-full" viewBox="0 0 10 240" fill="none" preserveAspectRatio="none">
+            <svg className="w-full h-full" viewBox="0 0 10 240" fill="none" preserveAspectRatio="none" shapeRendering="geometricPrecision">
               <path d="M 0,15 H 5 V 7.5 H 10 M 5,15 V 22.5 H 10" stroke="#000000" strokeWidth="0.8" />
               <path d="M 0,45 H 5 V 37.5 H 10 M 5,45 V 52.5 H 10" stroke="#000000" strokeWidth="0.8" />
               <path d="M 0,75 H 5 V 67.5 H 10 M 5,75 V 82.5 H 10" stroke="#000000" strokeWidth="0.8" />
@@ -588,12 +588,16 @@ export function BadgeFrontAndBack({
       </ResponsiveBadgeCard>
       )}
 
-      {/* Regras de Impressão Oficiais: Tamanho Exato do Crachá = 8.5 cm x 5.5 cm */}
+      {/* Regras de Impressão Oficiais: Tamanho Exato do Crachá = 9cm x 6cm com Qualidade 4K Ultra HD */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page {
             size: auto;
             margin: 8mm;
+          }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           body {
             background: #ffffff !important;
@@ -618,12 +622,12 @@ export function BadgeFrontAndBack({
             print-color-adjust: exact !important;
           }
           .badge-print-card-wrapper {
-            width: 8.5cm !important;
-            min-width: 8.5cm !important;
-            max-width: 8.5cm !important;
-            height: 5.5cm !important;
-            min-height: 5.5cm !important;
-            max-height: 5.5cm !important;
+            width: 9cm !important;
+            min-width: 9cm !important;
+            max-width: 9cm !important;
+            height: 6cm !important;
+            min-height: 6cm !important;
+            max-height: 6cm !important;
             position: relative !important;
             overflow: hidden !important;
             display: block !important;
@@ -636,16 +640,26 @@ export function BadgeFrontAndBack({
             padding: 0 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            text-rendering: geometricPrecision !important;
+            -webkit-font-smoothing: antialiased !important;
+            -moz-osx-font-smoothing: grayscale !important;
+            image-rendering: -webkit-optimize-contrast !important;
+            image-rendering: high-quality !important;
           }
           .badge-print-card-inner {
-            width: 530px !important;
-            height: 340px !important;
-            transform: scale(0.60615, 0.61139) !important;
+            width: 540px !important;
+            height: 360px !important;
+            transform: scale(0.62992126) !important;
             transform-origin: top left !important;
             margin: 0 !important;
             border-radius: 0 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            text-rendering: geometricPrecision !important;
+            -webkit-font-smoothing: antialiased !important;
+            -moz-osx-font-smoothing: grayscale !important;
+            image-rendering: -webkit-optimize-contrast !important;
+            image-rendering: high-quality !important;
           }
           .badge-print-card-inner > div {
             border-radius: 0 !important;

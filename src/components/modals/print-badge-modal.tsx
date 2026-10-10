@@ -78,7 +78,7 @@ export function PrintBadgeModal({
             <div className="w-5 h-5 rounded bg-[#00c853] flex items-center justify-center text-white font-black text-[9px] shadow">
               BP
             </div>
-            <span className="font-bold text-sm">Etiqueta de Gaiola / Crachá Oficial (8.5cm x 5.5cm)</span>
+            <span className="font-bold text-sm">Etiqueta de Gaiola / Crachá Oficial (9cm x 6cm - 4K Ultra HD)</span>
             <span className="text-xs text-slate-400">| {bird.name} ({bird.ringNumber})</span>
           </div>
 
@@ -155,7 +155,7 @@ export function PrintBadgeModal({
         <div className="bg-slate-800 px-6 py-3 border-t border-slate-700 flex flex-wrap items-center justify-between gap-3 print:hidden">
           <div className="flex items-center space-x-2 text-slate-400 text-xs">
             <span className="w-2 h-2 rounded-full bg-[#00c853] inline-block"></span>
-            <span>Dimensões de Impressão: <strong>8.5 cm x 5.5 cm</strong> • Autenticado por <strong>BirdPro</strong> (birdpro.com.br)</span>
+            <span>Dimensões de Impressão: <strong>9 cm x 6 cm (4K Ultra HD)</strong> • Autenticado por <strong>BirdPro</strong> (birdpro.com.br)</span>
           </div>
 
           <div className="flex items-center space-x-3">
