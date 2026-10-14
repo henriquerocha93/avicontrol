@@ -7,6 +7,7 @@ import { Printer, X, Download, FileText, Sparkles, Check, ExternalLink, ChevronD
 import { Bird, Tenant } from '@/types'
 import { formatDate } from '@/lib/utils'
 import { db } from '@/lib/db'
+import { firebaseSync } from '@/lib/firebase-service'
 import { resolvePedigreeTree } from '@/lib/pedigree'
 import { BadgeFrontAndBack } from '@/components/genealogy/badge-front-and-back'
 import { PedigreeCertificateArouca } from '@/components/genealogy/pedigree-certificate-arouca'
@@ -84,6 +85,26 @@ export function PrintPedigreeModal({
       }
     }
   }
+
+  // Sincroniza ave e criatório na nuvem em background sempre que o modal for aberto
+  useEffect(() => {
+    if (isOpen && activeBird && firebaseSync.isAvailable()) {
+      const activeT = tenant || db.getTenant(activeBird.tenantId) || db.getTenant()
+      const tenantSnapshot = activeT ? {
+        id: activeT.id,
+        name: activeT.name,
+        ownerName: activeT.ownerName,
+        registryNumber: activeT.registryNumber,
+        phone: activeT.phone || activeT.cellphone,
+        logoUrl: activeT.logoUrl,
+        visualConfig: activeT.visualConfig
+      } : undefined
+      firebaseSync.saveDocument('birds', activeBird.id, { ...activeBird, tenantSnapshot }).catch(() => {})
+      if (activeT) {
+        firebaseSync.saveTenant(activeT).catch(() => {})
+      }
+    }
+  }, [isOpen, activeBird?.id])
 
   if (!isOpen || !mounted || !activeBird || typeof document === 'undefined') return null
 

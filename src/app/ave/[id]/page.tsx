@@ -171,18 +171,26 @@ function PublicCertificateContent() {
       setTenant(t)
       setIsAuthenticating(false)
 
-      // 7. Consulta em nuvem em segundo plano com timeout de segurança (não trava a tela do visitante)
+      // 7. Consulta em nuvem em segundo plano com timeout robusto para mobile (4G/5G)
       if (decodedId && firebaseSync.isAvailable()) {
         try {
-          const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200))
-          const cloudPromise = firebaseSync.fetchBirdAnywhere(decodedId)
-          const cloudBird = await Promise.race([cloudPromise, timeoutPromise])
+          const timeoutBird = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
+          const cloudBird = await Promise.race([firebaseSync.fetchBirdAnywhere(decodedId), timeoutBird])
           if (cloudBird && !isCancelled) {
             setBird(cloudBird)
-            if (cloudBird.tenantId) {
+
+            // Se o pássaro já tiver o tenantSnapshot embutido, aplica imediatamente em 0ms
+            if ((cloudBird as any).tenantSnapshot) {
+              setTenant((cloudBird as any).tenantSnapshot)
+            }
+
+            // Busca os dados e imagens do criatório na nuvem com timeout independente
+            const tid = cloudBird.tenantId || targetBird?.tenantId || 'tenant-demo-01'
+            if (tid) {
+              const timeoutTenant = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
               const cloudTenant = await Promise.race([
-                firebaseSync.fetchTenantById(cloudBird.tenantId),
-                timeoutPromise
+                firebaseSync.fetchTenantById(tid),
+                timeoutTenant
               ])
               if (cloudTenant && !isCancelled) {
                 setTenant(cloudTenant)

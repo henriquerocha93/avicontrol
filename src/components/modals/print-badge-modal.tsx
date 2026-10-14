@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Printer, X, Ruler } from 'lucide-react'
 import { Bird, Tenant } from '@/types'
 import { db } from '@/lib/db'
+import { firebaseSync } from '@/lib/firebase-service'
 import { BadgeFrontAndBack } from '@/components/genealogy/badge-front-and-back'
 
 interface PrintBadgeModalProps {
@@ -57,13 +58,13 @@ export function PrintBadgeModal({
       'labelFrontScale', 'labelBackScale', 'labelLogoScale', 'treeLogoScale', 'treeBackgroundScale'
     ] as const
     for (const k of vcKeys) {
-      if (fromDb?.visualConfig?.[k]) {
-        (mergedVc as any)[k] = fromDb.visualConfig[k]
+      if (tenant?.visualConfig?.[k]) {
+        (mergedVc as any)[k] = tenant.visualConfig[k]
       }
     }
     return {
       ...fromDb,
-      ...(tenant && tenant.id ? tenant : {}),
+      ...(tenant && (tenant.id || tenant.name) ? tenant : {}),
       visualConfig: mergedVc
     }
   }
@@ -71,7 +72,8 @@ export function PrintBadgeModal({
   const [activeTenant, setActiveTenant] = useState<Tenant>(getLatestTenant)
 
   useEffect(() => {
-    setActiveTenant(getLatestTenant())
+    const lat = getLatestTenant()
+    setActiveTenant(lat)
     const handleUpdate = () => {
       setActiveTenant(getLatestTenant())
     }
@@ -80,6 +82,26 @@ export function PrintBadgeModal({
       return () => window.removeEventListener('birdpro_db_updated', handleUpdate)
     }
   }, [tenant, bird?.tenantId, isOpen])
+
+  // Sincroniza ave e criatório na nuvem em background sempre que o modal de impressão for aberto
+  useEffect(() => {
+    if (isOpen && bird && firebaseSync.isAvailable()) {
+      const lat = getLatestTenant()
+      const tenantSnapshot = lat ? {
+        id: lat.id,
+        name: lat.name,
+        ownerName: lat.ownerName,
+        registryNumber: lat.registryNumber,
+        phone: lat.phone || lat.cellphone,
+        logoUrl: lat.logoUrl,
+        visualConfig: lat.visualConfig
+      } : undefined
+      firebaseSync.saveDocument('birds', bird.id, { ...bird, tenantSnapshot }).catch(() => {})
+      if (lat) {
+        firebaseSync.saveTenant(lat).catch(() => {})
+      }
+    }
+  }, [isOpen, bird?.id])
 
   if (!isOpen || !mounted || typeof document === 'undefined') return null
 

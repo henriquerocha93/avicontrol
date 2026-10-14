@@ -131,13 +131,13 @@ export function BadgeFrontAndBack({
       'labelFrontScale', 'labelBackScale', 'labelLogoScale', 'treeLogoScale', 'treeBackgroundScale'
     ] as const
     for (const k of vcKeys) {
-      if (fromDb?.visualConfig?.[k]) {
-        (mergedVc as any)[k] = fromDb.visualConfig[k]
+      if (tenant?.visualConfig?.[k]) {
+        (mergedVc as any)[k] = tenant.visualConfig[k]
       }
     }
     return {
       ...fromDb,
-      ...(tenant && tenant.id ? tenant : {}),
+      ...(tenant && (tenant.id || tenant.name) ? tenant : {}),
       visualConfig: mergedVc
     }
   }

@@ -49,10 +49,24 @@ export class FirebaseSyncService {
   public async fetchTenantById(tenantId: string): Promise<Tenant | null> {
     if (!this.isAvailable() || !dbFirestore) return null;
     try {
-      const docRef = doc(dbFirestore, 'tenants', tenantId);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        return { id: snap.id, ...snap.data() } as Tenant;
+      if (tenantId) {
+        const docRef = doc(dbFirestore, 'tenants', tenantId);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          return { id: snap.id, ...snap.data() } as Tenant;
+        }
+      }
+      // Fallback: busca qualquer criatório com logos/configurações na nuvem
+      const colRef = collection(dbFirestore, 'tenants');
+      const allSnap = await getDocs(colRef);
+      if (!allSnap.empty) {
+        const withConfig = allSnap.docs.find(d => {
+          const dat = d.data();
+          const vc = dat.visualConfig || {};
+          return vc.labelLogoUrl || vc.treeLogoUrl || dat.logoUrl || dat.name;
+        });
+        const chosen = withConfig || allSnap.docs[0];
+        return { id: chosen.id, ...chosen.data() } as Tenant;
       }
       return null;
     } catch (err) {
