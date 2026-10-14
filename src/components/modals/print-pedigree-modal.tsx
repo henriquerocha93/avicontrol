@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/utils'
 import { db } from '@/lib/db'
 import { resolvePedigreeTree } from '@/lib/pedigree'
 import { BadgeFrontAndBack } from '@/components/genealogy/badge-front-and-back'
+import { PedigreeCertificateArouca } from '@/components/genealogy/pedigree-certificate-arouca'
 
 interface PrintPedigreeModalProps {
   isOpen: boolean
@@ -35,7 +36,8 @@ export function PrintPedigreeModal({
       return 4
     }
   })
-  const [themeStyle, setThemeStyle] = useState<'DARK_PRESTIGE' | 'CLASSIC_LIGHT' | 'BADGE_PRO'>('DARK_PRESTIGE')
+  // Padrão: Certificado Oficial Clássico A4 de Alta Qualidade (Padrão Arouca / Criatório)
+  const [themeStyle, setThemeStyle] = useState<'CLASSIC_LIGHT' | 'DARK_PRESTIGE' | 'BADGE_PRO'>('CLASSIC_LIGHT')
   const [showCertificateHeader, setShowCertificateHeader] = useState<boolean>(true)
   const [showQrCode, setShowQrCode] = useState<boolean>(true)
   const [badgeWidthCm, setBadgeWidthCm] = useState<number>(9)
@@ -339,6 +341,15 @@ export function PrintPedigreeModal({
                 tenant={tenant || ({} as any)}
                 printWidthCm={badgeWidthCm}
                 printHeightCm={badgeHeightCm}
+              />
+            </div>
+          ) : themeStyle === 'CLASSIC_LIGHT' ? (
+            <div className="w-full flex justify-center overflow-x-auto">
+              <PedigreeCertificateArouca
+                bird={activeBird}
+                tenant={tenant}
+                generationsCount={generationsCount}
+                showQrCode={showQrCode}
               />
             </div>
           ) : (

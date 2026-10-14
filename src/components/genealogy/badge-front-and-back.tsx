@@ -156,9 +156,22 @@ export function BadgeFrontAndBack({
   }, [tenant, bird?.tenantId])
 
   const vc = activeTenant?.visualConfig || {}
-  const publicUrl = typeof window !== 'undefined' 
-    ? `${window.location.origin}/ave/${bird.id}` 
-    : `https://www.birdpro.com.br/ave/${bird.id}`
+  
+  // Parâmetros compactos na URL do QR Code para leitura instantânea no celular em 0ms (mesmo sem internet ou offline)
+  const queryParams = new URLSearchParams()
+  if (bird.ringNumber) queryParams.set('r', bird.ringNumber)
+  if (bird.name) queryParams.set('n', bird.name)
+  if (bird.species) queryParams.set('s', bird.species)
+  if (bird.sex) queryParams.set('x', bird.sex)
+  if (bird.birthDate) queryParams.set('d', bird.birthDate)
+  if (activeTenant?.name) queryParams.set('t', activeTenant.name)
+  if (activeTenant?.registryNumber) queryParams.set('c', activeTenant.registryNumber)
+  const qs = queryParams.toString() ? `?${queryParams.toString()}` : ''
+
+  const baseUrl = typeof window !== 'undefined' && window.location.origin 
+    ? window.location.origin 
+    : 'https://www.birdpro.com.br'
+  const publicUrl = `${baseUrl}/ave/${encodeURIComponent(bird.id)}${qs}`
 
   // Paletas das caixas
   const maleBg = vc.maleColor || vc.colorPaletteMale || '#dbeafe'

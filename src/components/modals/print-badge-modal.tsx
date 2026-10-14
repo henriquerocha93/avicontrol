@@ -19,7 +19,8 @@ export function PrintBadgeModal({
   bird,
   tenant
 }: PrintBadgeModalProps) {
-  const [printMode, setPrintMode] = useState<'BOTH' | 'FRONT_ONLY' | 'BACK_ONLY'>('BOTH')
+  // Padrão: Imprimir SOMENTE 1 CRACHÁ (Frente Oficial com QR Code)
+  const [printMode, setPrintMode] = useState<'FRONT_ONLY' | 'BACK_ONLY' | 'BOTH'>('FRONT_ONLY')
   const [badgeWidthCm, setBadgeWidthCm] = useState<number>(9)
   const [badgeHeightCm, setBadgeHeightCm] = useState<number>(6)
 
@@ -70,9 +71,9 @@ export function PrintBadgeModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto print:static print:inset-auto print:overflow-visible print:bg-transparent print:p-0 print:m-0">
       {/* Modal Box */}
-      <div className="bg-slate-900 rounded-lg shadow-2xl w-full max-w-[1240px] border border-slate-700 overflow-hidden flex flex-col my-auto animate-scale-in">
+      <div className="bg-slate-900 rounded-lg shadow-2xl w-full max-w-[1240px] border border-slate-700 overflow-hidden flex flex-col my-auto animate-scale-in print:border-0 print:shadow-none print:bg-transparent print:w-auto print:max-w-none print:m-0 print:overflow-visible">
         
         {/* Top Actions Bar (Hidden on print) */}
         <div className="bg-slate-800 px-5 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-3 text-white print:hidden">
@@ -80,23 +81,12 @@ export function PrintBadgeModal({
             <div className="w-5 h-5 rounded bg-[#00c853] flex items-center justify-center text-white font-black text-[9px] shadow">
               BP
             </div>
-            <span className="font-bold text-sm">Etiqueta de Gaiola / Crachá Oficial (9cm x 6cm - 4K Ultra HD)</span>
+            <span className="font-bold text-sm">Etiqueta de Gaiola / Crachá Oficial (4K Ultra HD)</span>
             <span className="text-xs text-slate-400">| {bird.name} ({bird.ringNumber})</span>
           </div>
 
-          {/* Opções de Impressão: Frente e Verso / Somente Frente / Somente Verso */}
+          {/* Opções de Impressão: Somente 1 Crachá (Frente) / Somente Verso / Frente e Verso */}
           <div className="flex items-center bg-slate-900/90 p-0.5 rounded-lg border border-slate-700 text-xs">
-            <button
-              type="button"
-              onClick={() => setPrintMode('BOTH')}
-              className={`px-3 py-1.5 rounded-md font-bold transition flex items-center space-x-1.5 cursor-pointer ${
-                printMode === 'BOTH'
-                  ? 'bg-[#00c853] text-white shadow'
-                  : 'text-slate-300 hover:text-white'
-              }`}
-            >
-              <span>Frente e Verso</span>
-            </button>
             <button
               type="button"
               onClick={() => setPrintMode('FRONT_ONLY')}
@@ -106,7 +96,7 @@ export function PrintBadgeModal({
                   : 'text-slate-300 hover:text-white'
               }`}
             >
-              <span>Somente Frente</span>
+              <span>🏷️ 1 Crachá (Frente Oficial)</span>
             </button>
             <button
               type="button"
@@ -117,7 +107,18 @@ export function PrintBadgeModal({
                   : 'text-slate-300 hover:text-white'
               }`}
             >
-              <span>Somente Verso</span>
+              <span>🌳 Verso (Genealogia)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrintMode('BOTH')}
+              className={`px-3 py-1.5 rounded-md font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+                printMode === 'BOTH'
+                  ? 'bg-[#00c853] text-white shadow'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <span>📄 Frente e Verso (2 Crachás)</span>
             </button>
           </div>
 
@@ -129,10 +130,10 @@ export function PrintBadgeModal({
               <Printer className="w-4 h-4" />
               <span>
                 {printMode === 'FRONT_ONLY' 
-                  ? 'Imprimir Somente Frente (PDF)' 
+                  ? 'Imprimir 1 Crachá (PDF)' 
                   : printMode === 'BACK_ONLY' 
-                    ? 'Imprimir Somente Verso (PDF)' 
-                    : 'Imprimir Frente e Verso (PDF)'}
+                    ? 'Imprimir Verso (PDF)' 
+                    : 'Imprimir Frente e Verso'}
               </span>
             </button>
             <button

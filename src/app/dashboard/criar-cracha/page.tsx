@@ -45,8 +45,8 @@ export default function CriarCrachaPage() {
 
   const currentTenant = activeTenant || tenant || ({} as any);
 
-  // Modo de exibição: Apenas Frente ou Frente e Verso
-  const [badgeMode, setBadgeMode] = useState<'BOTH' | 'FRONT_ONLY'>('BOTH');
+  // Modo de exibição: Apenas Frente (1 crachá) ou Frente e Verso
+  const [badgeMode, setBadgeMode] = useState<'BOTH' | 'FRONT_ONLY'>('FRONT_ONLY');
   const [badgeWidthCm, setBadgeWidthCm] = useState<number>(9);
   const [badgeHeightCm, setBadgeHeightCm] = useState<number>(6);
   const [isSaved, setIsSaved] = useState(false);
