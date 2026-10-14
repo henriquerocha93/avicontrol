@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { Printer, X, Download, FileText, Sparkles, Check, ExternalLink, ChevronDown, Moon, Sun, Award, QrCode } from 'lucide-react'
+import { Printer, X, Download, FileText, Sparkles, Check, ExternalLink, ChevronDown, Moon, Sun, Award, QrCode, Ruler } from 'lucide-react'
 import { Bird, Tenant } from '@/types'
 import { formatDate } from '@/lib/utils'
 import { db } from '@/lib/db'
@@ -38,6 +38,8 @@ export function PrintPedigreeModal({
   const [themeStyle, setThemeStyle] = useState<'DARK_PRESTIGE' | 'CLASSIC_LIGHT' | 'BADGE_PRO'>('DARK_PRESTIGE')
   const [showCertificateHeader, setShowCertificateHeader] = useState<boolean>(true)
   const [showQrCode, setShowQrCode] = useState<boolean>(true)
+  const [badgeWidthCm, setBadgeWidthCm] = useState<number>(9)
+  const [badgeHeightCm, setBadgeHeightCm] = useState<number>(6)
 
   const tenant = initialTenant || db.getTenant(activeBird?.tenantId) || db.getTenant()
 
@@ -226,13 +228,118 @@ export function PrintPedigreeModal({
         </div>
 
         {/* ========================================================================= */}
+        {/* SELETOR DE TAMANHO DO CRACHÁ EM CM (Impressão Automática no Tamanho Desejado) */}
+        {/* ========================================================================= */}
+        {themeStyle === 'BADGE_PRO' && (
+          <div className="bg-[#131920] border-b border-emerald-500/30 px-5 py-2.5 flex flex-wrap items-center justify-between gap-3 text-white print:hidden animate-fade-in">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5 text-xs font-black text-emerald-400">
+                <Ruler className="w-4 h-4 text-[#00c853]" />
+                <span>Tamanho do Crachá na Folha:</span>
+              </div>
+
+              {/* Presets Rápidos com 1 clique */}
+              <div className="flex flex-wrap items-center gap-1.5 bg-slate-900/90 p-1 rounded-lg border border-slate-700 text-xs">
+                <button
+                  type="button"
+                  onClick={() => { setBadgeWidthCm(9); setBadgeHeightCm(6); }}
+                  className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer ${
+                    badgeWidthCm === 9 && badgeHeightCm === 6
+                      ? 'bg-[#00c853] text-white shadow-xs'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  9 × 6 cm (Padrão 4K)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setBadgeWidthCm(8.5); setBadgeHeightCm(5.5); }}
+                  className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer ${
+                    badgeWidthCm === 8.5 && badgeHeightCm === 5.5
+                      ? 'bg-[#00c853] text-white shadow-xs'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  8.5 × 5.5 cm (Cartão/PVC)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setBadgeWidthCm(10); setBadgeHeightCm(7); }}
+                  className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer ${
+                    badgeWidthCm === 10 && badgeHeightCm === 7
+                      ? 'bg-[#00c853] text-white shadow-xs'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  10 × 7 cm (Gaiola Média)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setBadgeWidthCm(12); setBadgeHeightCm(8); }}
+                  className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer ${
+                    badgeWidthCm === 12 && badgeHeightCm === 8
+                      ? 'bg-[#00c853] text-white shadow-xs'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  12 × 8 cm (Gaiolão)
+                </button>
+              </div>
+
+              {/* Digitar Tamanho Personalizado em cm */}
+              <div className="flex items-center gap-2 text-xs">
+                <div className="flex items-center gap-1 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700">
+                  <span className="text-slate-400 font-semibold text-[11px]">Largura:</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="4"
+                    max="30"
+                    value={badgeWidthCm}
+                    onChange={(e) => setBadgeWidthCm(Math.max(3, parseFloat(e.target.value) || 9))}
+                    className="w-14 bg-slate-800 text-white text-center font-bold font-mono text-xs rounded border border-slate-600 px-1 py-0.5 focus:border-emerald-500 focus:outline-none"
+                  />
+                  <span className="text-slate-400 text-[11px]">cm</span>
+                </div>
+
+                <span className="text-slate-500 font-bold">×</span>
+
+                <div className="flex items-center gap-1 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700">
+                  <span className="text-slate-400 font-semibold text-[11px]">Altura:</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="3"
+                    max="25"
+                    value={badgeHeightCm}
+                    onChange={(e) => setBadgeHeightCm(Math.max(2, parseFloat(e.target.value) || 6))}
+                    className="w-14 bg-slate-800 text-white text-center font-bold font-mono text-xs rounded border border-slate-600 px-1 py-0.5 focus:border-emerald-500 focus:outline-none"
+                  />
+                  <span className="text-slate-400 text-[11px]">cm</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px] text-emerald-400 font-mono">
+              <span className="w-2 h-2 rounded-full bg-[#00c853] inline-block animate-pulse"></span>
+              <span>Saída de Impressão: <strong>{badgeWidthCm}cm × {badgeHeightCm}cm</strong></span>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
         {/* CERTIFICATE CANVAS OR BADGE FRONT & BACK CANVAS                           */}
         {/* ========================================================================= */}
         <div className="p-4 sm:p-6 bg-slate-950 overflow-x-auto flex justify-center print:p-0 print:bg-white">
           
           {themeStyle === 'BADGE_PRO' ? (
             <div className="w-full flex justify-center">
-              <BadgeFrontAndBack bird={activeBird} tenant={tenant || ({} as any)} />
+              <BadgeFrontAndBack
+                bird={activeBird}
+                tenant={tenant || ({} as any)}
+                printWidthCm={badgeWidthCm}
+                printHeightCm={badgeHeightCm}
+              />
             </div>
           ) : (
             <div

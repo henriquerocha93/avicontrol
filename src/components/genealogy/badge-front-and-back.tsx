@@ -18,12 +18,14 @@ export interface BadgeAncestors {
   greatGreatGrandparents?: { name: string; male: boolean }[];
 }
 
-interface BadgeFrontAndBackProps {
+export interface BadgeFrontAndBackProps {
   bird: Bird
   tenant?: Tenant | null
   theme?: 'LIGHT' | 'DARK'
   mode?: 'BOTH' | 'FRONT_ONLY' | 'BACK_ONLY'
   customAncestors?: BadgeAncestors
+  printWidthCm?: number
+  printHeightCm?: number
 }
 
 // Container responsivo que redimensiona proporcionalmente o crachá no mobile/tablet/pc
@@ -104,8 +106,15 @@ export function BadgeFrontAndBack({
   tenant, 
   theme = 'LIGHT',
   mode = 'BOTH',
-  customAncestors
+  customAncestors,
+  printWidthCm = 9,
+  printHeightCm = 6
 }: BadgeFrontAndBackProps) {
+  const validWidthCm = Number.isFinite(printWidthCm) && (printWidthCm as number) > 0 ? (printWidthCm as number) : 9
+  const validHeightCm = Number.isFinite(printHeightCm) && (printHeightCm as number) > 0 ? (printHeightCm as number) : 6
+  // 1 cm = 37.79527559 px a 96 DPI
+  const scaleX = ((validWidthCm * 37.79527559) / 540).toFixed(6)
+  const scaleY = ((validHeightCm * 37.79527559) / 360).toFixed(6)
   const getLatestTenant = () => {
     const fromDb = db.getTenant(tenant?.id || bird?.tenantId) || db.getTenant()
     const mergedVc = {
@@ -363,9 +372,16 @@ export function BadgeFrontAndBack({
 
         {/* Linha 3: Proprietário, WhatsApp e QR Code Oficial */}
         <div className="relative z-10 pt-1.5 border-t border-slate-300 flex items-center justify-between gap-2">
-          {/* QR Code de Autenticidade em Alta Resolução (Nível H - 4K Print) */}
-          <div className="w-12 h-12 bg-white p-0.5 border border-slate-400 rounded shrink-0 flex items-center justify-center">
-            <QRCodeSVG value={publicUrl} size={44} level="H" />
+          {/* QR Code de Autenticidade - Grande Visibilidade para Câmera do Celular */}
+          <div className="shrink-0 flex items-center gap-1.5 bg-white p-1 rounded-lg border-2 border-slate-700 shadow-xs">
+            <div className="w-[62px] h-[62px] bg-white flex items-center justify-center shrink-0">
+              <QRCodeSVG value={publicUrl} size={60} level="M" />
+            </div>
+            <div className="flex flex-col justify-center leading-none text-left pr-0.5">
+              <span className="text-[6.5px] font-black uppercase tracking-wider text-emerald-700 block">ESCANEAR</span>
+              <span className="text-[5.5px] font-bold text-slate-600 block mt-0.5">CÂMERA DO</span>
+              <span className="text-[5.5px] font-bold text-slate-600 block">CELULAR</span>
+            </div>
           </div>
 
           <div className="flex-1">
@@ -450,32 +466,32 @@ export function BadgeFrontAndBack({
               {paiNome}
             </div>
 
-            {/* MEIO: INFORMAÇÕES DA AVE & VALIDAÇÃO (Exatamente no espaço vago entre pai e mãe) */}
+            {/* MEIO: VALIDAÇÃO & QR CODE OFICIAL AMPLIADO PARA LEITURA FÁCIL */}
             <div 
-              className="my-auto p-1 rounded border border-slate-300 shadow-2xs flex flex-col items-center justify-center text-center"
-              style={{ backgroundColor: fieldBg, color: fieldText }}
+              className="my-auto p-1 rounded-lg border-2 border-emerald-500 shadow-sm flex flex-col items-center justify-center text-center bg-white"
             >
-              <span className="text-[6.5px] font-black uppercase tracking-wider text-emerald-800">
-                VALIDAÇÃO BIRDPRO
-              </span>
-              <div className="w-9 h-9 p-0.5 bg-white border border-slate-400 rounded flex items-center justify-center my-0.5 shadow-2xs">
-                <QRCodeSVG value={publicUrl} size={32} level="H" />
+              <div className="flex items-center gap-1 mb-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#00c853]"></span>
+                <span className="text-[6.5px] font-black uppercase tracking-wider text-slate-900 leading-none">
+                  VALIDAÇÃO BIRDPRO
+                </span>
               </div>
-              <div className="w-full text-[6px] font-semibold leading-tight space-y-0.5 pt-0.5 border-t border-slate-200">
-                <p className="font-black truncate uppercase text-[6.5px]" style={{ color: fieldText }}>
+
+              {/* QR Code Grande em Alta Resolução (Nível M - Leitura Instantânea pelo Celular) */}
+              <div className="w-[66px] h-[66px] p-0.5 bg-white border border-slate-300 rounded flex items-center justify-center shadow-2xs">
+                <QRCodeSVG value={publicUrl} size={62} level="M" />
+              </div>
+
+              <div className="w-full text-center pt-0.5 mt-0.5 border-t border-slate-200 leading-tight">
+                <p className="font-black truncate uppercase text-[7px] text-slate-900">
                   {bird.name}
                 </p>
-                <p className="truncate" style={{ color: fieldText }}>
-                  <strong style={{ color: fieldText }}>Espécie:</strong> {bird.species?.split('(')[0]?.trim() || 'Canário-da-terra'}
+                <p className="font-mono font-black text-[6.5px] text-emerald-700 truncate">
+                  ANILHA: {bird.ringNumber || 'OFICIAL'}
                 </p>
-                <p className="truncate font-mono font-bold" style={{ color: fieldText }}>
-                  <strong className="font-sans font-semibold" style={{ color: fieldText }}>Anilha:</strong> {bird.ringNumber || 'OFICIAL'}
-                </p>
-                <div className="flex items-center justify-center gap-1 text-[5.5px]" style={{ color: fieldText }}>
-                  <span><strong style={{ color: fieldText }}>Nasc:</strong> {bird.birthDate ? formatDate(bird.birthDate) : '2026'}</span>
-                  <span>•</span>
-                  <span className="font-bold" style={{ color: fieldText }}>{bird.sex === 'MALE' ? '♂ Macho' : bird.sex === 'FEMALE' ? '♀ Fêmea' : 'Indef.'}</span>
-                </div>
+                <span className="text-[5.5px] font-bold text-slate-500 block uppercase tracking-tight">
+                  Aponte a Câmera
+                </span>
               </div>
             </div>
 
@@ -622,12 +638,12 @@ export function BadgeFrontAndBack({
             print-color-adjust: exact !important;
           }
           .badge-print-card-wrapper {
-            width: 9cm !important;
-            min-width: 9cm !important;
-            max-width: 9cm !important;
-            height: 6cm !important;
-            min-height: 6cm !important;
-            max-height: 6cm !important;
+            width: ${validWidthCm}cm !important;
+            min-width: ${validWidthCm}cm !important;
+            max-width: ${validWidthCm}cm !important;
+            height: ${validHeightCm}cm !important;
+            min-height: ${validHeightCm}cm !important;
+            max-height: ${validHeightCm}cm !important;
             position: relative !important;
             overflow: hidden !important;
             display: block !important;
@@ -649,7 +665,7 @@ export function BadgeFrontAndBack({
           .badge-print-card-inner {
             width: 540px !important;
             height: 360px !important;
-            transform: scale(0.62992126) !important;
+            transform: scale(${scaleX}, ${scaleY}) !important;
             transform-origin: top left !important;
             margin: 0 !important;
             border-radius: 0 !important;

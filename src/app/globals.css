@@ -594,12 +594,12 @@ html.dark .shadow-xl {
   }
 
   .badge-print-card-wrapper {
-    width: 9cm !important;
-    min-width: 9cm !important;
-    max-width: 9cm !important;
-    height: 6cm !important;
-    min-height: 6cm !important;
-    max-height: 6cm !important;
+    width: var(--badge-print-w, 9cm) !important;
+    min-width: var(--badge-print-w, 9cm) !important;
+    max-width: var(--badge-print-w, 9cm) !important;
+    height: var(--badge-print-h, 6cm) !important;
+    min-height: var(--badge-print-h, 6cm) !important;
+    max-height: var(--badge-print-h, 6cm) !important;
     position: relative !important;
     overflow: hidden !important;
     display: block !important;
