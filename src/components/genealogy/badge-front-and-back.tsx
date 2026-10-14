@@ -155,8 +155,6 @@ export function BadgeFrontAndBack({
       mergedVc.bgGenealogyUrl || 
       mergedVc.labelBackBackgroundUrl || 
       mergedVc.bgLabelBackUrl || 
-      fromDb?.coverUrl || 
-      tenant?.coverUrl || 
       ''
 
     if (universalBg) {
@@ -174,9 +172,31 @@ export function BadgeFrontAndBack({
       }
     }
 
+    // Logo/Foto de perfil universal: se o criador salvou logo em qualquer campo, propaga automaticamente
+    const universalLogo = 
+      mergedVc.labelLogoUrl || 
+      mergedVc.logoLabelUrl || 
+      mergedVc.treeLogoUrl || 
+      mergedVc.logoGenealogyUrl || 
+      fromDb?.logoUrl || 
+      tenant?.logoUrl || 
+      ''
+
+    if (universalLogo) {
+      if (!mergedVc.labelLogoUrl && !mergedVc.logoLabelUrl) {
+        mergedVc.labelLogoUrl = universalLogo
+        mergedVc.logoLabelUrl = universalLogo
+      }
+      if (!mergedVc.treeLogoUrl && !mergedVc.logoGenealogyUrl) {
+        mergedVc.treeLogoUrl = universalLogo
+        mergedVc.logoGenealogyUrl = universalLogo
+      }
+    }
+
     return {
       ...(tenant && (tenant.id || tenant.name) ? tenant : {}),
       ...(fromDb || {}),
+      logoUrl: fromDb?.logoUrl || tenant?.logoUrl || universalLogo || undefined,
       ownerName: fromDb?.ownerName || tenant?.ownerName || '',
       visualConfig: mergedVc
     } as Tenant
@@ -219,8 +239,17 @@ export function BadgeFrontAndBack({
   const labelFrontText = vc.labelFrontTextColor || vc.textColorLabelFront || '#475569'
   const labelBackText = vc.labelBackTextColor || vc.textColorLabelBack || '#475569'
 
-  // Imagens com resolução inteligente de fallback entre todos os campos de imagem do criatório
-  const logoImage = vc.labelLogoUrl || vc.logoLabelUrl || vc.treeLogoUrl || vc.logoGenealogyUrl || activeTenant?.logoUrl || ''
+  // Logo ou foto de perfil com resolução inteligente e fallback completo
+  const universalLogo = 
+    vc.labelLogoUrl || 
+    vc.logoLabelUrl || 
+    vc.treeLogoUrl || 
+    vc.logoGenealogyUrl || 
+    activeTenant?.logoUrl || 
+    tenant?.logoUrl || 
+    ''
+
+  const logoImage = bird?.photoUrl || vc.labelLogoUrl || vc.logoLabelUrl || universalLogo || ''
   
   const universalBg = 
     vc.labelFrontBackgroundUrl || 
@@ -229,7 +258,6 @@ export function BadgeFrontAndBack({
     vc.bgGenealogyUrl || 
     vc.labelBackBackgroundUrl || 
     vc.bgLabelBackUrl || 
-    activeTenant?.coverUrl || 
     ''
 
   const frontBg = vc.labelFrontBackgroundUrl || vc.bgLabelFrontUrl || universalBg
@@ -323,8 +351,8 @@ export function BadgeFrontAndBack({
               // eslint-disable-next-line @next/next/no-img-element
               <img 
                 src={logoImage} 
-                alt="Brasão" 
-                className="w-20 h-20 object-contain mx-auto drop-shadow-xs transition-transform" 
+                alt={bird?.photoUrl ? bird.name : (activeTenant?.name || "Logo Criatório")} 
+                className={`w-20 h-20 ${bird?.photoUrl ? 'object-cover rounded-xl border border-slate-300' : 'object-contain'} mx-auto drop-shadow-xs transition-transform`} 
                 style={{ transform: vc.labelLogoScale && vc.labelLogoScale !== 1 ? `scale(${vc.labelLogoScale})` : undefined }}
               />
             ) : (

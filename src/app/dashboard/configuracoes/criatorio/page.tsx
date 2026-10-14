@@ -209,9 +209,26 @@ export default function CriatorioConfigPage() {
         }
       }
 
+      // Propagação inteligente de logo/foto: sincroniza entre etiqueta, árvore e criatório
+      const isLogoField = [
+        'treeLogoUrl', 'logoGenealogyUrl',
+        'labelLogoUrl', 'logoLabelUrl'
+      ].includes(field as string)
+
+      if (isLogoField && value) {
+        if (!updatedVc.treeLogoUrl && !updatedVc.logoGenealogyUrl) {
+          updatedVc.treeLogoUrl = value
+          updatedVc.logoGenealogyUrl = value
+        }
+        if (!updatedVc.labelLogoUrl && !updatedVc.logoLabelUrl) {
+          updatedVc.labelLogoUrl = value
+          updatedVc.logoLabelUrl = value
+        }
+      }
+
       return {
         ...prev,
-        coverUrl: prev.coverUrl || (isBgField && value ? value : prev.coverUrl),
+        logoUrl: (isLogoField && value) ? value : prev.logoUrl,
         visualConfig: updatedVc
       }
     })
@@ -430,7 +447,6 @@ export default function CriatorioConfigPage() {
       if (!prev) return null
       return {
         ...prev,
-        coverUrl: bgUrl,
         visualConfig: {
           ...(prev.visualConfig || {}),
           labelFrontBackgroundUrl: bgUrl,
@@ -443,6 +459,25 @@ export default function CriatorioConfigPage() {
       }
     })
     showToast('✓ Fundo aplicado com sucesso em todos os crachás e certificados!')
+  }
+
+  const handleApplyLogoToAll = (logoUrl: string) => {
+    if (!logoUrl) return
+    setTenant(prev => {
+      if (!prev) return null
+      return {
+        ...prev,
+        logoUrl: logoUrl,
+        visualConfig: {
+          ...(prev.visualConfig || {}),
+          treeLogoUrl: logoUrl,
+          logoGenealogyUrl: logoUrl,
+          labelLogoUrl: logoUrl,
+          logoLabelUrl: logoUrl
+        }
+      }
+    })
+    showToast('✓ Logo/Foto de perfil aplicada com sucesso em todos os crachás e certificados!')
   }
 
   const handleOpenImageSelector = (field: keyof TenantVisualConfig, title: string) => {
@@ -504,7 +539,15 @@ export default function CriatorioConfigPage() {
       currentVc.bgGenealogyUrl || 
       currentVc.labelBackBackgroundUrl || 
       currentVc.bgLabelBackUrl || 
-      tenant.coverUrl || 
+      ''
+
+    // Garante que a logo/foto de perfil seja unificada para todos os crachás e certificados
+    const universalLogo = 
+      currentVc.labelLogoUrl || 
+      currentVc.logoLabelUrl || 
+      currentVc.treeLogoUrl || 
+      currentVc.logoGenealogyUrl || 
+      tenant.logoUrl || 
       ''
 
     const unifiedVc: TenantVisualConfig = {
@@ -515,11 +558,15 @@ export default function CriatorioConfigPage() {
       bgLabelBackUrl: currentVc.labelBackBackgroundUrl || currentVc.bgLabelBackUrl || currentVc.labelFrontBackgroundUrl || universalBg,
       treeBackgroundUrl: currentVc.treeBackgroundUrl || currentVc.bgGenealogyUrl || universalBg,
       bgGenealogyUrl: currentVc.treeBackgroundUrl || currentVc.bgGenealogyUrl || universalBg,
+      labelLogoUrl: currentVc.labelLogoUrl || currentVc.logoLabelUrl || universalLogo,
+      logoLabelUrl: currentVc.labelLogoUrl || currentVc.logoLabelUrl || universalLogo,
+      treeLogoUrl: currentVc.treeLogoUrl || currentVc.logoGenealogyUrl || universalLogo,
+      logoGenealogyUrl: currentVc.treeLogoUrl || currentVc.logoGenealogyUrl || universalLogo,
     }
 
     const tenantToSave: Tenant = {
       ...tenant,
-      coverUrl: tenant.coverUrl || universalBg || undefined,
+      logoUrl: tenant.logoUrl || universalLogo || undefined,
       visualConfig: unifiedVc
     }
 
@@ -1333,6 +1380,17 @@ export default function CriatorioConfigPage() {
                   Limpar
                 </button>
               </div>
+
+              {vc.treeLogoUrl && (
+                <button
+                  type="button"
+                  onClick={() => handleApplyLogoToAll(vc.treeLogoUrl!)}
+                  className="w-full py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10.5px] font-bold rounded flex items-center justify-center gap-1.5 transition shadow-2xs"
+                  title="Aplica esta foto/logo automaticamente em todos os crachás e na árvore genealógica"
+                >
+                  <span>⚡ Aplicar em TODOS os crachás</span>
+                </button>
+              )}
             </div>
 
             {/* Box 2: Background Árvore (1150x800px) */}
@@ -1492,6 +1550,17 @@ export default function CriatorioConfigPage() {
                   Limpar
                 </button>
               </div>
+
+              {vc.labelLogoUrl && (
+                <button
+                  type="button"
+                  onClick={() => handleApplyLogoToAll(vc.labelLogoUrl!)}
+                  className="w-full py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10.5px] font-bold rounded flex items-center justify-center gap-1.5 transition shadow-2xs"
+                  title="Aplica esta foto/logo automaticamente em todos os crachás e na árvore genealógica"
+                >
+                  <span>⚡ Aplicar em TODOS os crachás</span>
+                </button>
+              )}
             </div>
 
             {/* Box 4: Background Etiqueta Frente */}

@@ -233,11 +233,24 @@ class DataService {
               t.address === 'Rua das violetas' ||
               t.city === 'IJUI' ||
               t.registryNumber === '4719754' ||
-              t.website?.includes('madruguinha');
+              t.website?.includes('madruguinha') ||
+              (t.coverUrl && (t.coverUrl.includes('1544717305') || t.coverUrl.includes('1534528741'))) ||
+              (t.logoUrl && (t.logoUrl.includes('1544717305') || t.logoUrl.includes('1534528741')));
 
             if (isDemo || t.address === 'Rua das violetas' || t.city === 'IJUI' || t.registryNumber === '4719754') {
               hadDemoFields = true;
             }
+
+            const cleanVc = { ...(t.visualConfig || {}) };
+            for (const k of ['treeBackgroundUrl', 'bgGenealogyUrl', 'labelFrontBackgroundUrl', 'bgLabelFrontUrl', 'labelBackBackgroundUrl', 'bgLabelBackUrl', 'treeLogoUrl', 'labelLogoUrl']) {
+              if ((cleanVc as any)[k] && ((cleanVc as any)[k].includes('1544717305') || (cleanVc as any)[k].includes('1534528741'))) {
+                (cleanVc as any)[k] = '';
+                hadDemoFields = true;
+              }
+            }
+
+            const cleanCover = (t.coverUrl && (t.coverUrl.includes('1544717305') || t.coverUrl.includes('1534528741'))) ? '' : t.coverUrl;
+            const cleanLogo = (t.logoUrl && (t.logoUrl.includes('1544717305') || t.logoUrl.includes('1534528741'))) ? '' : t.logoUrl;
 
             return {
               ...t,
@@ -258,12 +271,21 @@ class DataService {
               facebook: t.facebook?.includes('MADRUGUINHA') ? '' : t.facebook,
               instagram: t.instagram?.includes('MADRUGUINHA') ? '' : t.instagram,
               website: (t.website?.includes('madruguinha') || t.website?.includes('Madruguinha')) ? '' : t.website,
+              coverUrl: cleanCover,
+              logoUrl: cleanLogo,
+              visualConfig: cleanVc,
               owners: (t.owners || []).filter(o => !o.name?.includes('Madruguinha') && !o.nickname?.includes('Madruguinha') && !o.name?.includes('Schreiber'))
             };
           });
           if (hadDemoFields) {
             this.saveToStorage();
           }
+        }
+
+        // Auto-sanitize legacy demo globalConfig systemLogoUrl
+        if (this.state.globalConfig?.systemLogoUrl && this.state.globalConfig.systemLogoUrl.includes('1544717305')) {
+          this.state.globalConfig.systemLogoUrl = '/icon-512x512.png';
+          this.saveToStorage();
         }
 
         // Auto-sanitize legacy demo user
@@ -912,7 +934,24 @@ class DataService {
         ...incomingVc
       };
 
-      // Unifica automaticamente qualquer imagem de fundo para todos os crachás e árvores
+      const isUnsplashDemo = (url?: string) => {
+        if (!url) return false;
+        return url.includes('1544717305') || url.includes('1534528741');
+      };
+
+      // Remove qualquer imagem de mulher demo que possa ter vazado nas configurações
+      for (const k of ['treeBackgroundUrl', 'bgGenealogyUrl', 'labelFrontBackgroundUrl', 'bgLabelFrontUrl', 'labelBackBackgroundUrl', 'bgLabelBackUrl']) {
+        if (isUnsplashDemo((mergedVc as any)[k])) {
+          (mergedVc as any)[k] = '';
+        }
+      }
+      for (const k of ['treeLogoUrl', 'logoGenealogyUrl', 'labelLogoUrl', 'logoLabelUrl']) {
+        if (isUnsplashDemo((mergedVc as any)[k])) {
+          (mergedVc as any)[k] = '';
+        }
+      }
+
+      // Unifica automaticamente qualquer imagem de fundo para todos os crachás e árvores (exclusivo para crachás, sem coverUrl)
       const universalBg = 
         mergedVc.labelFrontBackgroundUrl || 
         mergedVc.bgLabelFrontUrl || 
@@ -920,8 +959,6 @@ class DataService {
         mergedVc.bgGenealogyUrl || 
         mergedVc.labelBackBackgroundUrl || 
         mergedVc.bgLabelBackUrl || 
-        tenant.coverUrl || 
-        this.state.tenants[idx].coverUrl || 
         '';
 
       if (universalBg) {
@@ -933,22 +970,47 @@ class DataService {
         if (!mergedVc.bgGenealogyUrl) mergedVc.bgGenealogyUrl = universalBg;
       }
 
+      // Unifica automaticamente qualquer logo/foto de perfil para todos os crachás e árvores
+      const cleanTenantLogo = isUnsplashDemo(tenant.logoUrl) ? '' : (tenant.logoUrl || '');
+      const cleanDbLogo = isUnsplashDemo(this.state.tenants[idx].logoUrl) ? '' : (this.state.tenants[idx].logoUrl || '');
+
+      const universalLogo = 
+        mergedVc.labelLogoUrl || 
+        mergedVc.logoLabelUrl || 
+        mergedVc.treeLogoUrl || 
+        mergedVc.logoGenealogyUrl || 
+        cleanTenantLogo || 
+        cleanDbLogo || 
+        '';
+
+      if (universalLogo) {
+        if (!mergedVc.labelLogoUrl) mergedVc.labelLogoUrl = universalLogo;
+        if (!mergedVc.logoLabelUrl) mergedVc.logoLabelUrl = universalLogo;
+        if (!mergedVc.treeLogoUrl) mergedVc.treeLogoUrl = universalLogo;
+        if (!mergedVc.logoGenealogyUrl) mergedVc.logoGenealogyUrl = universalLogo;
+      }
+
+      const cleanCover = isUnsplashDemo(tenant.coverUrl || this.state.tenants[idx].coverUrl) ? '' : (tenant.coverUrl || this.state.tenants[idx].coverUrl || undefined);
+      const cleanFinalLogo = isUnsplashDemo(tenant.logoUrl || this.state.tenants[idx].logoUrl) ? '' : (tenant.logoUrl || this.state.tenants[idx].logoUrl || universalLogo || undefined);
+
       this.state.tenants[idx] = {
         ...this.state.tenants[idx],
         ...tenant,
-        coverUrl: this.state.tenants[idx].coverUrl || tenant.coverUrl || universalBg || undefined,
+        coverUrl: cleanCover,
+        logoUrl: cleanFinalLogo,
         visualConfig: mergedVc
       };
 
-      // Propaga a configuração visual e backgrounds para todos os criatórios locais (ex: demo ou aves vinculadas)
+      // Propaga a configuração visual, backgrounds e logos para todos os criatórios locais (ex: demo ou aves vinculadas)
       for (let i = 0; i < this.state.tenants.length; i++) {
         if (i !== idx) {
           this.state.tenants[i].visualConfig = {
             ...(this.state.tenants[i].visualConfig || {}),
             ...mergedVc
           };
-          if (universalBg && !this.state.tenants[i].coverUrl) {
-            this.state.tenants[i].coverUrl = universalBg;
+          // Propaga apenas campos visuais e logo
+          if (universalLogo && !this.state.tenants[i].logoUrl) {
+            this.state.tenants[i].logoUrl = universalLogo;
           }
         }
       }

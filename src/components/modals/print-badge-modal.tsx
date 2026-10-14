@@ -81,8 +81,6 @@ export function PrintBadgeModal({
       mergedVc.bgGenealogyUrl || 
       mergedVc.labelBackBackgroundUrl || 
       mergedVc.bgLabelBackUrl || 
-      fromDb?.coverUrl || 
-      tenant?.coverUrl || 
       ''
 
     if (universalBg) {
@@ -100,9 +98,31 @@ export function PrintBadgeModal({
       }
     }
 
+    // Logo/Foto de perfil universal automático
+    const universalLogo = 
+      mergedVc.labelLogoUrl || 
+      mergedVc.logoLabelUrl || 
+      mergedVc.treeLogoUrl || 
+      mergedVc.logoGenealogyUrl || 
+      fromDb?.logoUrl || 
+      tenant?.logoUrl || 
+      ''
+
+    if (universalLogo) {
+      if (!mergedVc.labelLogoUrl && !mergedVc.logoLabelUrl) {
+        mergedVc.labelLogoUrl = universalLogo
+        mergedVc.logoLabelUrl = universalLogo
+      }
+      if (!mergedVc.treeLogoUrl && !mergedVc.logoGenealogyUrl) {
+        mergedVc.treeLogoUrl = universalLogo
+        mergedVc.logoGenealogyUrl = universalLogo
+      }
+    }
+
     return {
       ...(tenant && (tenant.id || tenant.name) ? tenant : {}),
       ...(fromDb || {}),
+      logoUrl: fromDb?.logoUrl || tenant?.logoUrl || universalLogo || undefined,
       ownerName: fromDb?.ownerName || tenant?.ownerName || '',
       visualConfig: mergedVc
     } as Tenant
