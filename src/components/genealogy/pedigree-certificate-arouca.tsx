@@ -556,18 +556,35 @@ export function PedigreeCertificateArouca({
           </div>
 
           {/* ======================================================== */}
-          {/* RODAPÉ: LOGO DA AVE + SISTEMA BIRDPRO                    */}
+          {/* RODAPÉ: LOGO BIRDPRO + SISTEMA OFICIAL                   */}
           {/* ======================================================== */}
           <div className="relative z-10 flex items-center justify-between pt-1 px-1">
-            <div className="flex items-center gap-2">
-              {/* Ícone Estilizado da Fênix/Pássaro em Vermelho */}
-              <svg className="w-5 h-5 text-[#e11d48] shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C9.5 5 7 8 7 11c0 2.5 1.5 4.5 3.5 5.5-.5-1.5-.5-3 0-4.5 1 2 2.5 3 4.5 3 2 0 3.5-1.5 3.5-3.5 0-3-2.5-6-6.5-9.5z" />
-                <path d="M6 13c-1.5 1-2.5 2.5-2.5 4.5 0 3 2.5 5.5 5.5 5.5 1.5 0 3-.5 4-1.5-2-.5-3.5-2-3.5-4 0-1.5.5-3 1.5-4-1.5-.5-3.5-.5-5-.5z" opacity="0.8" />
-                <path d="M18 13c1.5 1 2.5 2.5 2.5 4.5 0 3-2.5 5.5-5.5 5.5-1.5 0-3-.5-4-1.5 2-.5 3.5-2 3.5-4 0-1.5-.5-3-1.5-4 1.5-.5 3.5-.5 5-.5z" opacity="0.8" />
-              </svg>
-              <span className="text-[11.5px] font-black text-black">
-                Sistema: <span className="font-extrabold">www.birdpro.com.br</span>
+            <div className="flex items-center gap-2.5">
+              {/* Logo Oficial BirdPro (Ícone + Tipografia) */}
+              <div className="flex items-center gap-1.5">
+                <div className="w-[22px] h-[22px] rounded-md bg-gradient-to-br from-[#00c853] via-emerald-600 to-[#022c1b] p-0.5 shadow-xs border border-emerald-400/50 shrink-0 flex items-center justify-center">
+                  <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-xs">
+                    <path
+                      d="M7 26C11 19 20 15 33 11C37 9.5 41 7 41 7C40 11 38 18 34 22C29.5 26.5 23 29.5 15.5 30.5C11 31 8.5 28.5 7 26Z"
+                      fill="white"
+                      fillOpacity="0.98"
+                    />
+                    <path
+                      d="M19 23C25 21 34 16 39 9.5C35 15 30.5 24.5 23.5 28.5C17.5 32 11.5 32.5 9 32.5C12 30.5 16 26.5 19 23Z"
+                      fill="#a7f3d0"
+                      fillOpacity="0.9"
+                    />
+                    <circle cx="35" cy="35" r="7" stroke="#F59E0B" strokeWidth="2.8" fill="none" />
+                    <circle cx="35" cy="35" r="3.2" fill="#F59E0B" />
+                  </svg>
+                </div>
+                <span className="font-black text-[12px] tracking-tight text-slate-950 leading-none">
+                  BIRD<span className="text-[#00c853]">PRO</span>
+                </span>
+              </div>
+
+              <span className="text-[11px] font-bold text-slate-600">
+                • Sistema: <span className="font-extrabold text-black">www.birdpro.com.br</span>
               </span>
             </div>
 
