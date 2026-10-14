@@ -165,43 +165,33 @@ export function PedigreeCertificateArouca({
         <div className="relative z-10 w-full h-full bg-white rounded-2xl border-[3px] border-[#ffd600] shadow-sm flex flex-col justify-between p-3.5 overflow-hidden">
           
           {/* ======================================================== */}
-          {/* MARCA D'ÁGUA EXPANSIVA & ELEGANTE DO CRIATÓRIO (SEM QUADRADO) */}
+          {/* FUNDO TOTAL INTEGRADO DO CERTIFICADO                      */}
           {/* ======================================================== */}
-          <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-0 overflow-hidden">
-            {/* Halo / Aura sutil e nobre ao fundo */}
+          {bgWatermarkUrl ? (
             <div 
-              className="absolute w-[860px] h-[580px] rounded-full pointer-events-none"
+              className="absolute inset-0 pointer-events-none z-0 overflow-hidden"
               style={{
-                background: 'radial-gradient(ellipse at center, rgba(255, 214, 0, 0.08) 0%, rgba(255, 214, 0, 0.02) 50%, transparent 75%)'
+                opacity: 0.14
               }}
-            />
-
-            {bgWatermarkUrl ? (
+            >
               <div 
-                className="relative w-[780px] h-[520px] flex items-center justify-center pointer-events-none"
-                style={{ 
-                  opacity: 0.17,
-                  mixBlendMode: 'multiply',
-                  maskImage: 'radial-gradient(ellipse 65% 65% at 50% 50%, black 25%, rgba(0,0,0,0.7) 50%, transparent 75%)',
-                  WebkitMaskImage: 'radial-gradient(ellipse 65% 65% at 50% 50%, black 25%, rgba(0,0,0,0.7) 50%, transparent 75%)'
+                className="w-full h-full bg-center bg-no-repeat bg-cover"
+                style={{
+                  backgroundImage: `url("${bgWatermarkUrl}")`,
+                  transform: vc.treeBackgroundScale && vc.treeBackgroundScale !== 1 ? `scale(${vc.treeBackgroundScale})` : undefined
                 }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={bgWatermarkUrl}
-                  alt="Marca d'água"
-                  className="w-full h-full object-contain filter drop-shadow-sm scale-105"
-                />
-              </div>
-            ) : (
-              <div 
-                className="text-center font-black tracking-widest text-slate-900 uppercase text-7xl"
-                style={{ opacity: 0.08 }}
-              >
+              />
+            </div>
+          ) : (
+            <div 
+              className="absolute inset-0 pointer-events-none flex items-center justify-center z-0"
+              style={{ opacity: 0.08 }}
+            >
+              <div className="text-center font-black tracking-widest text-slate-900 uppercase text-7xl select-none">
                 {criatorioNome}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* ======================================================== */}
           {/* TOPO: LOGO + DADOS CRIATÓRIO + TÍTULO/FAIXA + QR CODE    */}
