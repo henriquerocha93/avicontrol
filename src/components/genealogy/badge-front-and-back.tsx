@@ -157,21 +157,11 @@ export function BadgeFrontAndBack({
 
   const vc = activeTenant?.visualConfig || {}
   
-  // Parâmetros compactos na URL do QR Code para leitura instantânea no celular em 0ms (mesmo sem internet ou offline)
-  const queryParams = new URLSearchParams()
-  if (bird.ringNumber) queryParams.set('r', bird.ringNumber)
-  if (bird.name) queryParams.set('n', bird.name)
-  if (bird.species) queryParams.set('s', bird.species)
-  if (bird.sex) queryParams.set('x', bird.sex)
-  if (bird.birthDate) queryParams.set('d', bird.birthDate)
-  if (activeTenant?.name) queryParams.set('t', activeTenant.name)
-  if (activeTenant?.registryNumber) queryParams.set('c', activeTenant.registryNumber)
-  const qs = queryParams.toString() ? `?${queryParams.toString()}` : ''
-
+  // URL limpa e ultra-curta para o QR Code ser lido instantaneamente por qualquer celular
   const baseUrl = typeof window !== 'undefined' && window.location.origin 
     ? window.location.origin 
     : 'https://www.birdpro.com.br'
-  const publicUrl = `${baseUrl}/ave/${encodeURIComponent(bird.id)}${qs}`
+  const publicUrl = `${baseUrl}/ave/${encodeURIComponent(bird.id || bird.ringNumber || '01')}`
 
   // Paletas das caixas
   const maleBg = vc.maleColor || vc.colorPaletteMale || '#dbeafe'
@@ -387,8 +377,8 @@ export function BadgeFrontAndBack({
         <div className="relative z-10 pt-1.5 border-t border-slate-300 flex items-center justify-between gap-2">
           {/* QR Code de Autenticidade - Grande Visibilidade para Câmera do Celular */}
           <div className="shrink-0 flex items-center gap-1.5 bg-white p-1 rounded-lg border-2 border-slate-700 shadow-xs">
-            <div className="w-[62px] h-[62px] bg-white flex items-center justify-center shrink-0">
-              <QRCodeSVG value={publicUrl} size={60} level="M" />
+            <div className="w-[64px] h-[64px] bg-white flex items-center justify-center shrink-0">
+              <QRCodeSVG value={publicUrl} size={62} level="M" includeMargin={true} />
             </div>
             <div className="flex flex-col justify-center leading-none text-left pr-0.5">
               <span className="text-[6.5px] font-black uppercase tracking-wider text-emerald-700 block">ESCANEAR</span>
