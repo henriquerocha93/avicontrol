@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { Printer, X, Download, FileText, Sparkles, Check, ExternalLink, ChevronDown, Moon, Sun, Award, QrCode, Ruler } from 'lucide-react'
 import { Bird, Tenant } from '@/types'
@@ -23,6 +24,22 @@ export function PrintPedigreeModal({
   bird: initialBird,
   tenant: initialTenant
 }: PrintPedigreeModalProps) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('is-printing-modal-open')
+    } else {
+      document.body.classList.remove('is-printing-modal-open')
+    }
+    return () => {
+      document.body.classList.remove('is-printing-modal-open')
+    }
+  }, [isOpen])
+
   const allBirds = db.getBirds()
   const [selectedBirdId, setSelectedBirdId] = useState<string>(initialBird?.id || '')
   const [activeBird, setActiveBird] = useState<Bird>(initialBird)
@@ -68,7 +85,7 @@ export function PrintPedigreeModal({
     }
   }
 
-  if (!isOpen || !activeBird) return null
+  if (!isOpen || !mounted || !activeBird || typeof document === 'undefined') return null
 
   // Resolve dynamic ancestors from DB
   const pedigree = resolvePedigreeTree(activeBird, allBirds)
@@ -95,8 +112,8 @@ export function PrintPedigreeModal({
   const logoImage = vc.treeLogoUrl || vc.labelLogoUrl || vc.logoGenealogyUrl || tenant?.logoUrl || ''
   const profileImage = activeBird.photoUrl || vc.labelLogoUrl || vc.treeLogoUrl || ''
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white">
+  const modalContent = (
+    <div id="print-modal-root" className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto print:static print:inset-auto print:overflow-visible print:bg-transparent print:p-0 print:m-0">
       
       {/* Modal Container */}
       <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-[1360px] border border-slate-700 overflow-hidden flex flex-col my-auto animate-scale-in print:border-0 print:shadow-none print:bg-white">
@@ -681,4 +698,6 @@ export function PrintPedigreeModal({
 
     </div>
   )
+
+  return createPortal(modalContent, document.body)
 }

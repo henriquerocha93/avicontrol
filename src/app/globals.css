@@ -552,6 +552,27 @@ html.dark .shadow-xl {
     height: auto !important;
   }
 
+  /* QUANDO UM MODAL DE IMPRESSÃO ESTIVER ABERTO (CRACHÁ OU PEDIGREE): */
+  /* Oculta 100% de toda a aplicação (dashboard, listas de aves, botões, tabelas) */
+  body.is-printing-modal-open > *:not(#print-modal-root),
+  body:has(#print-modal-root) > *:not(#print-modal-root) {
+    display: none !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #print-modal-root {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
   aside, header, nav, .print\:hidden {
     display: none !important;
   }

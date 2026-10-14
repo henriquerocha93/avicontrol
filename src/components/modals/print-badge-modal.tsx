@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Printer, X, Ruler } from 'lucide-react'
 import { Bird, Tenant } from '@/types'
 import { db } from '@/lib/db'
@@ -19,6 +20,22 @@ export function PrintBadgeModal({
   bird,
   tenant
 }: PrintBadgeModalProps) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('is-printing-modal-open')
+    } else {
+      document.body.classList.remove('is-printing-modal-open')
+    }
+    return () => {
+      document.body.classList.remove('is-printing-modal-open')
+    }
+  }, [isOpen])
+
   // Padrão: Imprimir SOMENTE 1 CRACHÁ (Frente Oficial com QR Code)
   const [printMode, setPrintMode] = useState<'FRONT_ONLY' | 'BACK_ONLY' | 'BOTH'>('FRONT_ONLY')
   const [badgeWidthCm, setBadgeWidthCm] = useState<number>(9)
@@ -64,14 +81,14 @@ export function PrintBadgeModal({
     }
   }, [tenant, bird?.tenantId, isOpen])
 
-  if (!isOpen) return null
+  if (!isOpen || !mounted || typeof document === 'undefined') return null
 
   const handlePrint = () => {
     window.print()
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto print:static print:inset-auto print:overflow-visible print:bg-transparent print:p-0 print:m-0">
+  const modalContent = (
+    <div id="print-modal-root" className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto print:static print:inset-auto print:overflow-visible print:bg-transparent print:p-0 print:m-0">
       {/* Modal Box */}
       <div className="bg-slate-900 rounded-lg shadow-2xl w-full max-w-[1240px] border border-slate-700 overflow-hidden flex flex-col my-auto animate-scale-in print:border-0 print:shadow-none print:bg-transparent print:w-auto print:max-w-none print:m-0 print:overflow-visible">
         
@@ -273,7 +290,7 @@ export function PrintBadgeModal({
               <Printer className="w-4 h-4" />
               <span>
                 {printMode === 'FRONT_ONLY' 
-                  ? 'Imprimir Somente Frente (PDF)' 
+                  ? 'Imprimir 1 Crachá (PDF)' 
                   : printMode === 'BACK_ONLY' 
                     ? 'Imprimir Somente Verso (PDF)' 
                     : 'Imprimir Frente e Verso (PDF)'}
@@ -285,4 +302,6 @@ export function PrintBadgeModal({
       </div>
     </div>
   )
+
+  return createPortal(modalContent, document.body)
 }
