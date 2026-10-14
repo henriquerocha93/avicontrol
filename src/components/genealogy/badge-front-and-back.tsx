@@ -394,7 +394,7 @@ export function BadgeFrontAndBack({
                 className="flex-1 px-1.5 py-0.5 border-r border-slate-400 truncate"
                 style={{ backgroundColor: fieldBg, color: fieldText }}
               >
-                {activeTenant?.name || 'Criatório Autorizado'}
+                {activeTenant?.ownerName || activeTenant?.name || 'Criador Responsável'}
               </div>
               <div 
                 className="px-2 py-0.5 shrink-0 font-mono"

@@ -244,6 +244,7 @@ export interface TenantVisualConfig {
 export interface Tenant {
   id: string;
   name: string;
+  ownerName?: string;
   slug: string;
   document: string; // CPF or CNPJ
   cpfCnpj?: string;

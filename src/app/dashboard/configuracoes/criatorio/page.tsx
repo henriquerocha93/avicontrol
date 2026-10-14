@@ -87,6 +87,7 @@ export default function CriatorioConfigPage() {
       const sanitized: Tenant = {
         ...t,
         name: t.name?.includes('Madruguinha') ? '' : (t.name || ''),
+        ownerName: t.ownerName || '',
         slug: t.slug === 'madruguinha' ? '' : (t.slug || ''),
         document: (t.document === '022.034.960-61' || t.document === '000.000.000-00') ? '' : (t.document || ''),
         email: t.email === 'luis.henrique.schreiber@hotmail.com' ? '' : (t.email || ''),
@@ -567,9 +568,41 @@ export default function CriatorioConfigPage() {
           </div>
 
           <div className="space-y-4">
-            {/* Linha 1 */}
+            {/* Linha 1: Nome do Criatório e Nome Completo do Proprietário */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-              <div className="md:col-span-3">
+              <div className="md:col-span-6">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nome do Criatório<span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={tenant.name || ''}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  placeholder="Ex: Criatório Rocha"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+                />
+              </div>
+
+              <div className="md:col-span-6">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nome Completo do Proprietário / Criador Responsável<span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={tenant.ownerName || ''}
+                  onChange={(e) => handleInputChange('ownerName', e.target.value)}
+                  placeholder="Ex: Luis Henrique Rocha"
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
+                />
+                <span className="text-[10px] text-slate-500 block mt-0.5">
+                  Este nome é exibido no campo &ldquo;Proprietário / Criador Responsável&rdquo; do crachá e nos certificados oficiais.
+                </span>
+              </div>
+            </div>
+
+            {/* Linha 2: Documentos e Registro */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+              <div className="md:col-span-4">
                 <label className="block text-xs text-slate-600 mb-1">
                   CNPJ/CPF<span className="text-red-500">*</span>
                 </label>
@@ -585,21 +618,8 @@ export default function CriatorioConfigPage() {
                 />
               </div>
 
-              <div className="md:col-span-5">
-                <label className="block text-xs text-slate-600 mb-1">
-                  Nome do Criatório<span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={tenant.name || ''}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  placeholder="Ex: Criatório Canto & Fibra"
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-xs text-slate-600 mb-1">Registro</label>
+              <div className="md:col-span-4">
+                <label className="block text-xs text-slate-600 mb-1">Registro (CTF / SISPASS / FOB)</label>
                 <input
                   type="text"
                   value={tenant.registryNumber || tenant.registrationNumber || ''}
@@ -607,12 +627,12 @@ export default function CriatorioConfigPage() {
                     handleInputChange('registryNumber', e.target.value)
                     handleInputChange('registrationNumber', e.target.value)
                   }}
-                  placeholder="Ex: 1234567"
+                  placeholder="Ex: 8730080"
                   className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded text-slate-800 focus:outline-none focus:border-[#00c853]"
                 />
               </div>
 
-              <div className="md:col-span-2">
+              <div className="md:col-span-4">
                 <label className="block text-xs text-slate-600 mb-1">Data Licença</label>
                 <DateManualInput
                   value={tenant.licenseDate || ''}
