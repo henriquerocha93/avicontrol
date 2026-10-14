@@ -115,31 +115,71 @@ export function BadgeFrontAndBack({
   // 1 cm = 37.79527559 px a 96 DPI
   const scaleX = ((validWidthCm * 37.79527559) / 540).toFixed(6)
   const scaleY = ((validHeightCm * 37.79527559) / 360).toFixed(6)
-  const getLatestTenant = () => {
+  const getLatestTenant = (): Tenant => {
     const fromDb = db.getTenant(tenant?.id || bird?.tenantId) || db.getTenant()
-    const mergedVc = {
-      ...(fromDb?.visualConfig || {}),
-      ...(tenant?.visualConfig || {})
+    const dbVc = fromDb?.visualConfig || {}
+    const propVc = tenant?.visualConfig || {}
+
+    // Une visualConfigs preservando estritamente valores válidos/preenchidos
+    const mergedVc: TenantVisualConfig = {
+      ...propVc,
+      ...dbVc
     }
-    const vcKeys = [
-      'labelLogoUrl', 'treeLogoUrl',
-      'labelFrontBackgroundUrl', 'labelBackBackgroundUrl', 'treeBackgroundUrl',
-      'fieldBgColor', 'colorField', 'fieldTextColor', 'colorTextField',
+
+    const priorityKeys: (keyof TenantVisualConfig)[] = [
+      'labelFrontBackgroundUrl', 'bgLabelFrontUrl',
+      'labelBackBackgroundUrl', 'bgLabelBackUrl',
+      'treeBackgroundUrl', 'bgGenealogyUrl',
+      'labelLogoUrl', 'logoLabelUrl',
+      'treeLogoUrl', 'logoGenealogyUrl',
+      'labelFrontScale', 'labelBackScale', 'treeBackgroundScale', 'labelLogoScale', 'treeLogoScale',
       'maleColor', 'colorPaletteMale', 'femaleColor', 'colorPaletteFemale',
       'maleTextColor', 'colorTextPaletteMale', 'femaleTextColor', 'colorTextPaletteFemale',
-      'labelFrontTextColor', 'textColorLabelFront', 'labelBackTextColor', 'textColorLabelBack',
-      'labelFrontScale', 'labelBackScale', 'labelLogoScale', 'treeLogoScale', 'treeBackgroundScale'
-    ] as const
-    for (const k of vcKeys) {
-      if (tenant?.visualConfig?.[k]) {
-        (mergedVc as any)[k] = tenant.visualConfig[k]
+      'fieldBgColor', 'colorField', 'fieldTextColor', 'colorTextField',
+      'labelFrontTextColor', 'textColorLabelFront', 'labelBackTextColor', 'textColorLabelBack'
+    ]
+
+    for (const key of priorityKeys) {
+      if (dbVc[key] !== undefined && dbVc[key] !== '') {
+        (mergedVc as any)[key] = dbVc[key]
+      } else if (propVc[key] !== undefined && propVc[key] !== '') {
+        (mergedVc as any)[key] = propVc[key]
       }
     }
-    return {
-      ...fromDb,
-      ...(tenant && (tenant.id || tenant.name) ? tenant : {}),
-      visualConfig: mergedVc
+
+    // Fundo universal: se o criador salvou imagem em qualquer campo de fundo, propaga automaticamente
+    const universalBg = 
+      mergedVc.labelFrontBackgroundUrl || 
+      mergedVc.bgLabelFrontUrl || 
+      mergedVc.treeBackgroundUrl || 
+      mergedVc.bgGenealogyUrl || 
+      mergedVc.labelBackBackgroundUrl || 
+      mergedVc.bgLabelBackUrl || 
+      fromDb?.coverUrl || 
+      tenant?.coverUrl || 
+      ''
+
+    if (universalBg) {
+      if (!mergedVc.labelFrontBackgroundUrl && !mergedVc.bgLabelFrontUrl) {
+        mergedVc.labelFrontBackgroundUrl = universalBg
+        mergedVc.bgLabelFrontUrl = universalBg
+      }
+      if (!mergedVc.labelBackBackgroundUrl && !mergedVc.bgLabelBackUrl) {
+        mergedVc.labelBackBackgroundUrl = universalBg
+        mergedVc.bgLabelBackUrl = universalBg
+      }
+      if (!mergedVc.treeBackgroundUrl && !mergedVc.bgGenealogyUrl) {
+        mergedVc.treeBackgroundUrl = universalBg
+        mergedVc.bgGenealogyUrl = universalBg
+      }
     }
+
+    return {
+      ...(tenant && (tenant.id || tenant.name) ? tenant : {}),
+      ...(fromDb || {}),
+      ownerName: fromDb?.ownerName || tenant?.ownerName || '',
+      visualConfig: mergedVc
+    } as Tenant
   }
 
   const [activeTenant, setActiveTenant] = useState<Tenant>(getLatestTenant)
@@ -151,7 +191,11 @@ export function BadgeFrontAndBack({
     }
     if (typeof window !== 'undefined') {
       window.addEventListener('birdpro_db_updated', handleUpdate)
-      return () => window.removeEventListener('birdpro_db_updated', handleUpdate)
+      window.addEventListener('storage', handleUpdate)
+      return () => {
+        window.removeEventListener('birdpro_db_updated', handleUpdate)
+        window.removeEventListener('storage', handleUpdate)
+      }
     }
   }, [tenant, bird?.tenantId])
 
@@ -176,9 +220,20 @@ export function BadgeFrontAndBack({
   const labelBackText = vc.labelBackTextColor || vc.textColorLabelBack || '#475569'
 
   // Imagens com resolução inteligente de fallback entre todos os campos de imagem do criatório
-  const logoImage = vc.labelLogoUrl || vc.treeLogoUrl || activeTenant?.logoUrl || ''
-  const frontBg = vc.labelFrontBackgroundUrl || vc.treeBackgroundUrl || ''
-  const backBg = vc.labelBackBackgroundUrl || vc.labelFrontBackgroundUrl || vc.treeBackgroundUrl || ''
+  const logoImage = vc.labelLogoUrl || vc.logoLabelUrl || vc.treeLogoUrl || vc.logoGenealogyUrl || activeTenant?.logoUrl || ''
+  
+  const universalBg = 
+    vc.labelFrontBackgroundUrl || 
+    vc.bgLabelFrontUrl || 
+    vc.treeBackgroundUrl || 
+    vc.bgGenealogyUrl || 
+    vc.labelBackBackgroundUrl || 
+    vc.bgLabelBackUrl || 
+    activeTenant?.coverUrl || 
+    ''
+
+  const frontBg = vc.labelFrontBackgroundUrl || vc.bgLabelFrontUrl || universalBg
+  const backBg = vc.labelBackBackgroundUrl || vc.bgLabelBackUrl || vc.labelFrontBackgroundUrl || vc.bgLabelFrontUrl || universalBg
 
   // Genealogia completa com padrão INDEFINIDO / INDEFINIDA caso algum parentesco não seja informado
   const formatAncestorName = (name?: string | null, isMale = true) => {

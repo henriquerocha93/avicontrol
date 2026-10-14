@@ -905,14 +905,54 @@ class DataService {
     }
 
     if (idx >= 0) {
+      const existingVc = this.state.tenants[idx].visualConfig || {};
+      const incomingVc = tenant.visualConfig || {};
+      const mergedVc = {
+        ...existingVc,
+        ...incomingVc
+      };
+
+      // Unifica automaticamente qualquer imagem de fundo para todos os crachás e árvores
+      const universalBg = 
+        mergedVc.labelFrontBackgroundUrl || 
+        mergedVc.bgLabelFrontUrl || 
+        mergedVc.treeBackgroundUrl || 
+        mergedVc.bgGenealogyUrl || 
+        mergedVc.labelBackBackgroundUrl || 
+        mergedVc.bgLabelBackUrl || 
+        tenant.coverUrl || 
+        this.state.tenants[idx].coverUrl || 
+        '';
+
+      if (universalBg) {
+        if (!mergedVc.labelFrontBackgroundUrl) mergedVc.labelFrontBackgroundUrl = universalBg;
+        if (!mergedVc.bgLabelFrontUrl) mergedVc.bgLabelFrontUrl = universalBg;
+        if (!mergedVc.labelBackBackgroundUrl) mergedVc.labelBackBackgroundUrl = universalBg;
+        if (!mergedVc.bgLabelBackUrl) mergedVc.bgLabelBackUrl = universalBg;
+        if (!mergedVc.treeBackgroundUrl) mergedVc.treeBackgroundUrl = universalBg;
+        if (!mergedVc.bgGenealogyUrl) mergedVc.bgGenealogyUrl = universalBg;
+      }
+
       this.state.tenants[idx] = {
         ...this.state.tenants[idx],
         ...tenant,
-        visualConfig: {
-          ...(this.state.tenants[idx].visualConfig || {}),
-          ...(tenant.visualConfig || {})
-        }
+        coverUrl: this.state.tenants[idx].coverUrl || tenant.coverUrl || universalBg || undefined,
+        visualConfig: mergedVc
       };
+
+      // Propaga a configuração visual e backgrounds para todos os criatórios locais (ex: demo ou aves vinculadas)
+      for (let i = 0; i < this.state.tenants.length; i++) {
+        if (i !== idx) {
+          this.state.tenants[i].visualConfig = {
+            ...(this.state.tenants[i].visualConfig || {}),
+            ...mergedVc
+          };
+          if (universalBg && !this.state.tenants[i].coverUrl) {
+            this.state.tenants[i].coverUrl = universalBg;
+          }
+        }
+      }
+
       this.logAction(this.state.tenants[idx].id, 'UPDATE_TENANT', 'CONFIGURACOES', `Dados do criatório atualizados`);
       this.saveToStorage();
       if (this.isBrowser) {

@@ -129,8 +129,8 @@ export function PrintPedigreeModal({
   }
 
   const vc = tenant?.visualConfig || {}
-  const bgImage = vc.treeBackgroundUrl || vc.bgGenealogyUrl || ''
-  const logoImage = vc.treeLogoUrl || vc.labelLogoUrl || vc.logoGenealogyUrl || tenant?.logoUrl || ''
+  const bgImage = vc.treeBackgroundUrl || vc.bgGenealogyUrl || vc.labelFrontBackgroundUrl || vc.bgLabelFrontUrl || vc.labelBackBackgroundUrl || tenant?.coverUrl || ''
+  const logoImage = vc.treeLogoUrl || vc.labelLogoUrl || vc.logoGenealogyUrl || vc.logoLabelUrl || tenant?.logoUrl || ''
   const profileImage = activeBird.photoUrl || vc.labelLogoUrl || vc.treeLogoUrl || ''
 
   const modalContent = (

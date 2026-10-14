@@ -42,31 +42,70 @@ export function PrintBadgeModal({
   const [badgeWidthCm, setBadgeWidthCm] = useState<number>(9)
   const [badgeHeightCm, setBadgeHeightCm] = useState<number>(6)
 
-  const getLatestTenant = () => {
+  const getLatestTenant = (): Tenant => {
     const fromDb = db.getTenant(tenant?.id || bird?.tenantId) || db.getTenant()
-    const mergedVc = {
-      ...(fromDb?.visualConfig || {}),
-      ...(tenant?.visualConfig || {})
+    const dbVc = fromDb?.visualConfig || {}
+    const propVc = tenant?.visualConfig || {}
+
+    const mergedVc: TenantVisualConfig = {
+      ...propVc,
+      ...dbVc
     }
-    const vcKeys = [
-      'labelLogoUrl', 'treeLogoUrl',
-      'labelFrontBackgroundUrl', 'labelBackBackgroundUrl', 'treeBackgroundUrl',
-      'fieldBgColor', 'colorField', 'fieldTextColor', 'colorTextField',
+
+    const priorityKeys: (keyof TenantVisualConfig)[] = [
+      'labelFrontBackgroundUrl', 'bgLabelFrontUrl',
+      'labelBackBackgroundUrl', 'bgLabelBackUrl',
+      'treeBackgroundUrl', 'bgGenealogyUrl',
+      'labelLogoUrl', 'logoLabelUrl',
+      'treeLogoUrl', 'logoGenealogyUrl',
+      'labelFrontScale', 'labelBackScale', 'treeBackgroundScale', 'labelLogoScale', 'treeLogoScale',
       'maleColor', 'colorPaletteMale', 'femaleColor', 'colorPaletteFemale',
       'maleTextColor', 'colorTextPaletteMale', 'femaleTextColor', 'colorTextPaletteFemale',
-      'labelFrontTextColor', 'textColorLabelFront', 'labelBackTextColor', 'textColorLabelBack',
-      'labelFrontScale', 'labelBackScale', 'labelLogoScale', 'treeLogoScale', 'treeBackgroundScale'
-    ] as const
-    for (const k of vcKeys) {
-      if (tenant?.visualConfig?.[k]) {
-        (mergedVc as any)[k] = tenant.visualConfig[k]
+      'fieldBgColor', 'colorField', 'fieldTextColor', 'colorTextField',
+      'labelFrontTextColor', 'textColorLabelFront', 'labelBackTextColor', 'textColorLabelBack'
+    ]
+
+    for (const key of priorityKeys) {
+      if (dbVc[key] !== undefined && dbVc[key] !== '') {
+        (mergedVc as any)[key] = dbVc[key]
+      } else if (propVc[key] !== undefined && propVc[key] !== '') {
+        (mergedVc as any)[key] = propVc[key]
       }
     }
-    return {
-      ...fromDb,
-      ...(tenant && (tenant.id || tenant.name) ? tenant : {}),
-      visualConfig: mergedVc
+
+    // Fundo universal automático
+    const universalBg = 
+      mergedVc.labelFrontBackgroundUrl || 
+      mergedVc.bgLabelFrontUrl || 
+      mergedVc.treeBackgroundUrl || 
+      mergedVc.bgGenealogyUrl || 
+      mergedVc.labelBackBackgroundUrl || 
+      mergedVc.bgLabelBackUrl || 
+      fromDb?.coverUrl || 
+      tenant?.coverUrl || 
+      ''
+
+    if (universalBg) {
+      if (!mergedVc.labelFrontBackgroundUrl && !mergedVc.bgLabelFrontUrl) {
+        mergedVc.labelFrontBackgroundUrl = universalBg
+        mergedVc.bgLabelFrontUrl = universalBg
+      }
+      if (!mergedVc.labelBackBackgroundUrl && !mergedVc.bgLabelBackUrl) {
+        mergedVc.labelBackBackgroundUrl = universalBg
+        mergedVc.bgLabelBackUrl = universalBg
+      }
+      if (!mergedVc.treeBackgroundUrl && !mergedVc.bgGenealogyUrl) {
+        mergedVc.treeBackgroundUrl = universalBg
+        mergedVc.bgGenealogyUrl = universalBg
+      }
     }
+
+    return {
+      ...(tenant && (tenant.id || tenant.name) ? tenant : {}),
+      ...(fromDb || {}),
+      ownerName: fromDb?.ownerName || tenant?.ownerName || '',
+      visualConfig: mergedVc
+    } as Tenant
   }
 
   const [activeTenant, setActiveTenant] = useState<Tenant>(getLatestTenant)
@@ -79,7 +118,11 @@ export function PrintBadgeModal({
     }
     if (typeof window !== 'undefined') {
       window.addEventListener('birdpro_db_updated', handleUpdate)
-      return () => window.removeEventListener('birdpro_db_updated', handleUpdate)
+      window.addEventListener('storage', handleUpdate)
+      return () => {
+        window.removeEventListener('birdpro_db_updated', handleUpdate)
+        window.removeEventListener('storage', handleUpdate)
+      }
     }
   }, [tenant, bird?.tenantId, isOpen])
 

@@ -169,7 +169,17 @@ export default function CriatorioConfigPage() {
         printCertificateTitle: 'printTitleCertificate',
         printTitleCertificate: 'printCertificateTitle',
         printUpToSixthGeneration: 'printSixthGeneration',
-        printSixthGeneration: 'printUpToSixthGeneration'
+        printSixthGeneration: 'printUpToSixthGeneration',
+        treeBackgroundUrl: 'bgGenealogyUrl',
+        bgGenealogyUrl: 'treeBackgroundUrl',
+        labelFrontBackgroundUrl: 'bgLabelFrontUrl',
+        bgLabelFrontUrl: 'labelFrontBackgroundUrl',
+        labelBackBackgroundUrl: 'bgLabelBackUrl',
+        bgLabelBackUrl: 'labelBackBackgroundUrl',
+        treeLogoUrl: 'logoGenealogyUrl',
+        logoGenealogyUrl: 'treeLogoUrl',
+        labelLogoUrl: 'logoLabelUrl',
+        logoLabelUrl: 'labelLogoUrl'
       }
 
       const alias = aliasMap[field as string]
@@ -177,8 +187,31 @@ export default function CriatorioConfigPage() {
         (updatedVc as any)[alias] = value
       }
 
+      // Propagação inteligente de background: se o usuário altera um background, preenche automaticamente os outros se vazios
+      const isBgField = [
+        'labelFrontBackgroundUrl', 'bgLabelFrontUrl',
+        'labelBackBackgroundUrl', 'bgLabelBackUrl',
+        'treeBackgroundUrl', 'bgGenealogyUrl'
+      ].includes(field as string)
+
+      if (isBgField && value) {
+        if (!updatedVc.labelFrontBackgroundUrl && !updatedVc.bgLabelFrontUrl) {
+          updatedVc.labelFrontBackgroundUrl = value
+          updatedVc.bgLabelFrontUrl = value
+        }
+        if (!updatedVc.labelBackBackgroundUrl && !updatedVc.bgLabelBackUrl) {
+          updatedVc.labelBackBackgroundUrl = value
+          updatedVc.bgLabelBackUrl = value
+        }
+        if (!updatedVc.treeBackgroundUrl && !updatedVc.bgGenealogyUrl) {
+          updatedVc.treeBackgroundUrl = value
+          updatedVc.bgGenealogyUrl = value
+        }
+      }
+
       return {
         ...prev,
+        coverUrl: prev.coverUrl || (isBgField && value ? value : prev.coverUrl),
         visualConfig: updatedVc
       }
     })
@@ -347,8 +380,10 @@ export default function CriatorioConfigPage() {
       if (dataUrl) {
         const img = new Image()
         img.onload = () => {
-          const maxWidth = 1200
-          const maxHeight = 1200
+          // Otimização de dimensões: crachás e telas não precisam de mais de 1000px
+          // Reduz drásticamente o tamanho do base64 evitando estouro de limite no Firestore
+          const maxWidth = 1000
+          const maxHeight = 750
           let width = img.width
           let height = img.height
 
@@ -368,14 +403,14 @@ export default function CriatorioConfigPage() {
           const ctx = canvas.getContext('2d')
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height)
-            const compressed = canvas.toDataURL('image/jpeg', 0.88)
+            const compressed = canvas.toDataURL('image/jpeg', 0.80)
             handleVisualConfigChange(field, compressed)
           } else {
             handleVisualConfigChange(field, dataUrl)
           }
           setIsProcessingImage(false)
           setIsImageModalOpen(false)
-          showToast('Imagem importada com sucesso!')
+          showToast('Imagem importada e otimizada com sucesso!')
         }
         img.onerror = () => {
           handleVisualConfigChange(field, dataUrl)
@@ -387,6 +422,27 @@ export default function CriatorioConfigPage() {
       }
     }
     reader.readAsDataURL(file)
+  }
+
+  const handleApplyBackgroundToAll = (bgUrl: string) => {
+    if (!bgUrl) return
+    setTenant(prev => {
+      if (!prev) return null
+      return {
+        ...prev,
+        coverUrl: bgUrl,
+        visualConfig: {
+          ...(prev.visualConfig || {}),
+          labelFrontBackgroundUrl: bgUrl,
+          bgLabelFrontUrl: bgUrl,
+          labelBackBackgroundUrl: bgUrl,
+          bgLabelBackUrl: bgUrl,
+          treeBackgroundUrl: bgUrl,
+          bgGenealogyUrl: bgUrl
+        }
+      }
+    })
+    showToast('✓ Fundo aplicado com sucesso em todos os crachás e certificados!')
   }
 
   const handleOpenImageSelector = (field: keyof TenantVisualConfig, title: string) => {
@@ -439,14 +495,43 @@ export default function CriatorioConfigPage() {
       }
     }
 
+    // Garante que o background seja unificado para todos os crachás e certificados
+    const currentVc = tenant.visualConfig || {}
+    const universalBg = 
+      currentVc.labelFrontBackgroundUrl || 
+      currentVc.bgLabelFrontUrl || 
+      currentVc.treeBackgroundUrl || 
+      currentVc.bgGenealogyUrl || 
+      currentVc.labelBackBackgroundUrl || 
+      currentVc.bgLabelBackUrl || 
+      tenant.coverUrl || 
+      ''
+
+    const unifiedVc: TenantVisualConfig = {
+      ...currentVc,
+      labelFrontBackgroundUrl: currentVc.labelFrontBackgroundUrl || currentVc.bgLabelFrontUrl || universalBg,
+      bgLabelFrontUrl: currentVc.labelFrontBackgroundUrl || currentVc.bgLabelFrontUrl || universalBg,
+      labelBackBackgroundUrl: currentVc.labelBackBackgroundUrl || currentVc.bgLabelBackUrl || currentVc.labelFrontBackgroundUrl || universalBg,
+      bgLabelBackUrl: currentVc.labelBackBackgroundUrl || currentVc.bgLabelBackUrl || currentVc.labelFrontBackgroundUrl || universalBg,
+      treeBackgroundUrl: currentVc.treeBackgroundUrl || currentVc.bgGenealogyUrl || universalBg,
+      bgGenealogyUrl: currentVc.treeBackgroundUrl || currentVc.bgGenealogyUrl || universalBg,
+    }
+
+    const tenantToSave: Tenant = {
+      ...tenant,
+      coverUrl: tenant.coverUrl || universalBg || undefined,
+      visualConfig: unifiedVc
+    }
+
     setTimeout(() => {
-      db.saveTenant(tenant)
+      const savedTenant = db.saveTenant(tenantToSave)
+      setTenant(savedTenant || tenantToSave)
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('birdpro_db_updated'))
       }
       setIsSaving(false)
       setSavedSuccess(true)
-      showToast('Configurações e cores salvas com sucesso!')
+      showToast('Configurações salvas e aplicadas em todos os crachás com sucesso!')
       setTimeout(() => setSavedSuccess(false), 4500)
     }, 150)
   }
@@ -1322,6 +1407,17 @@ export default function CriatorioConfigPage() {
                   Limpar
                 </button>
               </div>
+
+              {vc.treeBackgroundUrl && (
+                <button
+                  type="button"
+                  onClick={() => handleApplyBackgroundToAll(vc.treeBackgroundUrl!)}
+                  className="w-full py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10.5px] font-bold rounded flex items-center justify-center gap-1.5 transition shadow-2xs"
+                  title="Aplica este fundo automaticamente na frente e no verso de todos os crachás e certificados"
+                >
+                  <span>⚡ Aplicar em TODOS os crachás</span>
+                </button>
+              )}
             </div>
 
             {/* Box 3: Etiqueta */}
@@ -1470,6 +1566,17 @@ export default function CriatorioConfigPage() {
                   Limpar
                 </button>
               </div>
+
+              {vc.labelFrontBackgroundUrl && (
+                <button
+                  type="button"
+                  onClick={() => handleApplyBackgroundToAll(vc.labelFrontBackgroundUrl!)}
+                  className="w-full py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10.5px] font-bold rounded flex items-center justify-center gap-1.5 transition shadow-2xs"
+                  title="Aplica este fundo automaticamente em todos os crachás (Frente e Verso) e certificados"
+                >
+                  <span>⚡ Aplicar em TODOS os crachás</span>
+                </button>
+              )}
             </div>
 
             {/* Box 5: Background Etiqueta Verso */}
@@ -1544,6 +1651,17 @@ export default function CriatorioConfigPage() {
                   Limpar
                 </button>
               </div>
+
+              {vc.labelBackBackgroundUrl && (
+                <button
+                  type="button"
+                  onClick={() => handleApplyBackgroundToAll(vc.labelBackBackgroundUrl!)}
+                  className="w-full py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10.5px] font-bold rounded flex items-center justify-center gap-1.5 transition shadow-2xs"
+                  title="Aplica este fundo automaticamente em todos os crachás (Frente e Verso) e certificados"
+                >
+                  <span>⚡ Aplicar em TODOS os crachás</span>
+                </button>
+              )}
             </div>
 
           </div>

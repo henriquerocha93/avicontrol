@@ -179,9 +179,17 @@ function PublicCertificateContent() {
           if (cloudBird && !isCancelled) {
             setBird(cloudBird)
 
-            // Se o pássaro já tiver o tenantSnapshot embutido, aplica imediatamente em 0ms
+            // Se o pássaro já tiver o tenantSnapshot embutido, aplica com merge inteligente do criatório mais recente
             if ((cloudBird as any).tenantSnapshot) {
-              setTenant((cloudBird as any).tenantSnapshot)
+              const snapT = (cloudBird as any).tenantSnapshot
+              const localT = db.getTenant(cloudBird.tenantId) || db.getTenant()
+              setTenant({
+                ...snapT,
+                visualConfig: {
+                  ...(snapT?.visualConfig || {}),
+                  ...(localT?.visualConfig || {})
+                }
+              })
             }
 
             // Busca os dados e imagens do criatório na nuvem com timeout independente
@@ -193,7 +201,14 @@ function PublicCertificateContent() {
                 timeoutTenant
               ])
               if (cloudTenant && !isCancelled) {
-                setTenant(cloudTenant)
+                setTenant(prev => ({
+                  ...(prev || {}),
+                  ...cloudTenant,
+                  visualConfig: {
+                    ...(prev?.visualConfig || {}),
+                    ...(cloudTenant.visualConfig || {})
+                  }
+                }))
               }
             }
           }

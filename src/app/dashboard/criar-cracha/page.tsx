@@ -33,13 +33,17 @@ export default function CriarCrachaPage() {
 
   React.useEffect(() => {
     const syncTenant = () => {
-      const t = db.getTenant(tenant?.id);
+      const t = db.getTenant(tenant?.id) || db.getTenant();
       if (t) setActiveTenant(t);
     };
     syncTenant();
     if (typeof window !== 'undefined') {
       window.addEventListener('birdpro_db_updated', syncTenant);
-      return () => window.removeEventListener('birdpro_db_updated', syncTenant);
+      window.addEventListener('storage', syncTenant);
+      return () => {
+        window.removeEventListener('birdpro_db_updated', syncTenant);
+        window.removeEventListener('storage', syncTenant);
+      };
     }
   }, [tenant?.id]);
 

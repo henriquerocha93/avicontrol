@@ -27,7 +27,7 @@ export function PedigreeCertificateArouca({
 
   // Logos & Imagens do Criatório
   const logoUrl = vc.treeLogoUrl || vc.labelLogoUrl || vc.logoGenealogyUrl || tenant?.logoUrl || ''
-  const bgWatermarkUrl = vc.treeBackgroundUrl || vc.bgGenealogyUrl || vc.labelFrontBackgroundUrl || logoUrl || ''
+  const bgWatermarkUrl = vc.treeBackgroundUrl || vc.bgGenealogyUrl || vc.labelFrontBackgroundUrl || vc.bgLabelFrontUrl || vc.labelBackBackgroundUrl || vc.bgLabelBackUrl || tenant?.coverUrl || logoUrl || ''
 
   // Paleta de Cores Padrão Oficial (Amarelo Canário Ouro & Preto Profundo conforme modelo de referência)
   const maleBg = vc.maleColor || vc.colorPaletteMale || '#ffd600'

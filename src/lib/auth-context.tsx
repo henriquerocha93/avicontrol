@@ -64,23 +64,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       db.syncCloudData().catch(e => console.warn('Cloud sync error:', e));
 
       const handleDbUpdate = () => {
+        let tid: string | undefined;
         const raw = localStorage.getItem('birdpro_current_user');
         if (raw) {
           try {
             const current = JSON.parse(raw);
-            if (current?.tenantId) {
-              const freshTenant = db.getTenant(current.tenantId);
-              if (freshTenant) {
-                setTenant(prev => {
-                  if (!prev) return freshTenant;
-                  if (JSON.stringify(prev) === JSON.stringify(freshTenant)) {
-                    return prev;
-                  }
-                  return freshTenant;
-                });
-              }
-            }
+            if (current?.tenantId) tid = current.tenantId;
           } catch {}
+        }
+        const freshTenant = db.getTenant(tid) || db.getTenant();
+        if (freshTenant) {
+          setTenant(prev => {
+            if (!prev) return freshTenant;
+            if (JSON.stringify(prev) === JSON.stringify(freshTenant)) {
+              return prev;
+            }
+            return freshTenant;
+          });
         }
       };
 
