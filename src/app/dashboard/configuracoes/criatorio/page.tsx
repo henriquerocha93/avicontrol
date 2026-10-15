@@ -187,29 +187,15 @@ export default function CriatorioConfigPage() {
         (updatedVc as any)[alias] = value
       }
 
-      // Propagação inteligente de background: se o usuário altera um background, preenche automaticamente os outros se vazios
-      const isBgField = [
-        'labelFrontBackgroundUrl', 'bgLabelFrontUrl',
-        'labelBackBackgroundUrl', 'bgLabelBackUrl',
-        'treeBackgroundUrl', 'bgGenealogyUrl'
-      ].includes(field as string)
-
-      if (isBgField && value) {
-        if (!updatedVc.labelFrontBackgroundUrl && !updatedVc.bgLabelFrontUrl) {
-          updatedVc.labelFrontBackgroundUrl = value
-          updatedVc.bgLabelFrontUrl = value
-        }
+      // Propagação inteligente de background: se o usuário altera o fundo da frente do crachá, sugere para o verso
+      const isCrachaBgField = ['labelFrontBackgroundUrl', 'bgLabelFrontUrl'].includes(field as string)
+      if (isCrachaBgField && value) {
         if (!updatedVc.labelBackBackgroundUrl && !updatedVc.bgLabelBackUrl) {
           updatedVc.labelBackBackgroundUrl = value
-          updatedVc.bgLabelBackUrl = value
-        }
-        if (!updatedVc.treeBackgroundUrl && !updatedVc.bgGenealogyUrl) {
-          updatedVc.treeBackgroundUrl = value
-          updatedVc.bgGenealogyUrl = value
         }
       }
 
-      // Propagação inteligente de logo/foto: sincroniza entre etiqueta, árvore e criatório
+      // Propagação inteligente de logo/foto: sincroniza entre etiqueta e árvore se vazios
       const isLogoField = [
         'treeLogoUrl', 'logoGenealogyUrl',
         'labelLogoUrl', 'logoLabelUrl'
@@ -218,11 +204,9 @@ export default function CriatorioConfigPage() {
       if (isLogoField && value) {
         if (!updatedVc.treeLogoUrl && !updatedVc.logoGenealogyUrl) {
           updatedVc.treeLogoUrl = value
-          updatedVc.logoGenealogyUrl = value
         }
         if (!updatedVc.labelLogoUrl && !updatedVc.logoLabelUrl) {
           updatedVc.labelLogoUrl = value
-          updatedVc.logoLabelUrl = value
         }
       }
 
@@ -397,15 +381,30 @@ export default function CriatorioConfigPage() {
       if (dataUrl) {
         const img = new Image()
         img.onload = () => {
-          // Otimização de dimensões: crachás e telas não precisam de mais de 1000px
-          // Reduz drásticamente o tamanho do base64 evitando estouro de limite no Firestore
-          const maxWidth = 1000
-          const maxHeight = 750
+          // Otimização inteligente de dimensões e compressão especializada
+          // Evita estouro de cota no LocalStorage (5MB) e no Firestore (1MB), garantindo que os fundos nunca sumam
+          const isCrachaBg = field === 'labelFrontBackgroundUrl' || field === 'labelBackBackgroundUrl' || field === 'bgLabelFrontUrl' || field === 'bgLabelBackUrl'
+          const isLogo = field === 'labelLogoUrl' || field === 'logoLabelUrl' || field === 'treeLogoUrl' || field === 'logoGenealogyUrl' || (field as string) === 'logoUrl'
+
+          let maxWidth = 800
+          let maxHeight = 550
+          let quality = 0.70
+
+          if (isCrachaBg) {
+            maxWidth = 640
+            maxHeight = 420
+            quality = 0.65
+          } else if (isLogo) {
+            maxWidth = 280
+            maxHeight = 280
+            quality = 0.75
+          }
+
           let width = img.width
           let height = img.height
 
           if (width > maxWidth || height > maxHeight) {
-            if (width > height) {
+            if (width / maxWidth > height / maxHeight) {
               height = Math.round((height * maxWidth) / width)
               width = maxWidth
             } else {
@@ -420,7 +419,7 @@ export default function CriatorioConfigPage() {
           const ctx = canvas.getContext('2d')
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height)
-            const compressed = canvas.toDataURL('image/jpeg', 0.80)
+            const compressed = canvas.toDataURL('image/jpeg', quality)
             handleVisualConfigChange(field, compressed)
           } else {
             handleVisualConfigChange(field, dataUrl)
@@ -497,11 +496,31 @@ export default function CriatorioConfigPage() {
 
   const handleClearImage = (field: keyof TenantVisualConfig) => {
     handleVisualConfigChange(field, '')
-    if (field === 'treeLogoUrl') handleVisualConfigChange('treeLogoScale', 1)
-    if (field === 'treeBackgroundUrl') handleVisualConfigChange('treeBackgroundScale', 1)
-    if (field === 'labelLogoUrl') handleVisualConfigChange('labelLogoScale', 1)
-    if (field === 'labelFrontBackgroundUrl') handleVisualConfigChange('labelFrontScale', 1)
-    if (field === 'labelBackBackgroundUrl') handleVisualConfigChange('labelBackScale', 1)
+    if (field === 'treeLogoUrl' || field === 'logoGenealogyUrl') {
+      handleVisualConfigChange('treeLogoUrl', '')
+      handleVisualConfigChange('logoGenealogyUrl', '')
+      handleVisualConfigChange('treeLogoScale', 1)
+    }
+    if (field === 'treeBackgroundUrl' || field === 'bgGenealogyUrl') {
+      handleVisualConfigChange('treeBackgroundUrl', '')
+      handleVisualConfigChange('bgGenealogyUrl', '')
+      handleVisualConfigChange('treeBackgroundScale', 1)
+    }
+    if (field === 'labelLogoUrl' || field === 'logoLabelUrl') {
+      handleVisualConfigChange('labelLogoUrl', '')
+      handleVisualConfigChange('logoLabelUrl', '')
+      handleVisualConfigChange('labelLogoScale', 1)
+    }
+    if (field === 'labelFrontBackgroundUrl' || field === 'bgLabelFrontUrl') {
+      handleVisualConfigChange('labelFrontBackgroundUrl', '')
+      handleVisualConfigChange('bgLabelFrontUrl', '')
+      handleVisualConfigChange('labelFrontScale', 1)
+    }
+    if (field === 'labelBackBackgroundUrl' || field === 'bgLabelBackUrl') {
+      handleVisualConfigChange('labelBackBackgroundUrl', '')
+      handleVisualConfigChange('bgLabelBackUrl', '')
+      handleVisualConfigChange('labelBackScale', 1)
+    }
     showToast('Imagem removida.')
   }
 
@@ -530,43 +549,43 @@ export default function CriatorioConfigPage() {
       }
     }
 
-    // Garante que o background seja unificado para todos os crachás e certificados
-    const currentVc = tenant.visualConfig || {}
-    const universalBg = 
-      currentVc.labelFrontBackgroundUrl || 
-      currentVc.bgLabelFrontUrl || 
-      currentVc.treeBackgroundUrl || 
-      currentVc.bgGenealogyUrl || 
-      currentVc.labelBackBackgroundUrl || 
-      currentVc.bgLabelBackUrl || 
-      ''
+    const isBad = (url?: string | null) => {
+      if (!url || typeof url !== 'string') return true
+      return (
+        url.includes('1544717305') ||
+        url.includes('1534528741') ||
+        url.includes('53994a69daeb') ||
+        url.includes('2782549b5136')
+      )
+    }
 
-    // Garante que a logo/foto de perfil seja unificada para todos os crachás e certificados
-    const universalLogo = 
-      currentVc.labelLogoUrl || 
-      currentVc.logoLabelUrl || 
-      currentVc.treeLogoUrl || 
-      currentVc.logoGenealogyUrl || 
-      tenant.logoUrl || 
-      ''
+    const currentVc = tenant.visualConfig || {}
+
+    const frontBg = isBad(currentVc.labelFrontBackgroundUrl || currentVc.bgLabelFrontUrl) ? '' : (currentVc.labelFrontBackgroundUrl || currentVc.bgLabelFrontUrl || '')
+    const backBg = isBad(currentVc.labelBackBackgroundUrl || currentVc.bgLabelBackUrl) ? '' : (currentVc.labelBackBackgroundUrl || currentVc.bgLabelBackUrl || frontBg || '')
+    const treeBg = isBad(currentVc.treeBackgroundUrl || currentVc.bgGenealogyUrl) ? '' : (currentVc.treeBackgroundUrl || currentVc.bgGenealogyUrl || '')
+
+    const labelLogo = isBad(currentVc.labelLogoUrl || currentVc.logoLabelUrl || tenant.logoUrl) ? '' : (currentVc.labelLogoUrl || currentVc.logoLabelUrl || tenant.logoUrl || '')
+    const treeLogo = isBad(currentVc.treeLogoUrl || currentVc.logoGenealogyUrl) ? '' : (currentVc.treeLogoUrl || currentVc.logoGenealogyUrl || labelLogo || '')
 
     const unifiedVc: TenantVisualConfig = {
       ...currentVc,
-      labelFrontBackgroundUrl: currentVc.labelFrontBackgroundUrl || currentVc.bgLabelFrontUrl || universalBg,
-      bgLabelFrontUrl: currentVc.labelFrontBackgroundUrl || currentVc.bgLabelFrontUrl || universalBg,
-      labelBackBackgroundUrl: currentVc.labelBackBackgroundUrl || currentVc.bgLabelBackUrl || currentVc.labelFrontBackgroundUrl || universalBg,
-      bgLabelBackUrl: currentVc.labelBackBackgroundUrl || currentVc.bgLabelBackUrl || currentVc.labelFrontBackgroundUrl || universalBg,
-      treeBackgroundUrl: currentVc.treeBackgroundUrl || currentVc.bgGenealogyUrl || universalBg,
-      bgGenealogyUrl: currentVc.treeBackgroundUrl || currentVc.bgGenealogyUrl || universalBg,
-      labelLogoUrl: currentVc.labelLogoUrl || currentVc.logoLabelUrl || universalLogo,
-      logoLabelUrl: currentVc.labelLogoUrl || currentVc.logoLabelUrl || universalLogo,
-      treeLogoUrl: currentVc.treeLogoUrl || currentVc.logoGenealogyUrl || universalLogo,
-      logoGenealogyUrl: currentVc.treeLogoUrl || currentVc.logoGenealogyUrl || universalLogo,
+      labelFrontBackgroundUrl: frontBg,
+      labelBackBackgroundUrl: backBg,
+      treeBackgroundUrl: treeBg,
+      labelLogoUrl: labelLogo,
+      treeLogoUrl: treeLogo,
+      // Limpa chaves duplicadas desnecessárias se forem base64 para manter o documento minúsculo no Firestore e localStorage
+      bgLabelFrontUrl: frontBg.startsWith('data:') ? '' : frontBg,
+      bgLabelBackUrl: backBg.startsWith('data:') ? '' : backBg,
+      bgGenealogyUrl: treeBg.startsWith('data:') ? '' : treeBg,
+      logoLabelUrl: labelLogo.startsWith('data:') ? '' : labelLogo,
+      logoGenealogyUrl: treeLogo.startsWith('data:') ? '' : treeLogo
     }
 
     const tenantToSave: Tenant = {
       ...tenant,
-      logoUrl: tenant.logoUrl || universalLogo || undefined,
+      logoUrl: labelLogo || undefined,
       visualConfig: unifiedVc
     }
 

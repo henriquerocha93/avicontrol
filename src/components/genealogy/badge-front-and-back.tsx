@@ -147,40 +147,36 @@ export function BadgeFrontAndBack({
       }
     }
 
-    // Fundo universal: se o criador salvou imagem em qualquer campo de fundo, propaga automaticamente
-    const universalBg = 
-      mergedVc.labelFrontBackgroundUrl || 
-      mergedVc.bgLabelFrontUrl || 
-      mergedVc.treeBackgroundUrl || 
-      mergedVc.bgGenealogyUrl || 
-      mergedVc.labelBackBackgroundUrl || 
-      mergedVc.bgLabelBackUrl || 
-      ''
+    const isBadImg = (url?: string | null) => {
+      if (!url || typeof url !== 'string') return true
+      return (
+        url.includes('1544717305') ||
+        url.includes('1534528741') ||
+        url.includes('53994a69daeb') ||
+        url.includes('2782549b5136')
+      )
+    }
 
-    if (universalBg) {
-      if (!mergedVc.labelFrontBackgroundUrl && !mergedVc.bgLabelFrontUrl) {
-        mergedVc.labelFrontBackgroundUrl = universalBg
-        mergedVc.bgLabelFrontUrl = universalBg
-      }
-      if (!mergedVc.labelBackBackgroundUrl && !mergedVc.bgLabelBackUrl) {
-        mergedVc.labelBackBackgroundUrl = universalBg
-        mergedVc.bgLabelBackUrl = universalBg
-      }
-      if (!mergedVc.treeBackgroundUrl && !mergedVc.bgGenealogyUrl) {
-        mergedVc.treeBackgroundUrl = universalBg
-        mergedVc.bgGenealogyUrl = universalBg
-      }
+    // Fundo dos crachás
+    const crachaBg = !isBadImg(mergedVc.labelFrontBackgroundUrl) 
+      ? mergedVc.labelFrontBackgroundUrl 
+      : (!isBadImg(mergedVc.bgLabelFrontUrl) ? mergedVc.bgLabelFrontUrl : '')
+
+    if (crachaBg) {
+      if (!mergedVc.labelFrontBackgroundUrl) mergedVc.labelFrontBackgroundUrl = crachaBg
+      if (!mergedVc.labelBackBackgroundUrl) mergedVc.labelBackBackgroundUrl = crachaBg
     }
 
     // Logo/Foto de perfil universal: se o criador salvou logo em qualquer campo, propaga automaticamente
-    const universalLogo = 
+    const candidateLogo = 
       mergedVc.labelLogoUrl || 
       mergedVc.logoLabelUrl || 
       mergedVc.treeLogoUrl || 
-      mergedVc.logoGenealogyUrl || 
       fromDb?.logoUrl || 
       tenant?.logoUrl || 
       ''
+
+    const universalLogo = isBadImg(candidateLogo) ? '' : candidateLogo
 
     if (universalLogo) {
       if (!mergedVc.labelLogoUrl && !mergedVc.logoLabelUrl) {
@@ -239,29 +235,26 @@ export function BadgeFrontAndBack({
   const labelFrontText = vc.labelFrontTextColor || vc.textColorLabelFront || '#475569'
   const labelBackText = vc.labelBackTextColor || vc.textColorLabelBack || '#475569'
 
-  // Logo ou foto de perfil com resolução inteligente e fallback completo
-  const universalLogo = 
-    vc.labelLogoUrl || 
-    vc.logoLabelUrl || 
-    vc.treeLogoUrl || 
-    vc.logoGenealogyUrl || 
-    activeTenant?.logoUrl || 
-    tenant?.logoUrl || 
-    ''
+  const sanitizeImage = (url?: string | null) => {
+    if (!url || typeof url !== 'string') return ''
+    if (
+      url.includes('1544717305') ||
+      url.includes('1534528741') ||
+      url.includes('53994a69daeb') ||
+      url.includes('2782549b5136')
+    ) {
+      return ''
+    }
+    return url
+  }
 
-  const logoImage = bird?.photoUrl || vc.labelLogoUrl || vc.logoLabelUrl || universalLogo || ''
+  // Logo ou foto de perfil
+  const rawLogo = bird?.photoUrl || vc.labelLogoUrl || vc.logoLabelUrl || activeTenant?.logoUrl || tenant?.logoUrl || ''
+  const logoImage = sanitizeImage(rawLogo)
   
-  const universalBg = 
-    vc.labelFrontBackgroundUrl || 
-    vc.bgLabelFrontUrl || 
-    vc.treeBackgroundUrl || 
-    vc.bgGenealogyUrl || 
-    vc.labelBackBackgroundUrl || 
-    vc.bgLabelBackUrl || 
-    ''
-
-  const frontBg = vc.labelFrontBackgroundUrl || vc.bgLabelFrontUrl || universalBg
-  const backBg = vc.labelBackBackgroundUrl || vc.bgLabelBackUrl || vc.labelFrontBackgroundUrl || vc.bgLabelFrontUrl || universalBg
+  // Fundo oficial dos crachás (Frente e Verso) - nunca usa fotos padrão de terceiros
+  const frontBg = sanitizeImage(vc.labelFrontBackgroundUrl || vc.bgLabelFrontUrl || '')
+  const backBg = sanitizeImage(vc.labelBackBackgroundUrl || vc.bgLabelBackUrl || frontBg || '')
 
   // Genealogia completa com padrão INDEFINIDO / INDEFINIDA caso algum parentesco não seja informado
   const formatAncestorName = (name?: string | null, isMale = true) => {

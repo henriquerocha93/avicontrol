@@ -73,40 +73,36 @@ export function PrintBadgeModal({
       }
     }
 
-    // Fundo universal automático
-    const universalBg = 
-      mergedVc.labelFrontBackgroundUrl || 
-      mergedVc.bgLabelFrontUrl || 
-      mergedVc.treeBackgroundUrl || 
-      mergedVc.bgGenealogyUrl || 
-      mergedVc.labelBackBackgroundUrl || 
-      mergedVc.bgLabelBackUrl || 
-      ''
-
-    if (universalBg) {
-      if (!mergedVc.labelFrontBackgroundUrl && !mergedVc.bgLabelFrontUrl) {
-        mergedVc.labelFrontBackgroundUrl = universalBg
-        mergedVc.bgLabelFrontUrl = universalBg
-      }
-      if (!mergedVc.labelBackBackgroundUrl && !mergedVc.bgLabelBackUrl) {
-        mergedVc.labelBackBackgroundUrl = universalBg
-        mergedVc.bgLabelBackUrl = universalBg
-      }
-      if (!mergedVc.treeBackgroundUrl && !mergedVc.bgGenealogyUrl) {
-        mergedVc.treeBackgroundUrl = universalBg
-        mergedVc.bgGenealogyUrl = universalBg
-      }
+    const isBadImg = (url?: string | null) => {
+      if (!url || typeof url !== 'string') return true
+      return (
+        url.includes('1544717305') ||
+        url.includes('1534528741') ||
+        url.includes('53994a69daeb') ||
+        url.includes('2782549b5136')
+      )
     }
 
-    // Logo/Foto de perfil universal automático
-    const universalLogo = 
+    // Fundo dos crachás
+    const crachaBg = !isBadImg(mergedVc.labelFrontBackgroundUrl)
+      ? mergedVc.labelFrontBackgroundUrl
+      : (!isBadImg(mergedVc.bgLabelFrontUrl) ? mergedVc.bgLabelFrontUrl : '')
+
+    if (crachaBg) {
+      if (!mergedVc.labelFrontBackgroundUrl) mergedVc.labelFrontBackgroundUrl = crachaBg
+      if (!mergedVc.labelBackBackgroundUrl) mergedVc.labelBackBackgroundUrl = crachaBg
+    }
+
+    // Logo / Foto
+    const candidateLogo = 
       mergedVc.labelLogoUrl || 
       mergedVc.logoLabelUrl || 
       mergedVc.treeLogoUrl || 
-      mergedVc.logoGenealogyUrl || 
       fromDb?.logoUrl || 
       tenant?.logoUrl || 
       ''
+
+    const universalLogo = isBadImg(candidateLogo) ? '' : candidateLogo
 
     if (universalLogo) {
       if (!mergedVc.labelLogoUrl && !mergedVc.logoLabelUrl) {

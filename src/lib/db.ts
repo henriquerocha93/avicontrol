@@ -49,6 +49,65 @@ interface DatabaseState {
   breedingObservations: BreedingObservation[];
 }
 
+export function isDemoWomanOrUnsplashPerson(url?: string | null): boolean {
+  if (!url || typeof url !== 'string') return false;
+  return (
+    url.includes('1544717305') ||
+    url.includes('1534528741') ||
+    url.includes('53994a69daeb') ||
+    url.includes('2782549b5136')
+  );
+}
+
+export function sanitizeTenantVisualConfig(vc?: TenantVisualConfig | null): TenantVisualConfig {
+  const cleanVc: TenantVisualConfig = { ...(vc || {}) };
+  const allImageKeys: (keyof TenantVisualConfig)[] = [
+    'treeBackgroundUrl', 'bgGenealogyUrl',
+    'labelFrontBackgroundUrl', 'bgLabelFrontUrl',
+    'labelBackBackgroundUrl', 'bgLabelBackUrl',
+    'treeLogoUrl', 'logoGenealogyUrl',
+    'labelLogoUrl', 'logoLabelUrl'
+  ];
+
+  for (const k of allImageKeys) {
+    if (isDemoWomanOrUnsplashPerson(cleanVc[k] as string)) {
+      (cleanVc as any)[k] = '';
+    }
+  }
+  return cleanVc;
+}
+
+export function sanitizeTenantData(tenant: Tenant): { tenant: Tenant; wasCleaned: boolean } {
+  let wasCleaned = false;
+  if (!tenant) return { tenant, wasCleaned };
+
+  const cleanVc = sanitizeTenantVisualConfig(tenant.visualConfig);
+  if (JSON.stringify(cleanVc) !== JSON.stringify(tenant.visualConfig || {})) {
+    wasCleaned = true;
+  }
+
+  let cleanLogo = tenant.logoUrl;
+  if (isDemoWomanOrUnsplashPerson(cleanLogo)) {
+    cleanLogo = '';
+    wasCleaned = true;
+  }
+
+  let cleanCover = tenant.coverUrl;
+  if (isDemoWomanOrUnsplashPerson(cleanCover)) {
+    cleanCover = '';
+    wasCleaned = true;
+  }
+
+  const cleanedTenant: Tenant = {
+    ...tenant,
+    logoUrl: cleanLogo,
+    coverUrl: cleanCover,
+    visualConfig: cleanVc
+  };
+
+  return { tenant: cleanedTenant, wasCleaned };
+}
+
 const STORAGE_KEY = 'birdpro_production_db_v2';
 
 class DataService {
@@ -234,26 +293,20 @@ class DataService {
               t.city === 'IJUI' ||
               t.registryNumber === '4719754' ||
               t.website?.includes('madruguinha') ||
-              (t.coverUrl && (t.coverUrl.includes('1544717305') || t.coverUrl.includes('1534528741'))) ||
-              (t.logoUrl && (t.logoUrl.includes('1544717305') || t.logoUrl.includes('1534528741')));
+              isDemoWomanOrUnsplashPerson(t.coverUrl) ||
+              isDemoWomanOrUnsplashPerson(t.logoUrl);
 
             if (isDemo || t.address === 'Rua das violetas' || t.city === 'IJUI' || t.registryNumber === '4719754') {
               hadDemoFields = true;
             }
 
-            const cleanVc = { ...(t.visualConfig || {}) };
-            for (const k of ['treeBackgroundUrl', 'bgGenealogyUrl', 'labelFrontBackgroundUrl', 'bgLabelFrontUrl', 'labelBackBackgroundUrl', 'bgLabelBackUrl', 'treeLogoUrl', 'labelLogoUrl']) {
-              if ((cleanVc as any)[k] && ((cleanVc as any)[k].includes('1544717305') || (cleanVc as any)[k].includes('1534528741'))) {
-                (cleanVc as any)[k] = '';
-                hadDemoFields = true;
-              }
+            const { tenant: cleaned, wasCleaned } = sanitizeTenantData(t);
+            if (wasCleaned) {
+              hadDemoFields = true;
             }
 
-            const cleanCover = (t.coverUrl && (t.coverUrl.includes('1544717305') || t.coverUrl.includes('1534528741'))) ? '' : t.coverUrl;
-            const cleanLogo = (t.logoUrl && (t.logoUrl.includes('1544717305') || t.logoUrl.includes('1534528741'))) ? '' : t.logoUrl;
-
             return {
-              ...t,
+              ...cleaned,
               name: t.name?.includes('Madruguinha') ? '' : t.name,
               slug: t.slug === 'madruguinha' ? '' : t.slug,
               document: (t.document === '022.034.960-61' || t.document === '000.000.000-00') ? '' : t.document,
@@ -271,9 +324,6 @@ class DataService {
               facebook: t.facebook?.includes('MADRUGUINHA') ? '' : t.facebook,
               instagram: t.instagram?.includes('MADRUGUINHA') ? '' : t.instagram,
               website: (t.website?.includes('madruguinha') || t.website?.includes('Madruguinha')) ? '' : t.website,
-              coverUrl: cleanCover,
-              logoUrl: cleanLogo,
-              visualConfig: cleanVc,
               owners: (t.owners || []).filter(o => !o.name?.includes('Madruguinha') && !o.nickname?.includes('Madruguinha') && !o.name?.includes('Schreiber'))
             };
           });
@@ -556,15 +606,35 @@ class DataService {
             firebaseSync.deleteTenant(ct.id).catch(() => {});
             return;
           }
-          const idx = this.state.tenants.findIndex(t => t.id === ct.id);
+          const { tenant: cleanCt, wasCleaned } = sanitizeTenantData(ct);
+          if (wasCleaned && firebaseSync.isAvailable()) {
+            firebaseSync.saveTenant(cleanCt).catch(() => {});
+          }
+
+          const idx = this.state.tenants.findIndex(t => t.id === cleanCt.id);
           if (idx >= 0) {
-            const merged = { ...this.state.tenants[idx], ...ct };
+            const currentLocal = this.state.tenants[idx];
+            const mergedVc = sanitizeTenantVisualConfig({
+              ...(cleanCt.visualConfig || {}),
+              ...(currentLocal.visualConfig || {})
+            });
+            const merged: Tenant = {
+              ...cleanCt,
+              ...currentLocal,
+              logoUrl: currentLocal.logoUrl && !isDemoWomanOrUnsplashPerson(currentLocal.logoUrl)
+                ? currentLocal.logoUrl
+                : cleanCt.logoUrl,
+              coverUrl: currentLocal.coverUrl && !isDemoWomanOrUnsplashPerson(currentLocal.coverUrl)
+                ? currentLocal.coverUrl
+                : cleanCt.coverUrl,
+              visualConfig: mergedVc
+            };
             if (this.hashItem(this.state.tenants[idx]) !== this.hashItem(merged)) {
               this.state.tenants[idx] = merged;
               stateChanged = true;
             }
           } else {
-            this.state.tenants.unshift(ct);
+            this.state.tenants.unshift(cleanCt);
             stateChanged = true;
           }
         });
@@ -781,15 +851,35 @@ class DataService {
           }
 
           validLive.forEach(lt => {
-            const idx = this.state.tenants.findIndex(t => t.id === lt.id);
+            const { tenant: cleanLt, wasCleaned } = sanitizeTenantData(lt);
+            if (wasCleaned && firebaseSync.isAvailable()) {
+              firebaseSync.saveTenant(cleanLt).catch(() => {});
+            }
+
+            const idx = this.state.tenants.findIndex(t => t.id === cleanLt.id);
             if (idx >= 0) {
-              const merged = { ...this.state.tenants[idx], ...lt };
+              const currentLocal = this.state.tenants[idx];
+              const mergedVc = sanitizeTenantVisualConfig({
+                ...(cleanLt.visualConfig || {}),
+                ...(currentLocal.visualConfig || {})
+              });
+              const merged: Tenant = {
+                ...cleanLt,
+                ...currentLocal,
+                logoUrl: currentLocal.logoUrl && !isDemoWomanOrUnsplashPerson(currentLocal.logoUrl)
+                  ? currentLocal.logoUrl
+                  : cleanLt.logoUrl,
+                coverUrl: currentLocal.coverUrl && !isDemoWomanOrUnsplashPerson(currentLocal.coverUrl)
+                  ? currentLocal.coverUrl
+                  : cleanLt.coverUrl,
+                visualConfig: mergedVc
+              };
               if (this.hashItem(this.state.tenants[idx]) !== this.hashItem(merged)) {
                 this.state.tenants[idx] = merged;
                 changed = true;
               }
             } else {
-              this.state.tenants.unshift(lt);
+              this.state.tenants.unshift(cleanLt);
               changed = true;
             }
           });
@@ -896,11 +986,13 @@ class DataService {
       }
     }
     targetId = targetId || 'tenant-demo-01';
-    return (
+    const found = (
       this.state.tenants.find(t => t.id === targetId) ||
       this.state.tenants[0] ||
       INITIAL_TENANT
     );
+    const { tenant: cleanTenant } = sanitizeTenantData(found);
+    return cleanTenant;
   }
 
   updateTenant(tenant: Partial<Tenant>, id?: string): Tenant {
@@ -927,71 +1019,59 @@ class DataService {
     }
 
     if (idx >= 0) {
-      const existingVc = this.state.tenants[idx].visualConfig || {};
-      const incomingVc = tenant.visualConfig || {};
-      const mergedVc = {
+      const existingVc = sanitizeTenantVisualConfig(this.state.tenants[idx].visualConfig || {});
+      const incomingVc = sanitizeTenantVisualConfig(tenant.visualConfig || {});
+      const mergedVc: TenantVisualConfig = {
         ...existingVc,
         ...incomingVc
       };
 
-      const isUnsplashDemo = (url?: string) => {
-        if (!url) return false;
-        return url.includes('1544717305') || url.includes('1534528741');
-      };
+      // Fundo dos crachás
+      const frontBg = mergedVc.labelFrontBackgroundUrl || mergedVc.bgLabelFrontUrl || '';
+      const backBg = mergedVc.labelBackBackgroundUrl || mergedVc.bgLabelBackUrl || frontBg || '';
+      const treeBg = mergedVc.treeBackgroundUrl || mergedVc.bgGenealogyUrl || '';
 
-      // Remove qualquer imagem de mulher demo que possa ter vazado nas configurações
-      for (const k of ['treeBackgroundUrl', 'bgGenealogyUrl', 'labelFrontBackgroundUrl', 'bgLabelFrontUrl', 'labelBackBackgroundUrl', 'bgLabelBackUrl']) {
-        if (isUnsplashDemo((mergedVc as any)[k])) {
-          (mergedVc as any)[k] = '';
-        }
-      }
-      for (const k of ['treeLogoUrl', 'logoGenealogyUrl', 'labelLogoUrl', 'logoLabelUrl']) {
-        if (isUnsplashDemo((mergedVc as any)[k])) {
-          (mergedVc as any)[k] = '';
-        }
-      }
+      const cleanFrontBg = isDemoWomanOrUnsplashPerson(frontBg) ? '' : frontBg;
+      const cleanBackBg = isDemoWomanOrUnsplashPerson(backBg) ? '' : backBg;
+      const cleanTreeBg = isDemoWomanOrUnsplashPerson(treeBg) ? '' : treeBg;
 
-      // Unifica automaticamente qualquer imagem de fundo para todos os crachás e árvores (exclusivo para crachás, sem coverUrl)
-      const universalBg = 
-        mergedVc.labelFrontBackgroundUrl || 
-        mergedVc.bgLabelFrontUrl || 
-        mergedVc.treeBackgroundUrl || 
-        mergedVc.bgGenealogyUrl || 
-        mergedVc.labelBackBackgroundUrl || 
-        mergedVc.bgLabelBackUrl || 
-        '';
+      mergedVc.labelFrontBackgroundUrl = cleanFrontBg;
+      mergedVc.labelBackBackgroundUrl = cleanBackBg;
+      mergedVc.treeBackgroundUrl = cleanTreeBg;
 
-      if (universalBg) {
-        if (!mergedVc.labelFrontBackgroundUrl) mergedVc.labelFrontBackgroundUrl = universalBg;
-        if (!mergedVc.bgLabelFrontUrl) mergedVc.bgLabelFrontUrl = universalBg;
-        if (!mergedVc.labelBackBackgroundUrl) mergedVc.labelBackBackgroundUrl = universalBg;
-        if (!mergedVc.bgLabelBackUrl) mergedVc.bgLabelBackUrl = universalBg;
-        if (!mergedVc.treeBackgroundUrl) mergedVc.treeBackgroundUrl = universalBg;
-        if (!mergedVc.bgGenealogyUrl) mergedVc.bgGenealogyUrl = universalBg;
+      // Otimização crucial de armazenamento: limpa chaves de apelido legado se forem base64
+      // para NUNCA estourar o limite de 1MB do Firestore ou 5MB do LocalStorage
+      if (cleanFrontBg && cleanFrontBg.startsWith('data:')) {
+        mergedVc.bgLabelFrontUrl = '';
+      } else {
+        mergedVc.bgLabelFrontUrl = cleanFrontBg;
       }
 
-      // Unifica automaticamente qualquer logo/foto de perfil para todos os crachás e árvores
-      const cleanTenantLogo = isUnsplashDemo(tenant.logoUrl) ? '' : (tenant.logoUrl || '');
-      const cleanDbLogo = isUnsplashDemo(this.state.tenants[idx].logoUrl) ? '' : (this.state.tenants[idx].logoUrl || '');
-
-      const universalLogo = 
-        mergedVc.labelLogoUrl || 
-        mergedVc.logoLabelUrl || 
-        mergedVc.treeLogoUrl || 
-        mergedVc.logoGenealogyUrl || 
-        cleanTenantLogo || 
-        cleanDbLogo || 
-        '';
-
-      if (universalLogo) {
-        if (!mergedVc.labelLogoUrl) mergedVc.labelLogoUrl = universalLogo;
-        if (!mergedVc.logoLabelUrl) mergedVc.logoLabelUrl = universalLogo;
-        if (!mergedVc.treeLogoUrl) mergedVc.treeLogoUrl = universalLogo;
-        if (!mergedVc.logoGenealogyUrl) mergedVc.logoGenealogyUrl = universalLogo;
+      if (cleanBackBg && cleanBackBg.startsWith('data:')) {
+        mergedVc.bgLabelBackUrl = '';
+      } else {
+        mergedVc.bgLabelBackUrl = cleanBackBg;
       }
 
-      const cleanCover = isUnsplashDemo(tenant.coverUrl || this.state.tenants[idx].coverUrl) ? '' : (tenant.coverUrl || this.state.tenants[idx].coverUrl || undefined);
-      const cleanFinalLogo = isUnsplashDemo(tenant.logoUrl || this.state.tenants[idx].logoUrl) ? '' : (tenant.logoUrl || this.state.tenants[idx].logoUrl || universalLogo || undefined);
+      if (cleanTreeBg && cleanTreeBg.startsWith('data:')) {
+        mergedVc.bgGenealogyUrl = '';
+      } else {
+        mergedVc.bgGenealogyUrl = cleanTreeBg;
+      }
+
+      // Logo / Foto
+      const labelLogo = mergedVc.labelLogoUrl || mergedVc.logoLabelUrl || tenant.logoUrl || this.state.tenants[idx].logoUrl || '';
+      const cleanLabelLogo = isDemoWomanOrUnsplashPerson(labelLogo) ? '' : labelLogo;
+      mergedVc.labelLogoUrl = cleanLabelLogo;
+      mergedVc.logoLabelUrl = cleanLabelLogo.startsWith('data:') ? '' : cleanLabelLogo;
+
+      const treeLogo = mergedVc.treeLogoUrl || mergedVc.logoGenealogyUrl || cleanLabelLogo || '';
+      const cleanTreeLogo = isDemoWomanOrUnsplashPerson(treeLogo) ? '' : treeLogo;
+      mergedVc.treeLogoUrl = cleanTreeLogo;
+      mergedVc.logoGenealogyUrl = cleanTreeLogo.startsWith('data:') ? '' : cleanTreeLogo;
+
+      const cleanCover = isDemoWomanOrUnsplashPerson(tenant.coverUrl || this.state.tenants[idx].coverUrl) ? '' : (tenant.coverUrl || this.state.tenants[idx].coverUrl || undefined);
+      const cleanFinalLogo = isDemoWomanOrUnsplashPerson(tenant.logoUrl || this.state.tenants[idx].logoUrl) ? '' : (tenant.logoUrl || this.state.tenants[idx].logoUrl || cleanLabelLogo || undefined);
 
       this.state.tenants[idx] = {
         ...this.state.tenants[idx],
@@ -1001,16 +1081,15 @@ class DataService {
         visualConfig: mergedVc
       };
 
-      // Propaga a configuração visual, backgrounds e logos para todos os criatórios locais (ex: demo ou aves vinculadas)
+      // Propaga a configuração visual e logo para outros criatórios da sessão
       for (let i = 0; i < this.state.tenants.length; i++) {
         if (i !== idx) {
           this.state.tenants[i].visualConfig = {
             ...(this.state.tenants[i].visualConfig || {}),
             ...mergedVc
           };
-          // Propaga apenas campos visuais e logo
-          if (universalLogo && !this.state.tenants[i].logoUrl) {
-            this.state.tenants[i].logoUrl = universalLogo;
+          if (cleanFinalLogo && !this.state.tenants[i].logoUrl) {
+            this.state.tenants[i].logoUrl = cleanFinalLogo;
           }
         }
       }

@@ -50,7 +50,11 @@ function GenealogiaContent() {
     sync()
     if (typeof window !== 'undefined') {
       window.addEventListener('birdpro_db_updated', sync)
-      return () => window.removeEventListener('birdpro_db_updated', sync)
+      window.addEventListener('storage', sync)
+      return () => {
+        window.removeEventListener('birdpro_db_updated', sync)
+        window.removeEventListener('storage', sync)
+      }
     }
   }, [authTenant?.id])
 

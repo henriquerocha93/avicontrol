@@ -61,7 +61,28 @@ export function PrintPedigreeModal({
   const [badgeWidthCm, setBadgeWidthCm] = useState<number>(9)
   const [badgeHeightCm, setBadgeHeightCm] = useState<number>(6)
 
-  const tenant = initialTenant || db.getTenant(activeBird?.tenantId) || db.getTenant()
+  const getLatestTenant = (): Tenant => {
+    return initialTenant || db.getTenant(activeBird?.tenantId) || db.getTenant()
+  }
+
+  const [activeTenant, setActiveTenant] = useState<Tenant>(getLatestTenant)
+
+  useEffect(() => {
+    setActiveTenant(getLatestTenant())
+    const handleUpdate = () => {
+      setActiveTenant(getLatestTenant())
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('birdpro_db_updated', handleUpdate)
+      window.addEventListener('storage', handleUpdate)
+      return () => {
+        window.removeEventListener('birdpro_db_updated', handleUpdate)
+        window.removeEventListener('storage', handleUpdate)
+      }
+    }
+  }, [initialTenant, activeBird?.tenantId, isOpen])
+
+  const tenant = activeTenant
 
   useEffect(() => {
     if (initialBird) {
@@ -128,10 +149,26 @@ export function PrintPedigreeModal({
     }
   }
 
+  const sanitizeImage = (url?: string | null) => {
+    if (!url || typeof url !== 'string') return ''
+    if (
+      url.includes('1544717305') ||
+      url.includes('1534528741') ||
+      url.includes('53994a69daeb') ||
+      url.includes('2782549b5136')
+    ) {
+      return ''
+    }
+    return url
+  }
+
   const vc = tenant?.visualConfig || {}
-  const bgImage = vc.treeBackgroundUrl || vc.bgGenealogyUrl || vc.labelFrontBackgroundUrl || vc.bgLabelFrontUrl || vc.labelBackBackgroundUrl || tenant?.coverUrl || ''
-  const logoImage = vc.treeLogoUrl || vc.labelLogoUrl || vc.logoGenealogyUrl || vc.logoLabelUrl || tenant?.logoUrl || ''
-  const profileImage = activeBird.photoUrl || vc.labelLogoUrl || vc.treeLogoUrl || ''
+  const rawBg = vc.treeBackgroundUrl || vc.bgGenealogyUrl || ''
+  const bgImage = sanitizeImage(rawBg)
+  const rawLogo = vc.treeLogoUrl || vc.labelLogoUrl || vc.logoGenealogyUrl || tenant?.logoUrl || ''
+  const logoImage = sanitizeImage(rawLogo)
+  const rawProfile = activeBird.photoUrl || vc.labelLogoUrl || vc.treeLogoUrl || ''
+  const profileImage = sanitizeImage(rawProfile)
 
   const modalContent = (
     <div id="print-modal-root" className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto print:static print:inset-auto print:overflow-visible print:bg-transparent print:p-0 print:m-0">
