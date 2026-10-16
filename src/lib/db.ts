@@ -1,7 +1,7 @@
 import { 
   Bird, Cage, Ring, BreedingPair, Clutch, Egg, DiseaseRecord, Medication, 
   Treatment, SexingRecord, GenotypingRecord, BirdTimelineEvent, 
-  NotificationItem, Tenant, User, SupportTicket, BirdDocument, BirdPhoto, AuditLog,
+  NotificationItem, Tenant, TenantVisualConfig, User, SupportTicket, BirdDocument, BirdPhoto, AuditLog,
   SellerAffiliate, AffiliateCommission, AffiliatePayout, GlobalSystemConfig,
   CalendarEvent, NoteItem, AiLearnedInsight, UserReferralProgram, ReferredFriend, PlanType,
   CouponValidationResult, TournamentSession, BreedingObservation
@@ -75,6 +75,172 @@ export function sanitizeTenantVisualConfig(vc?: TenantVisualConfig | null): Tena
     }
   }
   return cleanVc;
+}
+
+const IMAGE_PAIR_KEYS: [keyof TenantVisualConfig, keyof TenantVisualConfig][] = [
+  ['treeBackgroundUrl', 'bgGenealogyUrl'],
+  ['labelFrontBackgroundUrl', 'bgLabelFrontUrl'],
+  ['labelBackBackgroundUrl', 'bgLabelBackUrl'],
+  ['treeLogoUrl', 'logoGenealogyUrl'],
+  ['labelLogoUrl', 'logoLabelUrl']
+];
+
+/**
+ * Mescla duas configurações visuais (local vs nuvem/anterior) garantindo que
+ * fundos (backgrounds) e logos NUNCA sejam apagados por strings vazias ('')
+ * a menos que o usuário tenha clicado explicitamente em "Limpar" (clearedFields).
+ */
+export function mergeVisualConfigs(
+  vcA?: TenantVisualConfig | null,
+  vcB?: TenantVisualConfig | null
+): TenantVisualConfig {
+  const a = sanitizeTenantVisualConfig(vcA);
+  const b = sanitizeTenantVisualConfig(vcB);
+
+  const timeA = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
+  const timeB = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
+  const bIsNewer = timeB >= timeA;
+
+  const older = bIsNewer ? a : b;
+  const newer = bIsNewer ? b : a;
+  const olderTime = bIsNewer ? timeA : timeB;
+  const newerTime = bIsNewer ? timeB : timeA;
+
+  const merged: TenantVisualConfig = { ...older };
+  for (const [k, v] of Object.entries(newer)) {
+    if (v !== undefined && v !== '') {
+      (merged as any)[k] = v;
+    }
+  }
+
+  // Merge clearedFields map
+  const clearedFields: Record<string, number> = {
+    ...(a.clearedFields || {}),
+    ...(b.clearedFields || {})
+  };
+  for (const k of Object.keys(clearedFields)) {
+    const tA = a.clearedFields?.[k] || 0;
+    const tB = b.clearedFields?.[k] || 0;
+    clearedFields[k] = Math.max(tA, tB);
+  }
+
+  for (const [primaryKey, aliasKey] of IMAGE_PAIR_KEYS) {
+    const rawOld = (older[primaryKey] || older[aliasKey] || '') as string;
+    const rawNew = (newer[primaryKey] || newer[aliasKey] || '') as string;
+    const valOld = isDemoWomanOrUnsplashPerson(rawOld) ? '' : rawOld;
+    const valNew = isDemoWomanOrUnsplashPerson(rawNew) ? '' : rawNew;
+
+    const clearTime = Math.max(
+      clearedFields[primaryKey as string] || 0,
+      clearedFields[aliasKey as string] || 0
+    );
+
+    let finalVal = '';
+    if (valNew && valOld) {
+      finalVal = valNew;
+    } else if (valNew) {
+      // Newer has an image — unless cleared AFTER newerTime, keep valNew
+      finalVal = clearTime > newerTime ? '' : valNew;
+    } else if (valOld) {
+      // Older has an image and newer is empty — only clear if explicitly cleared at or after olderTime
+      const wasExplicitlyCleared = clearTime > 0 && clearTime >= olderTime && !valNew;
+      finalVal = wasExplicitlyCleared ? '' : valOld;
+    }
+
+    // Se há imagem válida, limpa marcação antiga de clearedFields para essa chave
+    if (finalVal) {
+      delete clearedFields[primaryKey as string];
+      delete clearedFields[aliasKey as string];
+    }
+
+    (merged as any)[primaryKey] = finalVal;
+    // Evita duplicar strings base64 nas chaves legadas para economizar espaço no localStorage e Firestore
+    (merged as any)[aliasKey] = finalVal && finalVal.startsWith('data:') ? '' : finalVal;
+  }
+
+  // Se frente tem fundo e verso está vazio (e não foi limpo explicitamente), propaga frente para verso
+  const frontUrl = merged.labelFrontBackgroundUrl || '';
+  const backUrl = merged.labelBackBackgroundUrl || '';
+  const backClearedTime = Math.max(
+    clearedFields['labelBackBackgroundUrl'] || 0,
+    clearedFields['bgLabelBackUrl'] || 0
+  );
+  if (frontUrl && !backUrl && backClearedTime === 0) {
+    merged.labelBackBackgroundUrl = frontUrl;
+    merged.bgLabelBackUrl = frontUrl.startsWith('data:') ? '' : frontUrl;
+  }
+
+  if (Math.max(timeA, timeB) > 0) {
+    merged.updatedAt = Math.max(timeA, timeB);
+  }
+  if (Object.keys(clearedFields).length > 0) {
+    merged.clearedFields = clearedFields;
+  } else {
+    delete merged.clearedFields;
+  }
+
+  return merged;
+}
+
+const VISUAL_VAULT_GLOBAL_KEY = 'birdpro_visual_vault_v1';
+
+function hasAnyVisualImage(vc?: TenantVisualConfig | null): boolean {
+  if (!vc) return false;
+  return Boolean(
+    vc.treeBackgroundUrl || vc.bgGenealogyUrl ||
+    vc.labelFrontBackgroundUrl || vc.bgLabelFrontUrl ||
+    vc.labelBackBackgroundUrl || vc.bgLabelBackUrl ||
+    vc.treeLogoUrl || vc.logoGenealogyUrl ||
+    vc.labelLogoUrl || vc.logoLabelUrl ||
+    (vc.clearedFields && Object.keys(vc.clearedFields).length > 0)
+  );
+}
+
+export function saveVisualVault(tenantId: string, vc?: TenantVisualConfig | null, logoUrl?: string, coverUrl?: string): void {
+  if (typeof window === 'undefined' || !vc) return;
+  try {
+    const cleanVc = sanitizeTenantVisualConfig(vc);
+    if (!hasAnyVisualImage(cleanVc) && !cleanVc.updatedAt && !logoUrl && !coverUrl) return;
+    const existing = loadVisualVault(tenantId);
+    const mergedVc = mergeVisualConfigs(existing?.visualConfig, cleanVc);
+    const payload = {
+      tenantId: tenantId || 'tenant-demo-01',
+      visualConfig: mergedVc,
+      logoUrl: logoUrl || existing?.logoUrl || mergedVc.labelLogoUrl || mergedVc.treeLogoUrl || '',
+      coverUrl: coverUrl || existing?.coverUrl || '',
+      savedAt: Date.now()
+    };
+    const serialized = JSON.stringify(payload);
+    localStorage.setItem(VISUAL_VAULT_GLOBAL_KEY, serialized);
+    if (tenantId) {
+      localStorage.setItem(`birdpro_visual_vault_${tenantId}`, serialized);
+    }
+  } catch (e) {
+    console.warn('Visual vault save note:', e);
+  }
+}
+
+export function loadVisualVault(tenantId?: string): { visualConfig: TenantVisualConfig; logoUrl?: string; coverUrl?: string } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    let raw: string | null = null;
+    if (tenantId) {
+      raw = localStorage.getItem(`birdpro_visual_vault_${tenantId}`);
+    }
+    if (!raw) {
+      raw = localStorage.getItem(VISUAL_VAULT_GLOBAL_KEY);
+    }
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.visualConfig) {
+      return {
+        visualConfig: sanitizeTenantVisualConfig(parsed.visualConfig),
+        logoUrl: parsed.logoUrl,
+        coverUrl: parsed.coverUrl
+      };
+    }
+  } catch {}
+  return null;
 }
 
 export function sanitizeTenantData(tenant: Tenant): { tenant: Tenant; wasCleaned: boolean } {
@@ -332,6 +498,53 @@ class DataService {
           }
         }
 
+        // Restore/merge visualConfig from dedicated VisualVault for active tenant
+        if (this.state.tenants && this.state.tenants.length > 0) {
+          let activeTid = 'tenant-demo-01';
+          try {
+            const rawU = localStorage.getItem('birdpro_current_user');
+            if (rawU) {
+              const parsedU = JSON.parse(rawU);
+              if (parsedU?.tenantId) activeTid = parsedU.tenantId;
+            }
+          } catch {}
+
+          this.state.tenants = this.state.tenants.map(t => {
+            if (t.id === activeTid || t.id === 'tenant-demo-01') {
+              const vault = loadVisualVault(t.id);
+              if (vault?.visualConfig) {
+                const mergedVc = mergeVisualConfigs(t.visualConfig, vault.visualConfig);
+                return {
+                  ...t,
+                  logoUrl: t.logoUrl || vault.logoUrl || mergedVc.labelLogoUrl || mergedVc.treeLogoUrl || undefined,
+                  coverUrl: t.coverUrl || vault.coverUrl || undefined,
+                  visualConfig: mergedVc
+                };
+              }
+              if (hasAnyVisualImage(t.visualConfig)) {
+                saveVisualVault(t.id, t.visualConfig, t.logoUrl, t.coverUrl);
+              }
+            }
+            return t;
+          });
+        }
+
+        // Strip heavy duplicate tenantSnapshot.visualConfig from local birds array to save localStorage quota
+        if (this.state.birds && this.state.birds.length > 0) {
+          this.state.birds = this.state.birds.map((b: any) => {
+            if (b && b.tenantSnapshot) {
+              const { tenantSnapshot, ...rest } = b;
+              return rest;
+            }
+            return b;
+          });
+        }
+
+        // Cap auditLogs to prevent unbounded growth in localStorage
+        if (this.state.auditLogs && this.state.auditLogs.length > 100) {
+          this.state.auditLogs = this.state.auditLogs.slice(0, 100);
+        }
+
         // Auto-sanitize legacy demo globalConfig systemLogoUrl
         if (this.state.globalConfig?.systemLogoUrl && this.state.globalConfig.systemLogoUrl.includes('1544717305')) {
           this.state.globalConfig.systemLogoUrl = '/icon-512x512.png';
@@ -373,10 +586,58 @@ class DataService {
   private persist() {
     if (!this.isBrowser) return;
     try {
+      if (this.state.auditLogs && this.state.auditLogs.length > 100) {
+        this.state.auditLogs = this.state.auditLogs.slice(0, 100);
+      }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
       window.dispatchEvent(new Event('birdpro_db_updated'));
     } catch (e) {
-      console.error('Failed to persist db to storage', e);
+      console.warn('Storage quota reached, compacting non-essential logs and snapshots...', e);
+      try {
+        let activeTid = 'tenant-demo-01';
+        try {
+          const rawU = localStorage.getItem('birdpro_current_user');
+          if (rawU) {
+            const u = JSON.parse(rawU);
+            if (u?.tenantId) activeTid = u.tenantId;
+          }
+        } catch {}
+
+        // Save active tenant's visualConfig into dedicated vault first
+        const activeT = (this.state.tenants || []).find(t => t.id === activeTid) || this.state.tenants?.[0];
+        if (activeT) {
+          saveVisualVault(activeT.id, activeT.visualConfig, activeT.logoUrl, activeT.coverUrl);
+        }
+
+        // Compact heavy non-essential collections
+        this.state.auditLogs = (this.state.auditLogs || []).slice(0, 20);
+        this.state.timeline = (this.state.timeline || []).slice(0, 40);
+        this.state.notifications = (this.state.notifications || []).slice(0, 20);
+        this.state.birds = (this.state.birds || []).map((b: any) => {
+          if (b && b.tenantSnapshot) {
+            const { tenantSnapshot, ...rest } = b;
+            return rest;
+          }
+          return b;
+        });
+        // Strip duplicated base64 visualConfig from inactive tenants in local cache
+        this.state.tenants = (this.state.tenants || []).map(t => {
+          if (t.id !== activeTid && t.id !== 'tenant-demo-01' && t.visualConfig) {
+            const slimVc = { ...t.visualConfig };
+            for (const [pk, ak] of IMAGE_PAIR_KEYS) {
+              if (String(slimVc[pk] || '').startsWith('data:')) (slimVc as any)[pk] = '';
+              if (String(slimVc[ak] || '').startsWith('data:')) (slimVc as any)[ak] = '';
+            }
+            return { ...t, visualConfig: slimVc };
+          }
+          return t;
+        });
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+        window.dispatchEvent(new Event('birdpro_db_updated'));
+      } catch (retryErr) {
+        console.error('Failed to persist db to storage after compaction', retryErr);
+      }
     }
   }
 
@@ -484,6 +745,9 @@ class DataService {
         continue;
       }
       const data = { ...ch.data, id: ch.data?.id ?? ch.id };
+      if (coll === 'birds' && data.tenantSnapshot) {
+        delete data.tenantSnapshot;
+      }
       const h = this.hashItem(data);
       const i = st[coll].findIndex((x: any) => String(x.id) === ch.id);
       if (i >= 0) {
@@ -583,13 +847,73 @@ class DataService {
     this.saveToStorage();
   }
 
+  private getActiveUserTenantId(): string {
+    if (!this.isBrowser) return 'tenant-demo-01';
+    try {
+      const raw = localStorage.getItem('birdpro_current_user');
+      if (raw) {
+        const u = JSON.parse(raw);
+        if (u?.tenantId) return u.tenantId;
+      }
+    } catch {}
+    return 'tenant-demo-01';
+  }
+
+  private mergeTenantRecords(
+    cloudTenant: Tenant,
+    localTenant: Tenant,
+    extraVc?: TenantVisualConfig | null
+  ): Tenant {
+    let mergedVc = mergeVisualConfigs(cloudTenant.visualConfig, localTenant.visualConfig);
+    if (extraVc) {
+      mergedVc = mergeVisualConfigs(mergedVc, extraVc);
+    }
+
+    const merged: Tenant = {
+      ...cloudTenant,
+      ...localTenant
+    };
+
+    // Preserve non-empty scalar string fields from cloud if local is empty string (e.g. from INITIAL_TENANT)
+    const stringFields: (keyof Tenant)[] = [
+      'name', 'ownerName', 'slug', 'document', 'cpfCnpj', 'email',
+      'phone', 'cellphone', 'mobile', 'whatsapp', 'address', 'addressNumber',
+      'neighborhood', 'city', 'state', 'zipCode', 'cep', 'complement',
+      'description', 'registrationNumber', 'registryNumber', 'licenseDate',
+      'website', 'facebook', 'twitter', 'instagram', 'youtube'
+    ];
+    for (const f of stringFields) {
+      const locVal = localTenant[f];
+      const cldVal = cloudTenant[f];
+      if ((locVal === '' || locVal === undefined || locVal === null) && cldVal) {
+        (merged as any)[f] = cldVal;
+      }
+    }
+
+    if ((!localTenant.owners || localTenant.owners.length === 0) && cloudTenant.owners && cloudTenant.owners.length > 0) {
+      merged.owners = cloudTenant.owners;
+    }
+
+    const validLocalLogo = localTenant.logoUrl && !isDemoWomanOrUnsplashPerson(localTenant.logoUrl) ? localTenant.logoUrl : '';
+    const validCloudLogo = cloudTenant.logoUrl && !isDemoWomanOrUnsplashPerson(cloudTenant.logoUrl) ? cloudTenant.logoUrl : '';
+    merged.logoUrl = validLocalLogo || validCloudLogo || mergedVc.labelLogoUrl || mergedVc.treeLogoUrl || undefined;
+
+    const validLocalCover = localTenant.coverUrl && !isDemoWomanOrUnsplashPerson(localTenant.coverUrl) ? localTenant.coverUrl : '';
+    const validCloudCover = cloudTenant.coverUrl && !isDemoWomanOrUnsplashPerson(cloudTenant.coverUrl) ? cloudTenant.coverUrl : '';
+    merged.coverUrl = validLocalCover || validCloudCover || undefined;
+
+    merged.visualConfig = mergedVc;
+    return merged;
+  }
+
   // --- CLOUD FIRESTORE SYNCHRONIZATION ---
   public async syncCloudData(): Promise<void> {
     if (!this.isBrowser || !firebaseSync.isAvailable()) return;
     try {
-      // 1. Fetch remote tenants, users, sellers, commissions & payouts from Firestore
-      const [cloudTenants, cloudUsers, cloudSellers, cloudCommissions, cloudPayouts] = await Promise.all([
+      // 1. Fetch remote tenants, tenant_visuals, users, sellers, commissions & payouts from Firestore
+      const [cloudTenants, cloudVisuals, cloudUsers, cloudSellers, cloudCommissions, cloudPayouts] = await Promise.all([
         firebaseSync.fetchAllTenants(),
+        firebaseSync.fetchCollection<any>('tenant_visuals').catch(() => []),
         firebaseSync.fetchAllUsers(),
         firebaseSync.fetchAllSellers(),
         firebaseSync.fetchAllCommissions(),
@@ -597,6 +921,16 @@ class DataService {
       ]);
 
       let stateChanged = false;
+      const activeTid = this.getActiveUserTenantId();
+      const cloudVisualMap = new Map<string, any>();
+      if (Array.isArray(cloudVisuals)) {
+        cloudVisuals.forEach(cv => {
+          const cid = cv?.id || cv?.tenantId;
+          if (cid && cv?.visualConfig) {
+            cloudVisualMap.set(cid, cv);
+          }
+        });
+      }
 
       // 2. Merge cloud tenants into local state
       if (cloudTenants && cloudTenants.length > 0) {
@@ -611,33 +945,55 @@ class DataService {
             firebaseSync.saveTenant(cleanCt).catch(() => {});
           }
 
+          const isCurrentUsersTenant = cleanCt.id === activeTid || cleanCt.id === 'tenant-demo-01';
+          const localVault = isCurrentUsersTenant ? loadVisualVault(cleanCt.id) : null;
+          const cloudVisDoc = cloudVisualMap.get(cleanCt.id);
+          const extraVc = mergeVisualConfigs(cloudVisDoc?.visualConfig, localVault?.visualConfig);
+
           const idx = this.state.tenants.findIndex(t => t.id === cleanCt.id);
           if (idx >= 0) {
             const currentLocal = this.state.tenants[idx];
-            const mergedVc = sanitizeTenantVisualConfig({
-              ...(cleanCt.visualConfig || {}),
-              ...(currentLocal.visualConfig || {})
-            });
-            const merged: Tenant = {
-              ...cleanCt,
-              ...currentLocal,
-              logoUrl: currentLocal.logoUrl && !isDemoWomanOrUnsplashPerson(currentLocal.logoUrl)
-                ? currentLocal.logoUrl
-                : cleanCt.logoUrl,
-              coverUrl: currentLocal.coverUrl && !isDemoWomanOrUnsplashPerson(currentLocal.coverUrl)
-                ? currentLocal.coverUrl
-                : cleanCt.coverUrl,
-              visualConfig: mergedVc
-            };
+            const merged = this.mergeTenantRecords(cleanCt, currentLocal, extraVc);
+            if (isCurrentUsersTenant && hasAnyVisualImage(merged.visualConfig)) {
+              saveVisualVault(merged.id, merged.visualConfig, merged.logoUrl, merged.coverUrl);
+            }
             if (this.hashItem(this.state.tenants[idx]) !== this.hashItem(merged)) {
               this.state.tenants[idx] = merged;
               stateChanged = true;
             }
           } else {
-            this.state.tenants.unshift(cleanCt);
+            const withExtra = hasAnyVisualImage(extraVc)
+              ? { ...cleanCt, visualConfig: mergeVisualConfigs(cleanCt.visualConfig, extraVc) }
+              : cleanCt;
+            if (cleanCt.id === activeTid) {
+              this.state.tenants.unshift(withExtra);
+            } else {
+              this.state.tenants.push(withExtra);
+            }
             stateChanged = true;
           }
         });
+      }
+
+      // 2b. Ensure cloudVisualMap is applied to active local tenant even if not in cloudTenants
+      for (const [cid, cv] of cloudVisualMap.entries()) {
+        const idx = (this.state.tenants || []).findIndex(t => t.id === cid);
+        if (idx >= 0 && cv?.visualConfig) {
+          const current = this.state.tenants[idx];
+          const mergedVc = mergeVisualConfigs(current.visualConfig, cv.visualConfig);
+          if (this.hashItem(current.visualConfig) !== this.hashItem(mergedVc)) {
+            this.state.tenants[idx] = {
+              ...current,
+              logoUrl: current.logoUrl || cv.logoUrl || mergedVc.labelLogoUrl || mergedVc.treeLogoUrl || undefined,
+              coverUrl: current.coverUrl || cv.coverUrl || undefined,
+              visualConfig: mergedVc
+            };
+            if (cid === activeTid || cid === 'tenant-demo-01') {
+              saveVisualVault(cid, mergedVc, this.state.tenants[idx].logoUrl, this.state.tenants[idx].coverUrl);
+            }
+            stateChanged = true;
+          }
+        }
       }
 
       // 3. Merge cloud users into local state
@@ -781,7 +1137,7 @@ class DataService {
       if (this.state.tenants && this.state.tenants.length > 0) {
         for (const localTenant of this.state.tenants) {
           if (this.deletedTenantIds.has(localTenant.id)) continue;
-          if (localTenant.id !== 'tenant-demo-01' || (localTenant.name && localTenant.name.trim())) {
+          if (localTenant.id !== 'tenant-demo-01' || (localTenant.name && localTenant.name.trim()) || hasAnyVisualImage(localTenant.visualConfig)) {
             const existsInCloud = cloudTenants.some(ct => ct.id === localTenant.id);
             if (!existsInCloud) {
               await firebaseSync.saveTenant(localTenant);
@@ -830,6 +1186,7 @@ class DataService {
           if (!liveTenants) return;
           if (!this.state.tenants) this.state.tenants = [];
           let changed = false;
+          const currentActiveTid = this.getActiveUserTenantId();
 
           const validLive = liveTenants.filter(lt => {
             if (this.deletedTenantIds.has(lt.id)) {
@@ -843,7 +1200,7 @@ class DataService {
           const prevCount = this.state.tenants.length;
           this.state.tenants = this.state.tenants.filter(t => {
             if (this.deletedTenantIds.has(t.id)) return false;
-            if (t.id === 'tenant-demo-01') return true;
+            if (t.id === 'tenant-demo-01' || t.id === currentActiveTid) return true;
             return liveIds.has(t.id);
           });
           if (this.state.tenants.length !== prevCount) {
@@ -856,30 +1213,29 @@ class DataService {
               firebaseSync.saveTenant(cleanLt).catch(() => {});
             }
 
+            const isCurrentUsersTenant = cleanLt.id === currentActiveTid || cleanLt.id === 'tenant-demo-01';
+            const vault = isCurrentUsersTenant ? loadVisualVault(cleanLt.id) : null;
+
             const idx = this.state.tenants.findIndex(t => t.id === cleanLt.id);
             if (idx >= 0) {
               const currentLocal = this.state.tenants[idx];
-              const mergedVc = sanitizeTenantVisualConfig({
-                ...(cleanLt.visualConfig || {}),
-                ...(currentLocal.visualConfig || {})
-              });
-              const merged: Tenant = {
-                ...cleanLt,
-                ...currentLocal,
-                logoUrl: currentLocal.logoUrl && !isDemoWomanOrUnsplashPerson(currentLocal.logoUrl)
-                  ? currentLocal.logoUrl
-                  : cleanLt.logoUrl,
-                coverUrl: currentLocal.coverUrl && !isDemoWomanOrUnsplashPerson(currentLocal.coverUrl)
-                  ? currentLocal.coverUrl
-                  : cleanLt.coverUrl,
-                visualConfig: mergedVc
-              };
+              const merged = this.mergeTenantRecords(cleanLt, currentLocal, vault?.visualConfig);
+              if (isCurrentUsersTenant && hasAnyVisualImage(merged.visualConfig)) {
+                saveVisualVault(merged.id, merged.visualConfig, merged.logoUrl, merged.coverUrl);
+              }
               if (this.hashItem(this.state.tenants[idx]) !== this.hashItem(merged)) {
                 this.state.tenants[idx] = merged;
                 changed = true;
               }
             } else {
-              this.state.tenants.unshift(cleanLt);
+              const withVault = vault?.visualConfig
+                ? { ...cleanLt, visualConfig: mergeVisualConfigs(cleanLt.visualConfig, vault.visualConfig) }
+                : cleanLt;
+              if (cleanLt.id === currentActiveTid) {
+                this.state.tenants.unshift(withVault);
+              } else {
+                this.state.tenants.push(withVault);
+              }
               changed = true;
             }
           });
@@ -956,13 +1312,28 @@ class DataService {
 
   public mergeCloudTenant(tenant: Tenant): void {
     if (!this.state.tenants) this.state.tenants = [];
-    const idx = this.state.tenants.findIndex(t => t.id === tenant.id);
+    const { tenant: cleanCloud } = sanitizeTenantData(tenant);
+    const activeTid = this.getActiveUserTenantId();
+    const isCurrentUsersTenant = cleanCloud.id === activeTid || cleanCloud.id === 'tenant-demo-01';
+    const vault = isCurrentUsersTenant ? loadVisualVault(cleanCloud.id) : null;
+
+    const idx = this.state.tenants.findIndex(t => t.id === cleanCloud.id);
     if (idx >= 0) {
-      const merged = { ...this.state.tenants[idx], ...tenant };
+      const merged = this.mergeTenantRecords(cleanCloud, this.state.tenants[idx], vault?.visualConfig);
+      if (isCurrentUsersTenant && hasAnyVisualImage(merged.visualConfig)) {
+        saveVisualVault(merged.id, merged.visualConfig, merged.logoUrl, merged.coverUrl);
+      }
       if (this.hashItem(this.state.tenants[idx]) === this.hashItem(merged)) return;
       this.state.tenants[idx] = merged;
     } else {
-      this.state.tenants.unshift(tenant);
+      const withVault = vault?.visualConfig
+        ? { ...cleanCloud, visualConfig: mergeVisualConfigs(cleanCloud.visualConfig, vault.visualConfig) }
+        : cleanCloud;
+      if (cleanCloud.id === activeTid) {
+        this.state.tenants.unshift(withVault);
+      } else {
+        this.state.tenants.push(withVault);
+      }
     }
     this.saveToStorage();
   }
@@ -974,39 +1345,62 @@ class DataService {
 
   getTenant(id?: string): Tenant {
     let targetId = id;
+    const activeTid = this.getActiveUserTenantId();
     if (!targetId || targetId === 'tenant-demo-01') {
-      if (this.isBrowser) {
-        try {
-          const raw = localStorage.getItem('birdpro_current_user');
-          if (raw) {
-            const u = JSON.parse(raw);
-            if (u?.tenantId) targetId = u.tenantId;
-          }
-        } catch {}
-      }
+      targetId = activeTid;
     }
     targetId = targetId || 'tenant-demo-01';
+
     const found = (
       this.state.tenants.find(t => t.id === targetId) ||
+      this.state.tenants.find(t => t.id === 'tenant-demo-01') ||
       this.state.tenants[0] ||
       INITIAL_TENANT
     );
     const { tenant: cleanTenant } = sanitizeTenantData(found);
-    return cleanTenant;
+
+    // Merge with dedicated VisualVault if this is the active user's tenant
+    if (cleanTenant.id === activeTid || cleanTenant.id === 'tenant-demo-01' || targetId === activeTid) {
+      const vault = loadVisualVault(cleanTenant.id) || loadVisualVault(targetId);
+      if (vault?.visualConfig) {
+        const mergedVc = mergeVisualConfigs(cleanTenant.visualConfig, vault.visualConfig);
+        // Populate in-memory aliases so any component reading either primary or alias key gets the image
+        const readVc: TenantVisualConfig = {
+          ...mergedVc,
+          bgGenealogyUrl: mergedVc.treeBackgroundUrl || mergedVc.bgGenealogyUrl || '',
+          bgLabelFrontUrl: mergedVc.labelFrontBackgroundUrl || mergedVc.bgLabelFrontUrl || '',
+          bgLabelBackUrl: mergedVc.labelBackBackgroundUrl || mergedVc.bgLabelBackUrl || '',
+          logoGenealogyUrl: mergedVc.treeLogoUrl || mergedVc.logoGenealogyUrl || '',
+          logoLabelUrl: mergedVc.labelLogoUrl || mergedVc.logoLabelUrl || ''
+        };
+        return {
+          ...cleanTenant,
+          logoUrl: cleanTenant.logoUrl || vault.logoUrl || readVc.labelLogoUrl || readVc.treeLogoUrl || undefined,
+          coverUrl: cleanTenant.coverUrl || vault.coverUrl || undefined,
+          visualConfig: readVc
+        };
+      }
+    }
+
+    const vc = cleanTenant.visualConfig || {};
+    return {
+      ...cleanTenant,
+      visualConfig: {
+        ...vc,
+        bgGenealogyUrl: vc.treeBackgroundUrl || vc.bgGenealogyUrl || '',
+        bgLabelFrontUrl: vc.labelFrontBackgroundUrl || vc.bgLabelFrontUrl || '',
+        bgLabelBackUrl: vc.labelBackBackgroundUrl || vc.bgLabelBackUrl || '',
+        logoGenealogyUrl: vc.treeLogoUrl || vc.logoGenealogyUrl || '',
+        logoLabelUrl: vc.labelLogoUrl || vc.logoLabelUrl || ''
+      }
+    };
   }
 
   updateTenant(tenant: Partial<Tenant>, id?: string): Tenant {
+    const activeTid = this.getActiveUserTenantId();
     let targetId = id || tenant.id;
     if (!targetId || targetId === 'tenant-demo-01') {
-      if (this.isBrowser) {
-        try {
-          const raw = localStorage.getItem('birdpro_current_user');
-          if (raw) {
-            const u = JSON.parse(raw);
-            if (u?.tenantId) targetId = u.tenantId;
-          }
-        } catch {}
-      }
+      targetId = activeTid;
     }
     targetId = targetId || 'tenant-demo-01';
 
@@ -1015,81 +1409,71 @@ class DataService {
       idx = this.state.tenants.findIndex(t => t.id === tenant.id);
     }
     if (idx < 0 && this.state.tenants.length > 0) {
-      idx = 0;
+      idx = this.state.tenants.findIndex(t => t.id === 'tenant-demo-01');
+      if (idx < 0) idx = 0;
     }
 
     if (idx >= 0) {
-      const existingVc = sanitizeTenantVisualConfig(this.state.tenants[idx].visualConfig || {});
-      const incomingVc = sanitizeTenantVisualConfig(tenant.visualConfig || {});
-      const mergedVc: TenantVisualConfig = {
-        ...existingVc,
-        ...incomingVc
-      };
+      const currentTenant = this.state.tenants[idx];
+      const isCurrentUsersTenant = currentTenant.id === activeTid || currentTenant.id === 'tenant-demo-01';
+      const vault = isCurrentUsersTenant ? loadVisualVault(currentTenant.id) : null;
 
-      // Fundo dos crachás
-      const frontBg = mergedVc.labelFrontBackgroundUrl || mergedVc.bgLabelFrontUrl || '';
-      const backBg = mergedVc.labelBackBackgroundUrl || mergedVc.bgLabelBackUrl || frontBg || '';
-      const treeBg = mergedVc.treeBackgroundUrl || mergedVc.bgGenealogyUrl || '';
-
-      const cleanFrontBg = isDemoWomanOrUnsplashPerson(frontBg) ? '' : frontBg;
-      const cleanBackBg = isDemoWomanOrUnsplashPerson(backBg) ? '' : backBg;
-      const cleanTreeBg = isDemoWomanOrUnsplashPerson(treeBg) ? '' : treeBg;
-
-      mergedVc.labelFrontBackgroundUrl = cleanFrontBg;
-      mergedVc.labelBackBackgroundUrl = cleanBackBg;
-      mergedVc.treeBackgroundUrl = cleanTreeBg;
-
-      // Otimização crucial de armazenamento: limpa chaves de apelido legado se forem base64
-      // para NUNCA estourar o limite de 1MB do Firestore ou 5MB do LocalStorage
-      if (cleanFrontBg && cleanFrontBg.startsWith('data:')) {
-        mergedVc.bgLabelFrontUrl = '';
-      } else {
-        mergedVc.bgLabelFrontUrl = cleanFrontBg;
-      }
-
-      if (cleanBackBg && cleanBackBg.startsWith('data:')) {
-        mergedVc.bgLabelBackUrl = '';
-      } else {
-        mergedVc.bgLabelBackUrl = cleanBackBg;
-      }
-
-      if (cleanTreeBg && cleanTreeBg.startsWith('data:')) {
-        mergedVc.bgGenealogyUrl = '';
-      } else {
-        mergedVc.bgGenealogyUrl = cleanTreeBg;
-      }
+      // Merge existing visualConfig + vault + incoming visualConfig non-destructively
+      const baseVc = mergeVisualConfigs(currentTenant.visualConfig, vault?.visualConfig);
+      const incomingVc: TenantVisualConfig = tenant.visualConfig
+        ? {
+            ...sanitizeTenantVisualConfig(tenant.visualConfig),
+            updatedAt: tenant.visualConfig.updatedAt || Date.now()
+          }
+        : {};
+      const mergedVc = mergeVisualConfigs(baseVc, incomingVc);
 
       // Logo / Foto
-      const labelLogo = mergedVc.labelLogoUrl || mergedVc.logoLabelUrl || tenant.logoUrl || this.state.tenants[idx].logoUrl || '';
+      const labelLogo = mergedVc.labelLogoUrl || mergedVc.logoLabelUrl || tenant.logoUrl || currentTenant.logoUrl || '';
       const cleanLabelLogo = isDemoWomanOrUnsplashPerson(labelLogo) ? '' : labelLogo;
-      mergedVc.labelLogoUrl = cleanLabelLogo;
-      mergedVc.logoLabelUrl = cleanLabelLogo.startsWith('data:') ? '' : cleanLabelLogo;
+      const labelCleared = (mergedVc.clearedFields?.['labelLogoUrl'] || 0) > 0 && !mergedVc.labelLogoUrl;
+      if (!labelCleared && cleanLabelLogo) {
+        mergedVc.labelLogoUrl = cleanLabelLogo;
+        mergedVc.logoLabelUrl = cleanLabelLogo.startsWith('data:') ? '' : cleanLabelLogo;
+      }
 
       const treeLogo = mergedVc.treeLogoUrl || mergedVc.logoGenealogyUrl || cleanLabelLogo || '';
       const cleanTreeLogo = isDemoWomanOrUnsplashPerson(treeLogo) ? '' : treeLogo;
-      mergedVc.treeLogoUrl = cleanTreeLogo;
-      mergedVc.logoGenealogyUrl = cleanTreeLogo.startsWith('data:') ? '' : cleanTreeLogo;
+      const treeLogoCleared = (mergedVc.clearedFields?.['treeLogoUrl'] || 0) > 0 && !mergedVc.treeLogoUrl;
+      if (!treeLogoCleared && cleanTreeLogo) {
+        mergedVc.treeLogoUrl = cleanTreeLogo;
+        mergedVc.logoGenealogyUrl = cleanTreeLogo.startsWith('data:') ? '' : cleanTreeLogo;
+      }
 
-      const cleanCover = isDemoWomanOrUnsplashPerson(tenant.coverUrl || this.state.tenants[idx].coverUrl) ? '' : (tenant.coverUrl || this.state.tenants[idx].coverUrl || undefined);
-      const cleanFinalLogo = isDemoWomanOrUnsplashPerson(tenant.logoUrl || this.state.tenants[idx].logoUrl) ? '' : (tenant.logoUrl || this.state.tenants[idx].logoUrl || cleanLabelLogo || undefined);
+      const cleanCover = isDemoWomanOrUnsplashPerson(tenant.coverUrl || currentTenant.coverUrl)
+        ? ''
+        : (tenant.coverUrl || currentTenant.coverUrl || undefined);
+      const cleanFinalLogo = isDemoWomanOrUnsplashPerson(tenant.logoUrl || currentTenant.logoUrl)
+        ? ''
+        : (tenant.logoUrl || currentTenant.logoUrl || mergedVc.labelLogoUrl || undefined);
 
       this.state.tenants[idx] = {
-        ...this.state.tenants[idx],
+        ...currentTenant,
         ...tenant,
+        id: currentTenant.id,
         coverUrl: cleanCover,
         logoUrl: cleanFinalLogo,
         visualConfig: mergedVc
       };
 
-      // Propaga a configuração visual e logo para outros criatórios da sessão
-      for (let i = 0; i < this.state.tenants.length; i++) {
-        if (i !== idx) {
-          this.state.tenants[i].visualConfig = {
-            ...(this.state.tenants[i].visualConfig || {}),
-            ...mergedVc
-          };
-          if (cleanFinalLogo && !this.state.tenants[i].logoUrl) {
-            this.state.tenants[i].logoUrl = cleanFinalLogo;
+      // Save into dedicated localStorage VisualVault for instant, quota-isolated recovery
+      if (isCurrentUsersTenant) {
+        saveVisualVault(currentTenant.id, mergedVc, cleanFinalLogo, cleanCover);
+        if (currentTenant.id !== 'tenant-demo-01') {
+          saveVisualVault('tenant-demo-01', mergedVc, cleanFinalLogo, cleanCover);
+        }
+        // Keep tenant-demo-01 and activeTid in sync for the current user without touching unrelated tenants
+        for (let i = 0; i < this.state.tenants.length; i++) {
+          if (i !== idx && (this.state.tenants[i].id === 'tenant-demo-01' || this.state.tenants[i].id === activeTid)) {
+            this.state.tenants[i].visualConfig = mergeVisualConfigs(this.state.tenants[i].visualConfig, mergedVc);
+            if (cleanFinalLogo && !this.state.tenants[i].logoUrl) {
+              this.state.tenants[i].logoUrl = cleanFinalLogo;
+            }
           }
         }
       }
@@ -1100,9 +1484,20 @@ class DataService {
         window.dispatchEvent(new Event('birdpro_db_updated'));
       }
       if (this.isBrowser && firebaseSync.isAvailable()) {
-        firebaseSync.saveTenant(this.state.tenants[idx]).catch(e => console.error('Cloud save tenant error:', e));
+        const savedT = this.state.tenants[idx];
+        firebaseSync.saveTenant(savedT).catch(e => console.error('Cloud save tenant error:', e));
+        if (hasAnyVisualImage(mergedVc) || mergedVc.updatedAt) {
+          firebaseSync.saveDocument('tenant_visuals', savedT.id, {
+            id: savedT.id,
+            tenantId: savedT.id,
+            visualConfig: mergedVc,
+            logoUrl: cleanFinalLogo || '',
+            coverUrl: cleanCover || '',
+            updatedAt: mergedVc.updatedAt || Date.now()
+          }, true).catch(e => console.warn('Cloud save tenant_visuals note:', e));
+        }
       }
-      return this.state.tenants[idx];
+      return this.getTenant(this.state.tenants[idx].id);
     }
     return INITIAL_TENANT;
   }

@@ -56,14 +56,7 @@ export const INITIAL_TENANT: Tenant = {
     levelDisplayPaletteGenealogy: 70,
     levelDisplayPaletteLabel: 60,
     printTitleCertificate: true,
-    printSixthGeneration: true,
-    treeLogoUrl: '',
-    treeBackgroundUrl: '',
-    logoGenealogyUrl: '',
-    bgGenealogyUrl: '',
-    labelLogoUrl: '',
-    bgLabelFrontUrl: '',
-    bgLabelBackUrl: ''
+    printSixthGeneration: true
   }
 };
 

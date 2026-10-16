@@ -118,6 +118,20 @@ export function PrintPedigreeModal({
   useEffect(() => {
     if (isOpen && activeBird && firebaseSync.isAvailable()) {
       const activeT = tenant || db.getTenant(activeBird.tenantId) || db.getTenant()
+      const vc = activeT?.visualConfig
+      const hasCustomVisuals = Boolean(
+        vc?.labelFrontBackgroundUrl ||
+        vc?.bgLabelFrontUrl ||
+        vc?.labelBackBackgroundUrl ||
+        vc?.bgLabelBackUrl ||
+        vc?.treeBackgroundUrl ||
+        vc?.bgGenealogyUrl ||
+        vc?.labelLogoUrl ||
+        vc?.logoLabelUrl ||
+        vc?.treeLogoUrl ||
+        vc?.logoGenealogyUrl ||
+        vc?.updatedAt
+      )
       const tenantSnapshot = activeT ? {
         id: activeT.id,
         name: activeT.name,
@@ -125,10 +139,10 @@ export function PrintPedigreeModal({
         registryNumber: activeT.registryNumber,
         phone: activeT.phone || activeT.cellphone,
         logoUrl: activeT.logoUrl,
-        visualConfig: activeT.visualConfig
+        ...(hasCustomVisuals ? { visualConfig: activeT.visualConfig } : {})
       } : undefined
-      firebaseSync.saveDocument('birds', activeBird.id, { ...activeBird, tenantSnapshot }).catch(() => {})
-      if (activeT) {
+      firebaseSync.saveDocument('birds', activeBird.id, { ...activeBird, ...(tenantSnapshot ? { tenantSnapshot } : {}) }).catch(() => {})
+      if (activeT && hasCustomVisuals) {
         firebaseSync.saveTenant(activeT).catch(() => {})
       }
     }

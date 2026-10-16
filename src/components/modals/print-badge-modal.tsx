@@ -153,6 +153,20 @@ export function PrintBadgeModal({
   useEffect(() => {
     if (isOpen && bird && firebaseSync.isAvailable()) {
       const lat = getLatestTenant()
+      const vc = lat?.visualConfig
+      const hasCustomVisuals = Boolean(
+        vc?.labelFrontBackgroundUrl ||
+        vc?.bgLabelFrontUrl ||
+        vc?.labelBackBackgroundUrl ||
+        vc?.bgLabelBackUrl ||
+        vc?.treeBackgroundUrl ||
+        vc?.bgGenealogyUrl ||
+        vc?.labelLogoUrl ||
+        vc?.logoLabelUrl ||
+        vc?.treeLogoUrl ||
+        vc?.logoGenealogyUrl ||
+        vc?.updatedAt
+      )
       const tenantSnapshot = lat ? {
         id: lat.id,
         name: lat.name,
@@ -160,10 +174,10 @@ export function PrintBadgeModal({
         registryNumber: lat.registryNumber,
         phone: lat.phone || lat.cellphone,
         logoUrl: lat.logoUrl,
-        visualConfig: lat.visualConfig
+        ...(hasCustomVisuals ? { visualConfig: lat.visualConfig } : {})
       } : undefined
-      firebaseSync.saveDocument('birds', bird.id, { ...bird, tenantSnapshot }).catch(() => {})
-      if (lat) {
+      firebaseSync.saveDocument('birds', bird.id, { ...bird, ...(tenantSnapshot ? { tenantSnapshot } : {}) }).catch(() => {})
+      if (lat && hasCustomVisuals) {
         firebaseSync.saveTenant(lat).catch(() => {})
       }
     }

@@ -28,7 +28,7 @@ import {
   EyeOff,
   ShieldCheck
 } from 'lucide-react'
-import { db } from '@/lib/db'
+import { db, mergeVisualConfigs, saveVisualVault } from '@/lib/db'
 import { Tenant, BreederOwner, TenantVisualConfig, Bird } from '@/types'
 import { BadgeFrontAndBack } from '@/components/genealogy/badge-front-and-back'
 import { DateManualInput } from '@/components/ui/date-manual-input'
@@ -71,44 +71,48 @@ export default function CriatorioConfigPage() {
   })
 
   useEffect(() => {
-    let targetTenantId: string | undefined
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem('birdpro_current_user')
-        if (raw) {
-          const u = JSON.parse(raw)
-          if (u?.tenantId) targetTenantId = u.tenantId
-        }
-      } catch {}
+    const getTargetTenantId = () => {
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('birdpro_current_user')
+          if (raw) {
+            const u = JSON.parse(raw)
+            if (u?.tenantId) return u.tenantId as string
+          }
+        } catch {}
+      }
+      return undefined
     }
+
+    const sanitizeTenant = (t: Tenant): Tenant => ({
+      ...t,
+      name: t.name?.includes('Madruguinha') ? '' : (t.name || ''),
+      ownerName: t.ownerName || '',
+      slug: t.slug === 'madruguinha' ? '' : (t.slug || ''),
+      document: (t.document === '022.034.960-61' || t.document === '000.000.000-00') ? '' : (t.document || ''),
+      email: t.email === 'luis.henrique.schreiber@hotmail.com' ? '' : (t.email || ''),
+      phone: t.phone === '(55) 9134-3265' ? '' : (t.phone || ''),
+      cellphone: t.cellphone === '(55) 9 9134-3265' ? '' : (t.cellphone || ''),
+      whatsapp: (t.whatsapp === '5555991343265' || t.whatsapp === '(55) 9 9134-3265') ? '' : (t.whatsapp || ''),
+      address: t.address === 'Rua das violetas' ? '' : (t.address || ''),
+      addressNumber: t.addressNumber === '109' ? '' : (t.addressNumber || ''),
+      neighborhood: t.neighborhood === 'universitario' ? '' : (t.neighborhood || ''),
+      city: t.city === 'IJUI' ? '' : (t.city || ''),
+      state: (t.state === 'RS' && t.city === 'IJUI') ? '' : (t.state || ''),
+      zipCode: (t.zipCode === '98700-000' || t.zipCode === '98700 000') ? '' : (t.zipCode || ''),
+      registryNumber: t.registryNumber === '4719754' ? '' : (t.registryNumber || ''),
+      facebook: t.facebook?.includes('MADRUGUINHA') ? '' : (t.facebook || ''),
+      instagram: t.instagram?.includes('MADRUGUINHA') ? '' : (t.instagram || ''),
+      website: t.website?.includes('madruguinha') ? '' : (t.website || ''),
+      owners: (t.owners || []).filter(o => !o.name?.includes('Madruguinha') && !o.nickname?.includes('Madruguinha'))
+    })
+
+    const targetTenantId = getTargetTenantId()
     const t = db.getTenant(targetTenantId)
     if (t) {
-      // Sanitize any legacy demo/mock data if present in state
-      const sanitized: Tenant = {
-        ...t,
-        name: t.name?.includes('Madruguinha') ? '' : (t.name || ''),
-        ownerName: t.ownerName || '',
-        slug: t.slug === 'madruguinha' ? '' : (t.slug || ''),
-        document: (t.document === '022.034.960-61' || t.document === '000.000.000-00') ? '' : (t.document || ''),
-        email: t.email === 'luis.henrique.schreiber@hotmail.com' ? '' : (t.email || ''),
-        phone: t.phone === '(55) 9134-3265' ? '' : (t.phone || ''),
-        cellphone: t.cellphone === '(55) 9 9134-3265' ? '' : (t.cellphone || ''),
-        whatsapp: (t.whatsapp === '5555991343265' || t.whatsapp === '(55) 9 9134-3265') ? '' : (t.whatsapp || ''),
-        address: t.address === 'Rua das violetas' ? '' : (t.address || ''),
-        addressNumber: t.addressNumber === '109' ? '' : (t.addressNumber || ''),
-        neighborhood: t.neighborhood === 'universitario' ? '' : (t.neighborhood || ''),
-        city: t.city === 'IJUI' ? '' : (t.city || ''),
-        state: (t.state === 'RS' && t.city === 'IJUI') ? '' : (t.state || ''),
-        zipCode: (t.zipCode === '98700-000' || t.zipCode === '98700 000') ? '' : (t.zipCode || ''),
-        registryNumber: t.registryNumber === '4719754' ? '' : (t.registryNumber || ''),
-        facebook: t.facebook?.includes('MADRUGUINHA') ? '' : (t.facebook || ''),
-        instagram: t.instagram?.includes('MADRUGUINHA') ? '' : (t.instagram || ''),
-        website: t.website?.includes('madruguinha') ? '' : (t.website || ''),
-        owners: (t.owners || []).filter(o => !o.name?.includes('Madruguinha') && !o.nickname?.includes('Madruguinha'))
-      }
+      const sanitized = sanitizeTenant(t)
       setTenant(sanitized)
 
-      // Initialize login email from session or tenant
       try {
         const rawSession = typeof window !== 'undefined' ? localStorage.getItem('birdpro_current_user') : null
         if (rawSession) {
@@ -118,6 +122,31 @@ export default function CriatorioConfigPage() {
           setLoginEmail(sanitized.email)
         }
       } catch {}
+    }
+
+    // Sincroniza automaticamente se novos fundos/logos chegarem da nuvem ou do cofre visual após montar a tela
+    const handleDbUpdate = () => {
+      const latest = db.getTenant(getTargetTenantId())
+      if (!latest) return
+      setTenant(prev => {
+        if (!prev) return sanitizeTenant(latest)
+        const mergedVc = mergeVisualConfigs(latest.visualConfig, prev.visualConfig)
+        return {
+          ...prev,
+          logoUrl: prev.logoUrl || latest.logoUrl,
+          coverUrl: prev.coverUrl || latest.coverUrl,
+          visualConfig: mergedVc
+        }
+      })
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('birdpro_db_updated', handleDbUpdate)
+      window.addEventListener('storage', handleDbUpdate)
+      return () => {
+        window.removeEventListener('birdpro_db_updated', handleDbUpdate)
+        window.removeEventListener('storage', handleDbUpdate)
+      }
     }
   }, [])
 
@@ -133,13 +162,17 @@ export default function CriatorioConfigPage() {
     setTenant(prev => prev ? { ...prev, [field]: value } : null)
   }
 
-  const handleVisualConfigChange = (field: keyof TenantVisualConfig, value: any) => {
+  const handleVisualConfigChange = (field: keyof TenantVisualConfig, value: any, autoPersist = false) => {
     setTenant(prev => {
       if (!prev) return null
+      const now = Date.now()
       const currentVc = prev.visualConfig || {}
+      const nextClearedFields: Record<string, number> = { ...(currentVc.clearedFields || {}) }
+
       const updatedVc: TenantVisualConfig = {
         ...currentVc,
-        [field]: value
+        [field]: value,
+        updatedAt: now
       }
 
       // Sincronizar pares de propriedades legadas e atuais para compatibilidade total
@@ -184,7 +217,30 @@ export default function CriatorioConfigPage() {
 
       const alias = aliasMap[field as string]
       if (alias) {
-        (updatedVc as any)[alias] = value
+        // Evita duplicar strings base64 pesadas nos campos legados
+        if (typeof value === 'string' && value.startsWith('data:') && ['bgLabelFrontUrl', 'bgLabelBackUrl', 'bgGenealogyUrl', 'logoLabelUrl', 'logoGenealogyUrl'].includes(alias)) {
+          (updatedVc as any)[alias] = ''
+        } else {
+          (updatedVc as any)[alias] = value
+        }
+      }
+
+      const isImageKey = [
+        'treeBackgroundUrl', 'bgGenealogyUrl',
+        'labelFrontBackgroundUrl', 'bgLabelFrontUrl',
+        'labelBackBackgroundUrl', 'bgLabelBackUrl',
+        'treeLogoUrl', 'logoGenealogyUrl',
+        'labelLogoUrl', 'logoLabelUrl'
+      ].includes(field as string)
+
+      if (isImageKey) {
+        if (value && typeof value === 'string' && value.trim().length > 0) {
+          delete nextClearedFields[field as string]
+          if (alias) delete nextClearedFields[alias]
+        } else {
+          nextClearedFields[field as string] = now
+          if (alias) nextClearedFields[alias] = now
+        }
       }
 
       // Propagação inteligente de background: se o usuário altera o fundo da frente do crachá, sugere para o verso
@@ -192,6 +248,8 @@ export default function CriatorioConfigPage() {
       if (isCrachaBgField && value) {
         if (!updatedVc.labelBackBackgroundUrl && !updatedVc.bgLabelBackUrl) {
           updatedVc.labelBackBackgroundUrl = value
+          delete nextClearedFields['labelBackBackgroundUrl']
+          delete nextClearedFields['bgLabelBackUrl']
         }
       }
 
@@ -204,17 +262,32 @@ export default function CriatorioConfigPage() {
       if (isLogoField && value) {
         if (!updatedVc.treeLogoUrl && !updatedVc.logoGenealogyUrl) {
           updatedVc.treeLogoUrl = value
+          delete nextClearedFields['treeLogoUrl']
+          delete nextClearedFields['logoGenealogyUrl']
         }
         if (!updatedVc.labelLogoUrl && !updatedVc.logoLabelUrl) {
           updatedVc.labelLogoUrl = value
+          delete nextClearedFields['labelLogoUrl']
+          delete nextClearedFields['logoLabelUrl']
         }
       }
 
-      return {
+      updatedVc.clearedFields = nextClearedFields
+
+      const nextTenant: Tenant = {
         ...prev,
         logoUrl: (isLogoField && value) ? value : prev.logoUrl,
         visualConfig: updatedVc
       }
+
+      if (autoPersist || isImageKey) {
+        saveVisualVault(nextTenant.id, nextTenant.visualConfig, nextTenant.logoUrl, nextTenant.coverUrl)
+        setTimeout(() => {
+          db.saveTenant(nextTenant)
+        }, 0)
+      }
+
+      return nextTenant
     })
   }
 
@@ -420,19 +493,19 @@ export default function CriatorioConfigPage() {
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height)
             const compressed = canvas.toDataURL('image/jpeg', quality)
-            handleVisualConfigChange(field, compressed)
+            handleVisualConfigChange(field, compressed, true)
           } else {
-            handleVisualConfigChange(field, dataUrl)
+            handleVisualConfigChange(field, dataUrl, true)
           }
           setIsProcessingImage(false)
           setIsImageModalOpen(false)
-          showToast('Imagem importada e otimizada com sucesso!')
+          showToast('✓ Imagem importada, otimizada e salva automaticamente!')
         }
         img.onerror = () => {
-          handleVisualConfigChange(field, dataUrl)
+          handleVisualConfigChange(field, dataUrl, true)
           setIsProcessingImage(false)
           setIsImageModalOpen(false)
-          showToast('Imagem importada com sucesso!')
+          showToast('✓ Imagem importada e salva automaticamente!')
         }
         img.src = dataUrl
       }
@@ -442,41 +515,73 @@ export default function CriatorioConfigPage() {
 
   const handleApplyBackgroundToAll = (bgUrl: string) => {
     if (!bgUrl) return
+    const now = Date.now()
+    const isData = bgUrl.startsWith('data:')
     setTenant(prev => {
       if (!prev) return null
-      return {
+      const nextCleared = { ...(prev.visualConfig?.clearedFields || {}) }
+      delete nextCleared['labelFrontBackgroundUrl']
+      delete nextCleared['bgLabelFrontUrl']
+      delete nextCleared['labelBackBackgroundUrl']
+      delete nextCleared['bgLabelBackUrl']
+      delete nextCleared['treeBackgroundUrl']
+      delete nextCleared['bgGenealogyUrl']
+
+      const nextTenant: Tenant = {
         ...prev,
         visualConfig: {
           ...(prev.visualConfig || {}),
           labelFrontBackgroundUrl: bgUrl,
-          bgLabelFrontUrl: bgUrl,
+          bgLabelFrontUrl: isData ? '' : bgUrl,
           labelBackBackgroundUrl: bgUrl,
-          bgLabelBackUrl: bgUrl,
+          bgLabelBackUrl: isData ? '' : bgUrl,
           treeBackgroundUrl: bgUrl,
-          bgGenealogyUrl: bgUrl
+          bgGenealogyUrl: isData ? '' : bgUrl,
+          updatedAt: now,
+          clearedFields: nextCleared
         }
       }
+      saveVisualVault(nextTenant.id, nextTenant.visualConfig, nextTenant.logoUrl, nextTenant.coverUrl)
+      setTimeout(() => {
+        db.saveTenant(nextTenant)
+      }, 0)
+      return nextTenant
     })
-    showToast('✓ Fundo aplicado com sucesso em todos os crachás e certificados!')
+    showToast('✓ Fundo aplicado e salvo em todos os crachás e certificados!')
   }
 
   const handleApplyLogoToAll = (logoUrl: string) => {
     if (!logoUrl) return
+    const now = Date.now()
+    const isData = logoUrl.startsWith('data:')
     setTenant(prev => {
       if (!prev) return null
-      return {
+      const nextCleared = { ...(prev.visualConfig?.clearedFields || {}) }
+      delete nextCleared['treeLogoUrl']
+      delete nextCleared['logoGenealogyUrl']
+      delete nextCleared['labelLogoUrl']
+      delete nextCleared['logoLabelUrl']
+
+      const nextTenant: Tenant = {
         ...prev,
         logoUrl: logoUrl,
         visualConfig: {
           ...(prev.visualConfig || {}),
           treeLogoUrl: logoUrl,
-          logoGenealogyUrl: logoUrl,
+          logoGenealogyUrl: isData ? '' : logoUrl,
           labelLogoUrl: logoUrl,
-          logoLabelUrl: logoUrl
+          logoLabelUrl: isData ? '' : logoUrl,
+          updatedAt: now,
+          clearedFields: nextCleared
         }
       }
+      saveVisualVault(nextTenant.id, nextTenant.visualConfig, nextTenant.logoUrl, nextTenant.coverUrl)
+      setTimeout(() => {
+        db.saveTenant(nextTenant)
+      }, 0)
+      return nextTenant
     })
-    showToast('✓ Logo/Foto de perfil aplicada com sucesso em todos os crachás e certificados!')
+    showToast('✓ Logo/Foto de perfil aplicada e salva em todos os crachás e certificados!')
   }
 
   const handleOpenImageSelector = (field: keyof TenantVisualConfig, title: string) => {
@@ -489,38 +594,81 @@ export default function CriatorioConfigPage() {
 
   const handleApplyPresetOrUrl = (url: string) => {
     if (!activeImageField) return
-    handleVisualConfigChange(activeImageField, url)
+    handleVisualConfigChange(activeImageField, url, true)
     setIsImageModalOpen(false)
-    showToast('Imagem aplicada com sucesso!')
+    showToast('✓ Imagem aplicada e salva com sucesso!')
   }
 
   const handleClearImage = (field: keyof TenantVisualConfig) => {
-    handleVisualConfigChange(field, '')
-    if (field === 'treeLogoUrl' || field === 'logoGenealogyUrl') {
-      handleVisualConfigChange('treeLogoUrl', '')
-      handleVisualConfigChange('logoGenealogyUrl', '')
-      handleVisualConfigChange('treeLogoScale', 1)
-    }
-    if (field === 'treeBackgroundUrl' || field === 'bgGenealogyUrl') {
-      handleVisualConfigChange('treeBackgroundUrl', '')
-      handleVisualConfigChange('bgGenealogyUrl', '')
-      handleVisualConfigChange('treeBackgroundScale', 1)
-    }
-    if (field === 'labelLogoUrl' || field === 'logoLabelUrl') {
-      handleVisualConfigChange('labelLogoUrl', '')
-      handleVisualConfigChange('logoLabelUrl', '')
-      handleVisualConfigChange('labelLogoScale', 1)
-    }
-    if (field === 'labelFrontBackgroundUrl' || field === 'bgLabelFrontUrl') {
-      handleVisualConfigChange('labelFrontBackgroundUrl', '')
-      handleVisualConfigChange('bgLabelFrontUrl', '')
-      handleVisualConfigChange('labelFrontScale', 1)
-    }
-    if (field === 'labelBackBackgroundUrl' || field === 'bgLabelBackUrl') {
-      handleVisualConfigChange('labelBackBackgroundUrl', '')
-      handleVisualConfigChange('bgLabelBackUrl', '')
-      handleVisualConfigChange('labelBackScale', 1)
-    }
+    const now = Date.now()
+    setTenant(prev => {
+      if (!prev) return null
+      const currentVc = prev.visualConfig || {}
+      const nextCleared: Record<string, number> = {
+        ...(currentVc.clearedFields || {}),
+        [field as string]: now
+      }
+      const updatedVc: TenantVisualConfig = {
+        ...currentVc,
+        [field]: '',
+        updatedAt: now
+      }
+
+      if (field === 'treeLogoUrl' || field === 'logoGenealogyUrl') {
+        updatedVc.treeLogoUrl = ''
+        updatedVc.logoGenealogyUrl = ''
+        updatedVc.treeLogoScale = 1
+        nextCleared['treeLogoUrl'] = now
+        nextCleared['logoGenealogyUrl'] = now
+      }
+      if (field === 'treeBackgroundUrl' || field === 'bgGenealogyUrl') {
+        updatedVc.treeBackgroundUrl = ''
+        updatedVc.bgGenealogyUrl = ''
+        updatedVc.treeBackgroundScale = 1
+        nextCleared['treeBackgroundUrl'] = now
+        nextCleared['bgGenealogyUrl'] = now
+      }
+      if (field === 'labelLogoUrl' || field === 'logoLabelUrl') {
+        updatedVc.labelLogoUrl = ''
+        updatedVc.logoLabelUrl = ''
+        updatedVc.labelLogoScale = 1
+        nextCleared['labelLogoUrl'] = now
+        nextCleared['logoLabelUrl'] = now
+      }
+      if (field === 'labelFrontBackgroundUrl' || field === 'bgLabelFrontUrl') {
+        updatedVc.labelFrontBackgroundUrl = ''
+        updatedVc.bgLabelFrontUrl = ''
+        updatedVc.labelFrontScale = 1
+        nextCleared['labelFrontBackgroundUrl'] = now
+        nextCleared['bgLabelFrontUrl'] = now
+      }
+      if (field === 'labelBackBackgroundUrl' || field === 'bgLabelBackUrl') {
+        updatedVc.labelBackBackgroundUrl = ''
+        updatedVc.bgLabelBackUrl = ''
+        updatedVc.labelBackScale = 1
+        nextCleared['labelBackBackgroundUrl'] = now
+        nextCleared['bgLabelBackUrl'] = now
+      }
+
+      updatedVc.clearedFields = nextCleared
+
+      const nextLogoUrl = (field === 'labelLogoUrl' || field === 'logoLabelUrl')
+        ? (updatedVc.treeLogoUrl || '')
+        : prev.logoUrl
+
+      const nextTenant: Tenant = {
+        ...prev,
+        logoUrl: nextLogoUrl || undefined,
+        visualConfig: updatedVc
+      }
+
+      saveVisualVault(nextTenant.id, nextTenant.visualConfig, nextTenant.logoUrl, nextTenant.coverUrl)
+      setTimeout(() => {
+        db.saveTenant(nextTenant)
+      }, 0)
+
+      return nextTenant
+    })
     showToast('Imagem removida.')
   }
 
@@ -559,14 +707,28 @@ export default function CriatorioConfigPage() {
       )
     }
 
+    const now = Date.now()
     const currentVc = tenant.visualConfig || {}
+    const nextCleared: Record<string, number> = { ...(currentVc.clearedFields || {}) }
 
     const frontBg = isBad(currentVc.labelFrontBackgroundUrl || currentVc.bgLabelFrontUrl) ? '' : (currentVc.labelFrontBackgroundUrl || currentVc.bgLabelFrontUrl || '')
-    const backBg = isBad(currentVc.labelBackBackgroundUrl || currentVc.bgLabelBackUrl) ? '' : (currentVc.labelBackBackgroundUrl || currentVc.bgLabelBackUrl || frontBg || '')
+    const backExplicitlyCleared = Boolean(nextCleared['labelBackBackgroundUrl'] || nextCleared['bgLabelBackUrl'])
+    const backBg = isBad(currentVc.labelBackBackgroundUrl || currentVc.bgLabelBackUrl)
+      ? (backExplicitlyCleared ? '' : frontBg)
+      : (currentVc.labelBackBackgroundUrl || currentVc.bgLabelBackUrl || (backExplicitlyCleared ? '' : frontBg) || '')
     const treeBg = isBad(currentVc.treeBackgroundUrl || currentVc.bgGenealogyUrl) ? '' : (currentVc.treeBackgroundUrl || currentVc.bgGenealogyUrl || '')
 
     const labelLogo = isBad(currentVc.labelLogoUrl || currentVc.logoLabelUrl || tenant.logoUrl) ? '' : (currentVc.labelLogoUrl || currentVc.logoLabelUrl || tenant.logoUrl || '')
-    const treeLogo = isBad(currentVc.treeLogoUrl || currentVc.logoGenealogyUrl) ? '' : (currentVc.treeLogoUrl || currentVc.logoGenealogyUrl || labelLogo || '')
+    const treeExplicitlyCleared = Boolean(nextCleared['treeLogoUrl'] || nextCleared['logoGenealogyUrl'])
+    const treeLogo = isBad(currentVc.treeLogoUrl || currentVc.logoGenealogyUrl)
+      ? (treeExplicitlyCleared ? '' : labelLogo)
+      : (currentVc.treeLogoUrl || currentVc.logoGenealogyUrl || (treeExplicitlyCleared ? '' : labelLogo) || '')
+
+    if (frontBg) { delete nextCleared['labelFrontBackgroundUrl']; delete nextCleared['bgLabelFrontUrl'] }
+    if (backBg) { delete nextCleared['labelBackBackgroundUrl']; delete nextCleared['bgLabelBackUrl'] }
+    if (treeBg) { delete nextCleared['treeBackgroundUrl']; delete nextCleared['bgGenealogyUrl'] }
+    if (labelLogo) { delete nextCleared['labelLogoUrl']; delete nextCleared['logoLabelUrl'] }
+    if (treeLogo) { delete nextCleared['treeLogoUrl']; delete nextCleared['logoGenealogyUrl'] }
 
     const unifiedVc: TenantVisualConfig = {
       ...currentVc,
@@ -580,7 +742,9 @@ export default function CriatorioConfigPage() {
       bgLabelBackUrl: backBg.startsWith('data:') ? '' : backBg,
       bgGenealogyUrl: treeBg.startsWith('data:') ? '' : treeBg,
       logoLabelUrl: labelLogo.startsWith('data:') ? '' : labelLogo,
-      logoGenealogyUrl: treeLogo.startsWith('data:') ? '' : treeLogo
+      logoGenealogyUrl: treeLogo.startsWith('data:') ? '' : treeLogo,
+      updatedAt: now,
+      clearedFields: nextCleared
     }
 
     const tenantToSave: Tenant = {
@@ -588,6 +752,8 @@ export default function CriatorioConfigPage() {
       logoUrl: labelLogo || undefined,
       visualConfig: unifiedVc
     }
+
+    saveVisualVault(tenantToSave.id, unifiedVc, tenantToSave.logoUrl, tenantToSave.coverUrl)
 
     setTimeout(() => {
       const savedTenant = db.saveTenant(tenantToSave)

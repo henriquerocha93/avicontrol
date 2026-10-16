@@ -239,6 +239,8 @@ export interface TenantVisualConfig {
   labelFrontScale?: number;
   labelBackBackgroundUrl?: string;
   labelBackScale?: number;
+  updatedAt?: number;
+  clearedFields?: Record<string, number>;
 }
 
 export interface Tenant {
