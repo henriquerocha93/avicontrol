@@ -164,48 +164,22 @@ export function PrintBadgeModal({
 
   if (!isOpen || !mounted || typeof document === 'undefined') return null
 
-  const isMobileDevice = () => {
-    if (typeof window === 'undefined') return false
-    return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768
-  }
-
-  const getTargetUrl = () => {
-    return `/ave/${bird.id}?print=1&style=BADGE_PRO&mode=${printMode}&w=${badgeWidthCm}&h=${badgeHeightCm}`
-  }
-
-  const openPrintableRoute = (url: string) => {
-    if (typeof window === 'undefined') return
-    try {
-      localStorage.setItem('birdpro_simulated_bird', JSON.stringify(bird))
-    } catch {}
-
-    // On mobile devices, window.open is blocked by Safari and Chrome popup blockers.
-    // Navigating directly guarantees immediate action without popup blockage.
-    if (isMobileDevice()) {
-      window.location.href = url
-      return
-    }
-
-    const newWin = window.open(url, '_blank')
-    if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
-      window.location.href = url
-    }
-  }
-
   const handlePrint = () => {
-    const url = getTargetUrl()
-    if (isMobileDevice()) {
-      // On mobile phones, window.print() inside a fixed portal modal often silently fails
-      // or crashes. Navigating to the clean standalone printable route triggers native print cleanly!
-      openPrintableRoute(url)
-      return
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('birdpro_simulated_bird', JSON.stringify(bird))
+      } catch {}
+      window.print()
     }
-    window.print()
   }
 
   const handleSavePdf = () => {
-    const url = getTargetUrl()
-    openPrintableRoute(url)
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('birdpro_simulated_bird', JSON.stringify(bird))
+      } catch {}
+      window.print()
+    }
   }
 
   const modalContent = (
@@ -391,7 +365,7 @@ export function PrintBadgeModal({
         </div>
 
         {/* Tag Preview Area */}
-        <div className="p-4 sm:p-6 bg-slate-950 overflow-x-auto flex justify-center print:p-0 print:bg-white">
+        <div className="p-4 sm:p-6 bg-slate-950 overflow-x-auto flex justify-center print:p-0 print:m-0 print:bg-transparent print:overflow-visible">
           <BadgeFrontAndBack
             bird={bird}
             tenant={activeTenant}

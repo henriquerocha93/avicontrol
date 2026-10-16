@@ -272,32 +272,6 @@ export default function CriarCrachaPage() {
     };
   }, [parents, grandparents, greatGrandparents, greatGreatGrandparents]);
 
-  const isMobileDevice = () => {
-    if (typeof window === 'undefined') return false;
-    return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
-  };
-
-  const getTargetUrl = () => {
-    return `/ave/${previewBird.id}?print=1&style=BADGE_PRO&mode=${badgeMode}&w=${badgeWidthCm}&h=${badgeHeightCm}`;
-  };
-
-  const openPrintableRoute = (url: string) => {
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.setItem('birdpro_simulated_bird', JSON.stringify(previewBird));
-    } catch {}
-
-    if (isMobileDevice()) {
-      window.location.href = url;
-      return;
-    }
-
-    const newWin = window.open(url, '_blank');
-    if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
-      window.location.href = url;
-    }
-  };
-
   const handlePrint = () => {
     // Se o usuário preencheu a ave, garante que fique salva no plantel/lista
     if ((birdData.name || birdData.ringNumber) && !savedBirdRecord) {
@@ -305,19 +279,18 @@ export default function CriarCrachaPage() {
     }
     if (typeof window !== 'undefined') {
       localStorage.setItem('birdpro_simulated_bird', JSON.stringify(previewBird));
+      window.print();
     }
-    if (isMobileDevice()) {
-      openPrintableRoute(getTargetUrl());
-      return;
-    }
-    window.print();
   };
 
   const handleSavePdf = () => {
     if ((birdData.name || birdData.ringNumber) && !savedBirdRecord) {
       handleSaveToCriatorio();
     }
-    openPrintableRoute(getTargetUrl());
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('birdpro_simulated_bird', JSON.stringify(previewBird));
+      window.print();
+    }
   };
 
   const handleSaveToCriatorio = () => {
