@@ -62,6 +62,8 @@ export function PrintPedigreeModal({
   const [badgeWidthCm, setBadgeWidthCm] = useState<number>(9)
   const [badgeHeightCm, setBadgeHeightCm] = useState<number>(6)
   const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false)
+  const [pdfReadyUrl, setPdfReadyUrl] = useState<string | null>(null)
+  const [pdfReadyFilename, setPdfReadyFilename] = useState<string>('documento.pdf')
 
   const getLatestTenant = (): Tenant => {
     return initialTenant || db.getTenant(activeBird?.tenantId) || db.getTenant()
@@ -141,6 +143,7 @@ export function PrintPedigreeModal({
   const handleOpenPdf = async () => {
     if (isExportingPdf) return
     setIsExportingPdf(true)
+    setPdfReadyUrl(null)
     try {
       if (typeof window !== 'undefined') {
         try {
@@ -153,13 +156,18 @@ export function PrintPedigreeModal({
       const cleanName = (activeBird.ringNumber || activeBird.name || 'ave').replace(/[^a-zA-Z0-9_\-]/g, '_')
       const filename = isBadge ? `cracha_${cleanName}` : `arvore_${cleanName}`
 
-      await exportElementToPdf(targetId, {
+      const res = await exportElementToPdf(targetId, {
         filename,
         format: isBadge ? 'badge' : 'a4',
         widthCm: isBadge ? badgeWidthCm : 29.7,
         heightCm: isBadge ? badgeHeightCm : 21,
         orientation: 'landscape'
       })
+
+      if (res.success && res.blobUrl) {
+        setPdfReadyUrl(res.blobUrl)
+        setPdfReadyFilename(res.filename || `${filename}.pdf`)
+      }
     } finally {
       setIsExportingPdf(false)
     }
@@ -317,19 +325,33 @@ export function PrintPedigreeModal({
 
           {/* Right Action Buttons */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleOpenPdf}
-              disabled={isExportingPdf}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 disabled:opacity-60 text-white text-xs font-bold rounded-lg border border-slate-600 flex items-center gap-1.5 transition cursor-pointer shadow-sm"
-              title="Salvar ou abrir documento em PDF"
-            >
-              {isExportingPdf ? (
-                <Loader2 className="w-3.5 h-3.5 text-sky-400 animate-spin" />
-              ) : (
-                <Download className="w-3.5 h-3.5 text-sky-400" />
-              )}
-              <span>{isExportingPdf ? 'Gerando PDF...' : (themeStyle === 'BADGE_PRO' ? 'Salvar Crachá (PDF)' : 'Salvar Certificado (PDF)')}</span>
-            </button>
+            {pdfReadyUrl ? (
+              <a
+                href={pdfReadyUrl}
+                download={pdfReadyFilename}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold rounded-lg border border-emerald-500 flex items-center gap-1.5 transition cursor-pointer shadow-sm animate-pulse"
+                title="Toque para abrir ou baixar o PDF gerado"
+              >
+                <Download className="w-3.5 h-3.5 text-white" />
+                <span>Baixar PDF Pronto</span>
+              </a>
+            ) : (
+              <button
+                onClick={handleOpenPdf}
+                disabled={isExportingPdf}
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 disabled:opacity-60 text-white text-xs font-bold rounded-lg border border-slate-600 flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                title="Salvar ou abrir documento em PDF"
+              >
+                {isExportingPdf ? (
+                  <Loader2 className="w-3.5 h-3.5 text-sky-400 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5 text-sky-400" />
+                )}
+                <span>{isExportingPdf ? 'Gerando PDF...' : (themeStyle === 'BADGE_PRO' ? 'Salvar Crachá (PDF)' : 'Salvar Certificado (PDF)')}</span>
+              </button>
+            )}
 
             <button
               onClick={handlePrint}
@@ -351,6 +373,36 @@ export function PrintPedigreeModal({
           </div>
 
         </div>
+
+        {/* Banner de PDF Gerado com Sucesso / Download Imediato */}
+        {pdfReadyUrl && (
+          <div className="bg-emerald-600 text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs font-bold animate-fade-in print:hidden shadow-lg border-b border-emerald-500">
+            <div className="flex items-center gap-2">
+              <Check className="w-4 h-4 text-emerald-200 shrink-0" />
+              <span>PDF gerado com sucesso! Toque no botão para abrir ou salvar:</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <a
+                href={pdfReadyUrl}
+                download={pdfReadyFilename}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 bg-white text-emerald-950 rounded-lg font-black hover:bg-emerald-50 active:bg-emerald-100 transition shadow flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Abrir / Baixar PDF</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => setPdfReadyUrl(null)}
+                className="text-emerald-200 hover:text-white p-1 cursor-pointer"
+                title="Fechar aviso"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ========================================================================= */}
         {/* SELETOR DE TAMANHO DO CRACHÁ EM CM (Impressão Automática no Tamanho Desejado) */}

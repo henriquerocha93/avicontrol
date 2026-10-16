@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Printer, X, Ruler, Download, Loader2 } from 'lucide-react'
+import { Printer, X, Ruler, Download, Loader2, Check } from 'lucide-react'
 import { Bird, Tenant } from '@/types'
 import { db } from '@/lib/db'
 import { firebaseSync } from '@/lib/firebase-service'
@@ -43,6 +43,8 @@ export function PrintBadgeModal({
   const [badgeWidthCm, setBadgeWidthCm] = useState<number>(9)
   const [badgeHeightCm, setBadgeHeightCm] = useState<number>(6)
   const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false)
+  const [pdfReadyUrl, setPdfReadyUrl] = useState<string | null>(null)
+  const [pdfReadyFilename, setPdfReadyFilename] = useState<string>('cracha.pdf')
 
   const getLatestTenant = (): Tenant => {
     const fromDb = db.getTenant(tenant?.id || bird?.tenantId) || db.getTenant()
@@ -169,6 +171,7 @@ export function PrintBadgeModal({
   const handleSavePdf = async () => {
     if (isExportingPdf) return
     setIsExportingPdf(true)
+    setPdfReadyUrl(null)
     try {
       if (typeof window !== 'undefined') {
         try {
@@ -177,13 +180,19 @@ export function PrintBadgeModal({
       }
 
       const cleanName = (bird.ringNumber || bird.name || 'cracha').replace(/[^a-zA-Z0-9_\-]/g, '_')
-      await exportElementToPdf('printable-badge', {
-        filename: `cracha_${cleanName}`,
+      const filename = `cracha_${cleanName}`
+      const res = await exportElementToPdf('printable-badge', {
+        filename,
         format: 'badge',
         widthCm: badgeWidthCm,
         heightCm: badgeHeightCm,
         orientation: 'landscape'
       })
+
+      if (res.success && res.blobUrl) {
+        setPdfReadyUrl(res.blobUrl)
+        setPdfReadyFilename(res.filename || `${filename}.pdf`)
+      }
     } finally {
       setIsExportingPdf(false)
     }
@@ -265,19 +274,33 @@ export function PrintBadgeModal({
           </div>
 
           <div className="flex items-center space-x-2 sm:space-x-3">
-            <button
-              onClick={handleSavePdf}
-              disabled={isExportingPdf}
-              className="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 disabled:opacity-60 text-white text-xs font-bold rounded flex items-center space-x-1.5 transition shadow cursor-pointer"
-              title="Salvar ou abrir crachá em PDF"
-            >
-              {isExportingPdf ? (
-                <Loader2 className="w-3.5 h-3.5 text-sky-400 animate-spin" />
-              ) : (
-                <Download className="w-3.5 h-3.5 text-sky-400" />
-              )}
-              <span>{isExportingPdf ? 'Gerando PDF...' : 'Salvar PDF'}</span>
-            </button>
+            {pdfReadyUrl ? (
+              <a
+                href={pdfReadyUrl}
+                download={pdfReadyFilename}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold rounded flex items-center space-x-1.5 transition shadow cursor-pointer animate-pulse"
+                title="Toque para abrir ou baixar o PDF gerado"
+              >
+                <Download className="w-3.5 h-3.5 text-white" />
+                <span>Baixar PDF Pronto</span>
+              </a>
+            ) : (
+              <button
+                onClick={handleSavePdf}
+                disabled={isExportingPdf}
+                className="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 disabled:opacity-60 text-white text-xs font-bold rounded flex items-center space-x-1.5 transition shadow cursor-pointer"
+                title="Salvar ou abrir crachá em PDF"
+              >
+                {isExportingPdf ? (
+                  <Loader2 className="w-3.5 h-3.5 text-sky-400 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5 text-sky-400" />
+                )}
+                <span>{isExportingPdf ? 'Gerando PDF...' : 'Salvar PDF'}</span>
+              </button>
+            )}
 
             <button
               onClick={handlePrint}
@@ -303,6 +326,36 @@ export function PrintBadgeModal({
             </button>
           </div>
         </div>
+
+        {/* Banner de PDF Gerado com Sucesso / Download Imediato */}
+        {pdfReadyUrl && (
+          <div className="bg-emerald-600 text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs font-bold animate-fade-in print:hidden shadow-lg border-b border-emerald-500">
+            <div className="flex items-center gap-2">
+              <Check className="w-4 h-4 text-emerald-200 shrink-0" />
+              <span>PDF gerado com sucesso! Toque no botão para abrir ou salvar:</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <a
+                href={pdfReadyUrl}
+                download={pdfReadyFilename}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 bg-white text-emerald-950 rounded-lg font-black hover:bg-emerald-50 active:bg-emerald-100 transition shadow flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Abrir / Baixar PDF</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => setPdfReadyUrl(null)}
+                className="text-emerald-200 hover:text-white p-1 cursor-pointer"
+                title="Fechar aviso"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Barra de Tamanho do Crachá em cm para Impressão */}
         <div className="bg-[#131920] border-b border-emerald-500/30 px-5 py-2.5 flex flex-wrap items-center justify-between gap-3 text-white print:hidden animate-fade-in">

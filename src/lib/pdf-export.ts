@@ -9,11 +9,18 @@ export interface ExportPdfOptions {
   orientation?: 'landscape' | 'portrait'
 }
 
+export interface ExportPdfResult {
+  success: boolean
+  blobUrl?: string
+  filename?: string
+  error?: string
+}
+
 export async function exportElementToPdf(
   targetElementOrId: HTMLElement | string,
   options: ExportPdfOptions = {}
-): Promise<boolean> {
-  if (typeof window === 'undefined') return false
+): Promise<ExportPdfResult> {
+  if (typeof window === 'undefined') return { success: false, error: 'Window não disponível' }
 
   try {
     const el = typeof targetElementOrId === 'string'
@@ -22,10 +29,10 @@ export async function exportElementToPdf(
 
     if (!el) {
       console.warn('Elemento para geração de PDF não encontrado:', targetElementOrId)
-      return false
+      return { success: false, error: 'Elemento não encontrado no DOM' }
     }
 
-    // Garante que fontes estejam carregadas
+    // 1. Aguarda fontes carregarem para evitar textos quebrados
     if (document.fonts && document.fonts.ready) {
       try {
         await document.fonts.ready
@@ -37,20 +44,71 @@ export async function exportElementToPdf(
     const targetH = options.heightCm || (isBadge ? 6 : 21)
     const orientation = options.orientation || (targetW >= targetH ? 'landscape' : 'portrait')
 
-    // Captura com html2canvas em alta resolução
+    // 2. html2canvas com viewport virtual expandido para mobile (evita que a tela estreita do celular corte o crachá/árvore)
     const canvas = await html2canvas(el, {
-      scale: 2, // 2x para nitidez perfeita no mobile sem sobrecarregar memória
+      scale: 2, // 2x para nitidez e rapidez sem esgotar memória no mobile
       useCORS: true,
-      allowTaint: true,
+      allowTaint: false, // false obrigatório para evitar SecurityError no toDataURL
       backgroundColor: '#ffffff',
       logging: false,
+      windowWidth: Math.max(1400, el.scrollWidth || 1200),
+      windowHeight: Math.max(900, el.scrollHeight || 800),
       scrollX: 0,
-      scrollY: 0
+      scrollY: 0,
+      onclone: (clonedDoc) => {
+        const targetId = typeof targetElementOrId === 'string' ? targetElementOrId : el.id
+        const clonedEl = targetId ? clonedDoc.getElementById(targetId) : null
+        const root = clonedEl || clonedDoc.body
+
+        // Remove SVGs decorativos com <pattern> que quebram o parser do html2canvas
+        const svgs = root.querySelectorAll('svg')
+        svgs.forEach(svg => {
+          if (svg.querySelector('pattern')) {
+            svg.remove()
+          }
+        })
+
+        // Reseta transformações de escala responsivas para capturar no tamanho 100% nativo
+        const scaledElements = root.querySelectorAll('[style*="scale"]')
+        scaledElements.forEach(item => {
+          const htmlItem = item as HTMLElement
+          if (htmlItem.style.transform && htmlItem.style.transform.includes('scale')) {
+            htmlItem.style.transform = 'none'
+            htmlItem.style.marginBottom = '0px'
+          }
+        })
+
+        // Reseta wrappers de crachás responsivos para não recortar a altura ou largura no mobile
+        const wrappers = root.querySelectorAll('.badge-print-card-wrapper')
+        wrappers.forEach(w => {
+          const hw = w as HTMLElement
+          hw.style.height = 'auto'
+          hw.style.maxWidth = 'none'
+          hw.style.width = 'auto'
+          hw.style.overflow = 'visible'
+        })
+        const inners = root.querySelectorAll('.badge-print-card-inner')
+        inners.forEach(i => {
+          const hi = i as HTMLElement
+          hi.style.transform = 'none'
+        })
+
+        if (clonedEl) {
+          clonedEl.style.overflow = 'visible'
+          clonedEl.style.transform = 'none'
+          clonedEl.style.maxWidth = 'none'
+        }
+      }
     })
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.95)
+    let imgData = ''
+    try {
+      imgData = canvas.toDataURL('image/jpeg', 0.95)
+    } catch {
+      imgData = canvas.toDataURL()
+    }
 
-    // Cria o documento PDF no tamanho exato
+    // 3. Monta o PDF nas medidas exatas em cm
     const pdf = new jsPDF({
       orientation,
       unit: 'cm',
@@ -62,37 +120,46 @@ export async function exportElementToPdf(
     const cleanFilename = (options.filename || 'documento')
       .replace(/[^a-zA-Z0-9_\-]/g, '_')
       .toLowerCase()
+    const fullFilename = `${cleanFilename}.pdf`
 
-    // 1. No mobile, tenta primeiro a Web Share API nativa (compartilhar / salvar em arquivos)
-    if (typeof navigator !== 'undefined' && navigator.canShare && navigator.share) {
-      try {
-        const blob = pdf.output('blob')
-        const file = new File([blob], `${cleanFilename}.pdf`, { type: 'application/pdf' })
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: options.filename || 'Crachá Oficial BIRDPRO',
-            text: 'PDF gerado pela plataforma BIRDPRO'
-          })
-          return true
-        }
-      } catch (shareErr) {
-        // Se usuário cancelou o compartilhamento ou não suportou, continua para download direto
-        console.warn('Compartilhamento nativo cancelado ou indisponível:', shareErr)
+    // 4. Cria o Blob em memória
+    const pdfBlob = pdf.output('blob')
+    const blobUrl = URL.createObjectURL(new Blob([pdfBlob], { type: 'application/pdf' }))
+
+    const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+
+    // 5. Download e abertura otimizados para Android, iPhone e Desktop
+    if (isIOS) {
+      // No iOS (iPhone Safari), abrir a URL do blob abre o leitor PDF nativo em tela cheia com zoom, print e compartilhar
+      window.open(blobUrl, '_blank')
+    } else {
+      // No Android e Desktop, dispara o download com tag <a>
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = fullFilename
+      link.target = '_blank'
+      link.rel = 'noopener noreferrer'
+      document.body.appendChild(link)
+      link.click()
+
+      // Fallback no Android: se o navegador bloquear o download silencioso, abre o leitor em aba limpa
+      if (isMobile) {
+        setTimeout(() => {
+          window.open(blobUrl, '_blank')
+        }, 300)
       }
+
+      setTimeout(() => {
+        try {
+          document.body.removeChild(link)
+        } catch {}
+      }, 1000)
     }
 
-    // 2. Download direto do arquivo PDF no dispositivo
-    pdf.save(`${cleanFilename}.pdf`)
-    return true
-  } catch (error) {
+    return { success: true, blobUrl, filename: fullFilename }
+  } catch (error: any) {
     console.error('Falha ao exportar PDF via html2canvas/jsPDF:', error)
-    // Fallback: tenta abrir janela de impressão do navegador se disponível
-    if (typeof window !== 'undefined' && window.print) {
-      try {
-        window.print()
-      } catch {}
-    }
-    return false
+    return { success: false, error: error?.message || 'Falha ao processar PDF' }
   }
 }
