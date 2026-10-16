@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Printer, X, Ruler } from 'lucide-react'
+import { Printer, X, Ruler, Download } from 'lucide-react'
 import { Bird, Tenant } from '@/types'
 import { db } from '@/lib/db'
 import { firebaseSync } from '@/lib/firebase-service'
@@ -164,8 +164,48 @@ export function PrintBadgeModal({
 
   if (!isOpen || !mounted || typeof document === 'undefined') return null
 
+  const isMobileDevice = () => {
+    if (typeof window === 'undefined') return false
+    return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768
+  }
+
+  const getTargetUrl = () => {
+    return `/ave/${bird.id}?print=1&style=BADGE_PRO&mode=${printMode}&w=${badgeWidthCm}&h=${badgeHeightCm}`
+  }
+
+  const openPrintableRoute = (url: string) => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.setItem('birdpro_simulated_bird', JSON.stringify(bird))
+    } catch {}
+
+    // On mobile devices, window.open is blocked by Safari and Chrome popup blockers.
+    // Navigating directly guarantees immediate action without popup blockage.
+    if (isMobileDevice()) {
+      window.location.href = url
+      return
+    }
+
+    const newWin = window.open(url, '_blank')
+    if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
+      window.location.href = url
+    }
+  }
+
   const handlePrint = () => {
+    const url = getTargetUrl()
+    if (isMobileDevice()) {
+      // On mobile phones, window.print() inside a fixed portal modal often silently fails
+      // or crashes. Navigating to the clean standalone printable route triggers native print cleanly!
+      openPrintableRoute(url)
+      return
+    }
     window.print()
+  }
+
+  const handleSavePdf = () => {
+    const url = getTargetUrl()
+    openPrintableRoute(url)
   }
 
   const modalContent = (
@@ -220,23 +260,34 @@ export function PrintBadgeModal({
             </button>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <button
+              onClick={handleSavePdf}
+              className="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white text-xs font-bold rounded flex items-center space-x-1.5 transition shadow cursor-pointer"
+              title="Salvar ou abrir crachá em PDF"
+            >
+              <Download className="w-3.5 h-3.5 text-sky-400" />
+              <span>Salvar PDF</span>
+            </button>
+
             <button
               onClick={handlePrint}
-              className="px-4 py-1.5 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-bold rounded flex items-center space-x-1.5 transition shadow cursor-pointer"
+              className="px-4 py-1.5 bg-[#00c853] hover:bg-[#00b84a] active:bg-[#009b3e] text-white text-xs font-bold rounded flex items-center space-x-1.5 transition shadow cursor-pointer"
+              title="Imprimir crachá diretamente"
             >
               <Printer className="w-4 h-4" />
               <span>
                 {printMode === 'FRONT_ONLY' 
-                  ? 'Imprimir 1 Crachá (PDF)' 
+                  ? 'Imprimir Crachá' 
                   : printMode === 'BACK_ONLY' 
-                    ? 'Imprimir Verso (PDF)' 
+                    ? 'Imprimir Verso' 
                     : 'Imprimir Frente e Verso'}
               </span>
             </button>
             <button
               onClick={onClose}
               className="p-1.5 text-slate-400 hover:text-white rounded transition cursor-pointer"
+              title="Fechar"
             >
               <X className="w-5 h-5" />
             </button>

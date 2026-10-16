@@ -17,7 +17,8 @@ import {
   Info,
   X,
   ExternalLink,
-  Ruler
+  Ruler,
+  Download
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { db } from '@/lib/db';
@@ -271,6 +272,32 @@ export default function CriarCrachaPage() {
     };
   }, [parents, grandparents, greatGrandparents, greatGreatGrandparents]);
 
+  const isMobileDevice = () => {
+    if (typeof window === 'undefined') return false;
+    return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+  };
+
+  const getTargetUrl = () => {
+    return `/ave/${previewBird.id}?print=1&style=BADGE_PRO&mode=${badgeMode}&w=${badgeWidthCm}&h=${badgeHeightCm}`;
+  };
+
+  const openPrintableRoute = (url: string) => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('birdpro_simulated_bird', JSON.stringify(previewBird));
+    } catch {}
+
+    if (isMobileDevice()) {
+      window.location.href = url;
+      return;
+    }
+
+    const newWin = window.open(url, '_blank');
+    if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
+      window.location.href = url;
+    }
+  };
+
   const handlePrint = () => {
     // Se o usuário preencheu a ave, garante que fique salva no plantel/lista
     if ((birdData.name || birdData.ringNumber) && !savedBirdRecord) {
@@ -279,7 +306,18 @@ export default function CriarCrachaPage() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('birdpro_simulated_bird', JSON.stringify(previewBird));
     }
+    if (isMobileDevice()) {
+      openPrintableRoute(getTargetUrl());
+      return;
+    }
     window.print();
+  };
+
+  const handleSavePdf = () => {
+    if ((birdData.name || birdData.ringNumber) && !savedBirdRecord) {
+      handleSaveToCriatorio();
+    }
+    openPrintableRoute(getTargetUrl());
   };
 
   const handleSaveToCriatorio = () => {
@@ -827,8 +865,18 @@ export default function CriarCrachaPage() {
             </button>
 
             <button
+              onClick={handleSavePdf}
+              className="flex-1 sm:flex-initial px-4 py-2.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer border border-slate-700"
+              title="Salvar ou abrir crachá em PDF"
+            >
+              <Download className="w-3.5 h-3.5 text-sky-400" />
+              <span>Salvar PDF</span>
+            </button>
+
+            <button
               onClick={handlePrint}
-              className="flex-1 sm:flex-initial px-5 py-2.5 bg-[#00c853] hover:bg-[#00b84a] text-slate-950 font-black rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-md cursor-pointer"
+              className="flex-1 sm:flex-initial px-5 py-2.5 bg-[#00c853] hover:bg-[#00b84a] active:bg-[#009b3e] text-slate-950 font-black rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-md cursor-pointer"
+              title="Imprimir crachá diretamente"
             >
               <Printer className="w-4 h-4 text-slate-950" />
               <span>Imprimir Crachá</span>

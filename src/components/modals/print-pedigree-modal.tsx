@@ -136,17 +136,49 @@ export function PrintPedigreeModal({
     ? `${window.location.origin}/ave/${activeBird.id}` 
     : `https://www.birdpro.com.br/ave/${activeBird.id}`
 
+  const isMobileDevice = () => {
+    if (typeof window === 'undefined') return false
+    return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768
+  }
+
+  const getTargetPrintUrl = () => {
+    const isBadge = themeStyle === 'BADGE_PRO'
+    return `/ave/${activeBird.id}?print=1&style=${themeStyle}&gen=${generationsCount}${isBadge ? `&w=${badgeWidthCm}&h=${badgeHeightCm}&mode=FRONT_ONLY` : ''}`
+  }
+
+  const openPrintableRoute = (url: string) => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.setItem('birdpro_simulated_bird', JSON.stringify(activeBird))
+    } catch {}
+
+    // On mobile devices, window.open is blocked by Safari and Chrome popup blockers.
+    // Navigating directly guarantees immediate action without popup blockage.
+    if (isMobileDevice()) {
+      window.location.href = url
+      return
+    }
+
+    const newWin = window.open(url, '_blank')
+    if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
+      window.location.href = url
+    }
+  }
+
   const handlePrint = () => {
+    const url = getTargetPrintUrl()
+    if (isMobileDevice()) {
+      // On mobile phones, window.print() inside a fixed portal modal often silently fails
+      // or crashes. Navigating to the clean standalone printable route triggers native print cleanly!
+      openPrintableRoute(url)
+      return
+    }
     window.print()
   }
 
   const handleOpenPdf = () => {
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('birdpro_simulated_bird', JSON.stringify(activeBird))
-      } catch {}
-      window.open(`/ave/${activeBird.id}?print=1&style=${themeStyle}&gen=${generationsCount}`, '_blank')
-    }
+    const url = getTargetPrintUrl()
+    openPrintableRoute(url)
   }
 
   const sanitizeImage = (url?: string | null) => {
@@ -278,19 +310,20 @@ export function PrintPedigreeModal({
           <div className="flex items-center gap-2">
             <button
               onClick={handleOpenPdf}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg border border-slate-600 flex items-center gap-1.5 transition cursor-pointer"
-              title="Abrir em nova aba para salvar como PDF"
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-white text-xs font-bold rounded-lg border border-slate-600 flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+              title="Salvar ou abrir documento em PDF"
             >
               <Download className="w-3.5 h-3.5 text-sky-400" />
-              <span>Abrir / Baixar PDF</span>
+              <span>{themeStyle === 'BADGE_PRO' ? 'Salvar Crachá (PDF)' : 'Salvar Certificado (PDF)'}</span>
             </button>
 
             <button
               onClick={handlePrint}
-              className="px-4 py-2 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-black rounded-lg flex items-center gap-1.5 transition shadow-md cursor-pointer"
+              className="px-4 py-2 bg-[#00c853] hover:bg-[#00b84a] active:bg-[#009b3e] text-white text-xs font-black rounded-lg flex items-center gap-1.5 transition shadow-md cursor-pointer"
+              title="Imprimir diretamente ou gerar impressão"
             >
               <Printer className="w-4 h-4" />
-              <span>Imprimir Certificado</span>
+              <span>{themeStyle === 'BADGE_PRO' ? 'Imprimir Crachá' : 'Imprimir Certificado'}</span>
             </button>
 
             <button

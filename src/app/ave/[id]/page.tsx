@@ -36,6 +36,9 @@ function PublicCertificateContent() {
   const autoPrint = searchParams?.get('print') === '1'
   const requestedStyle = (searchParams?.get('style') as any) || 'BADGE_PRO'
   const requestedGen = Number(searchParams?.get('gen')) || 5
+  const requestedMode = (searchParams?.get('mode') as any) || 'FRONT_ONLY'
+  const requestedW = Number(searchParams?.get('w')) || 9
+  const requestedH = Number(searchParams?.get('h')) || 6
   
   // Parâmetros instantâneos passados pelo QR code (permite renderização imediata no celular em 0ms)
   const ringParam = searchParams?.get('r') || searchParams?.get('ring') || ''
@@ -50,7 +53,11 @@ function PublicCertificateContent() {
   const [bird, setBird] = useState<Bird | null>(null)
   const [tenant, setTenant] = useState<Tenant | null>(null)
   const [themeStyle, setThemeStyle] = useState<'BADGE_PRO' | 'CLASSIC_LIGHT' | 'DARK_PRESTIGE'>(requestedStyle)
-  const [badgeMode, setBadgeMode] = useState<'FRONT_ONLY' | 'BACK_ONLY' | 'BOTH'>('FRONT_ONLY')
+  const [badgeMode, setBadgeMode] = useState<'FRONT_ONLY' | 'BACK_ONLY' | 'BOTH'>(
+    requestedMode === 'BOTH' || requestedMode === 'BACK_ONLY' ? requestedMode : 'FRONT_ONLY'
+  )
+  const [badgeWidthCm, setBadgeWidthCm] = useState<number>(requestedW)
+  const [badgeHeightCm, setBadgeHeightCm] = useState<number>(requestedH)
   const [generationsCount, setGenerationsCount] = useState<number>(requestedGen)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
 
@@ -236,9 +243,14 @@ function PublicCertificateContent() {
 
   useEffect(() => {
     if (autoPrint && bird && !isAuthenticating) {
-      setTimeout(() => {
-        window.print()
-      }, 500)
+      const timer = setTimeout(() => {
+        try {
+          window.print()
+        } catch (e) {
+          console.warn('Auto print error:', e)
+        }
+      }, 800)
+      return () => clearTimeout(timer)
     }
   }, [autoPrint, bird, isAuthenticating])
 
@@ -279,8 +291,26 @@ function PublicCertificateContent() {
       {/* Top Floating Controls Bar */}
       <div className="w-full bg-[#1b222a] border-b border-slate-800 px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-md sticky top-0 z-50 print:hidden">
         
-        {/* Identificação BirdPro */}
+        {/* Identificação BirdPro + Botão Voltar */}
         <div className="flex items-center space-x-3">
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                if (window.history.length > 1) {
+                  window.history.back()
+                } else {
+                  window.location.href = '/dashboard/genealogia'
+                }
+              }
+            }}
+            className="p-1.5 sm:px-2.5 sm:py-1.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-300 hover:text-white rounded-lg border border-slate-700 transition flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+            title="Voltar à tela anterior"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Voltar</span>
+          </button>
+
           <div className="w-8 h-8 rounded-lg bg-[#00c853] flex items-center justify-center text-slate-950 font-black text-xs shadow">
             BP
           </div>
@@ -328,12 +358,18 @@ function PublicCertificateContent() {
 
           <button
             onClick={handlePrint}
-            className="px-4 py-2 bg-[#00c853] hover:bg-[#00b84a] text-slate-950 font-black rounded-lg flex items-center space-x-1.5 transition shadow cursor-pointer"
+            className="px-4 py-2 bg-[#00c853] hover:bg-[#00b84a] active:bg-[#009b3e] text-slate-950 font-black rounded-lg flex items-center space-x-1.5 transition shadow cursor-pointer"
+            title="Imprimir ou salvar em PDF no celular/computador"
           >
             <Printer className="w-4 h-4 text-slate-950" />
             <span>Imprimir / Salvar PDF</span>
           </button>
         </div>
+      </div>
+
+      {/* Dica para celular */}
+      <div className="w-full bg-slate-900/90 border-b border-slate-800 px-4 py-1.5 text-center text-[11px] text-emerald-400 font-semibold print:hidden flex items-center justify-center gap-2">
+        <span>💡 No celular: Toque em <strong>Imprimir / Salvar PDF</strong> e selecione <strong>"Salvar como PDF"</strong> para baixar o arquivo.</span>
       </div>
 
       {/* ========================================================================= */}
@@ -394,6 +430,8 @@ function PublicCertificateContent() {
                 bird={bird} 
                 tenant={tenant} 
                 mode={badgeMode} 
+                printWidthCm={badgeWidthCm}
+                printHeightCm={badgeHeightCm}
               />
             </div>
 
