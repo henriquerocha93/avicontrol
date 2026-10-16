@@ -18,7 +18,8 @@ import {
   X,
   ExternalLink,
   Ruler,
-  Download
+  Download,
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { db } from '@/lib/db';
@@ -27,6 +28,7 @@ import { Bird, Tenant } from '@/types';
 import { BadgeFrontAndBack, BadgeAncestors } from '@/components/genealogy/badge-front-and-back';
 import { SpeciesCombobox } from '@/components/ui/species-combobox';
 import { resolvePedigreeTree } from '@/lib/pedigree';
+import { exportElementToPdf } from '@/lib/pdf-export';
 
 export default function CriarCrachaPage() {
   const { tenant } = useAuth();
@@ -56,6 +58,7 @@ export default function CriarCrachaPage() {
   const [badgeHeightCm, setBadgeHeightCm] = useState<number>(6);
   const [isSaved, setIsSaved] = useState(false);
   const [savedBirdRecord, setSavedBirdRecord] = useState<Bird | null>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const plantelBirds = useMemo(() => {
     return db.getBirds(currentTenant?.id);
@@ -272,25 +275,52 @@ export default function CriarCrachaPage() {
     };
   }, [parents, grandparents, greatGrandparents, greatGreatGrandparents]);
 
-  const handlePrint = () => {
-    // Se o usuário preencheu a ave, garante que fique salva no plantel/lista
-    if ((birdData.name || birdData.ringNumber) && !savedBirdRecord) {
-      handleSaveToCriatorio();
-    }
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('birdpro_simulated_bird', JSON.stringify(previewBird));
-      window.print();
+  const handleSavePdf = async () => {
+    if (isExportingPdf) return;
+    setIsExportingPdf(true);
+    try {
+      if ((birdData.name || birdData.ringNumber) && !savedBirdRecord) {
+        handleSaveToCriatorio();
+      }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('birdpro_simulated_bird', JSON.stringify(previewBird));
+      }
+
+      const cleanName = (previewBird.ringNumber || previewBird.name || 'cracha').replace(/[^a-zA-Z0-9_\-]/g, '_');
+      await exportElementToPdf('printable-badge', {
+        filename: `cracha_${cleanName}`,
+        format: 'badge',
+        widthCm: badgeWidthCm,
+        heightCm: badgeHeightCm,
+        orientation: 'landscape'
+      });
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
-  const handleSavePdf = () => {
+  const handlePrint = async () => {
     if ((birdData.name || birdData.ringNumber) && !savedBirdRecord) {
       handleSaveToCriatorio();
     }
     if (typeof window !== 'undefined') {
       localStorage.setItem('birdpro_simulated_bird', JSON.stringify(previewBird));
-      window.print();
     }
+
+    const isMobile = typeof window !== 'undefined' && (
+      /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768
+    );
+
+    if (!isMobile) {
+      window.print();
+      return;
+    }
+
+    try {
+      window.print();
+    } catch {}
+
+    await handleSavePdf();
   };
 
   const handleSaveToCriatorio = () => {
@@ -839,16 +869,22 @@ export default function CriarCrachaPage() {
 
             <button
               onClick={handleSavePdf}
-              className="flex-1 sm:flex-initial px-4 py-2.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer border border-slate-700"
+              disabled={isExportingPdf}
+              className="flex-1 sm:flex-initial px-4 py-2.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 disabled:opacity-60 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer border border-slate-700"
               title="Salvar ou abrir crachá em PDF"
             >
-              <Download className="w-3.5 h-3.5 text-sky-400" />
-              <span>Salvar PDF</span>
+              {isExportingPdf ? (
+                <Loader2 className="w-3.5 h-3.5 text-sky-400 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5 text-sky-400" />
+              )}
+              <span>{isExportingPdf ? 'Gerando PDF...' : 'Salvar PDF'}</span>
             </button>
 
             <button
               onClick={handlePrint}
-              className="flex-1 sm:flex-initial px-5 py-2.5 bg-[#00c853] hover:bg-[#00b84a] active:bg-[#009b3e] text-slate-950 font-black rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-md cursor-pointer"
+              disabled={isExportingPdf}
+              className="flex-1 sm:flex-initial px-5 py-2.5 bg-[#00c853] hover:bg-[#00b84a] active:bg-[#009b3e] disabled:opacity-60 text-slate-950 font-black rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-md cursor-pointer"
               title="Imprimir crachá diretamente"
             >
               <Printer className="w-4 h-4 text-slate-950" />

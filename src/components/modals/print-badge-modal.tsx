@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Printer, X, Ruler, Download } from 'lucide-react'
+import { Printer, X, Ruler, Download, Loader2 } from 'lucide-react'
 import { Bird, Tenant } from '@/types'
 import { db } from '@/lib/db'
 import { firebaseSync } from '@/lib/firebase-service'
 import { BadgeFrontAndBack } from '@/components/genealogy/badge-front-and-back'
+import { exportElementToPdf } from '@/lib/pdf-export'
 
 interface PrintBadgeModalProps {
   isOpen: boolean
@@ -41,6 +42,7 @@ export function PrintBadgeModal({
   const [printMode, setPrintMode] = useState<'FRONT_ONLY' | 'BACK_ONLY' | 'BOTH'>('FRONT_ONLY')
   const [badgeWidthCm, setBadgeWidthCm] = useState<number>(9)
   const [badgeHeightCm, setBadgeHeightCm] = useState<number>(6)
+  const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false)
 
   const getLatestTenant = (): Tenant => {
     const fromDb = db.getTenant(tenant?.id || bird?.tenantId) || db.getTenant()
@@ -164,22 +166,50 @@ export function PrintBadgeModal({
 
   if (!isOpen || !mounted || typeof document === 'undefined') return null
 
-  const handlePrint = () => {
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('birdpro_simulated_bird', JSON.stringify(bird))
-      } catch {}
-      window.print()
+  const handleSavePdf = async () => {
+    if (isExportingPdf) return
+    setIsExportingPdf(true)
+    try {
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('birdpro_simulated_bird', JSON.stringify(bird))
+        } catch {}
+      }
+
+      const cleanName = (bird.ringNumber || bird.name || 'cracha').replace(/[^a-zA-Z0-9_\-]/g, '_')
+      await exportElementToPdf('printable-badge', {
+        filename: `cracha_${cleanName}`,
+        format: 'badge',
+        widthCm: badgeWidthCm,
+        heightCm: badgeHeightCm,
+        orientation: 'landscape'
+      })
+    } finally {
+      setIsExportingPdf(false)
     }
   }
 
-  const handleSavePdf = () => {
+  const handlePrint = async () => {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('birdpro_simulated_bird', JSON.stringify(bird))
       } catch {}
-      window.print()
     }
+
+    const isMobile = typeof window !== 'undefined' && (
+      /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768
+    )
+
+    if (!isMobile) {
+      window.print()
+      return
+    }
+
+    try {
+      window.print()
+    } catch {}
+
+    await handleSavePdf()
   }
 
   const modalContent = (
@@ -237,16 +267,22 @@ export function PrintBadgeModal({
           <div className="flex items-center space-x-2 sm:space-x-3">
             <button
               onClick={handleSavePdf}
-              className="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white text-xs font-bold rounded flex items-center space-x-1.5 transition shadow cursor-pointer"
+              disabled={isExportingPdf}
+              className="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 disabled:opacity-60 text-white text-xs font-bold rounded flex items-center space-x-1.5 transition shadow cursor-pointer"
               title="Salvar ou abrir crachá em PDF"
             >
-              <Download className="w-3.5 h-3.5 text-sky-400" />
-              <span>Salvar PDF</span>
+              {isExportingPdf ? (
+                <Loader2 className="w-3.5 h-3.5 text-sky-400 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5 text-sky-400" />
+              )}
+              <span>{isExportingPdf ? 'Gerando PDF...' : 'Salvar PDF'}</span>
             </button>
 
             <button
               onClick={handlePrint}
-              className="px-4 py-1.5 bg-[#00c853] hover:bg-[#00b84a] active:bg-[#009b3e] text-white text-xs font-bold rounded flex items-center space-x-1.5 transition shadow cursor-pointer"
+              disabled={isExportingPdf}
+              className="px-4 py-1.5 bg-[#00c853] hover:bg-[#00b84a] active:bg-[#009b3e] disabled:opacity-60 text-white text-xs font-bold rounded flex items-center space-x-1.5 transition shadow cursor-pointer"
               title="Imprimir crachá diretamente"
             >
               <Printer className="w-4 h-4" />
@@ -391,15 +427,22 @@ export function PrintBadgeModal({
             </button>
             <button
               onClick={handlePrint}
-              className="px-6 py-2 bg-[#00c853] hover:bg-[#00b84a] text-white text-xs font-bold rounded shadow transition flex items-center space-x-2 cursor-pointer"
+              disabled={isExportingPdf}
+              className="px-6 py-2 bg-[#00c853] hover:bg-[#00b84a] active:bg-[#009b3e] disabled:opacity-60 text-white text-xs font-bold rounded shadow transition flex items-center space-x-2 cursor-pointer"
             >
-              <Printer className="w-4 h-4" />
+              {isExportingPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+              ) : (
+                <Printer className="w-4 h-4" />
+              )}
               <span>
-                {printMode === 'FRONT_ONLY' 
-                  ? 'Imprimir 1 Crachá (PDF)' 
-                  : printMode === 'BACK_ONLY' 
-                    ? 'Imprimir Somente Verso (PDF)' 
-                    : 'Imprimir Frente e Verso (PDF)'}
+                {isExportingPdf ? 'Gerando PDF...' : (
+                  printMode === 'FRONT_ONLY' 
+                    ? 'Imprimir 1 Crachá (PDF)' 
+                    : printMode === 'BACK_ONLY' 
+                      ? 'Imprimir Somente Verso (PDF)' 
+                      : 'Imprimir Frente e Verso (PDF)'
+                )}
               </span>
             </button>
           </div>

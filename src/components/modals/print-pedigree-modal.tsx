@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { QRCodeSVG } from 'qrcode.react'
-import { Printer, X, Download, FileText, Sparkles, Check, ExternalLink, ChevronDown, Moon, Sun, Award, QrCode, Ruler } from 'lucide-react'
+import { Printer, X, Download, FileText, Sparkles, Check, ExternalLink, ChevronDown, Moon, Sun, Award, QrCode, Ruler, Loader2 } from 'lucide-react'
 import { Bird, Tenant } from '@/types'
 import { formatDate } from '@/lib/utils'
 import { db } from '@/lib/db'
@@ -11,6 +11,7 @@ import { firebaseSync } from '@/lib/firebase-service'
 import { resolvePedigreeTree } from '@/lib/pedigree'
 import { BadgeFrontAndBack } from '@/components/genealogy/badge-front-and-back'
 import { PedigreeCertificateArouca } from '@/components/genealogy/pedigree-certificate-arouca'
+import { exportElementToPdf } from '@/lib/pdf-export'
 
 interface PrintPedigreeModalProps {
   isOpen: boolean
@@ -60,6 +61,7 @@ export function PrintPedigreeModal({
   const [showQrCode, setShowQrCode] = useState<boolean>(true)
   const [badgeWidthCm, setBadgeWidthCm] = useState<number>(9)
   const [badgeHeightCm, setBadgeHeightCm] = useState<number>(6)
+  const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false)
 
   const getLatestTenant = (): Tenant => {
     return initialTenant || db.getTenant(activeBird?.tenantId) || db.getTenant()
@@ -136,22 +138,56 @@ export function PrintPedigreeModal({
     ? `${window.location.origin}/ave/${activeBird.id}` 
     : `https://www.birdpro.com.br/ave/${activeBird.id}`
 
-  const handlePrint = () => {
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('birdpro_simulated_bird', JSON.stringify(activeBird))
-      } catch {}
-      window.print()
+  const handleOpenPdf = async () => {
+    if (isExportingPdf) return
+    setIsExportingPdf(true)
+    try {
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('birdpro_simulated_bird', JSON.stringify(activeBird))
+        } catch {}
+      }
+
+      const isBadge = themeStyle === 'BADGE_PRO'
+      const targetId = isBadge ? 'printable-badge' : 'pedigree-certificate'
+      const cleanName = (activeBird.ringNumber || activeBird.name || 'ave').replace(/[^a-zA-Z0-9_\-]/g, '_')
+      const filename = isBadge ? `cracha_${cleanName}` : `arvore_${cleanName}`
+
+      await exportElementToPdf(targetId, {
+        filename,
+        format: isBadge ? 'badge' : 'a4',
+        widthCm: isBadge ? badgeWidthCm : 29.7,
+        heightCm: isBadge ? badgeHeightCm : 21,
+        orientation: 'landscape'
+      })
+    } finally {
+      setIsExportingPdf(false)
     }
   }
 
-  const handleOpenPdf = () => {
+  const handlePrint = async () => {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('birdpro_simulated_bird', JSON.stringify(activeBird))
       } catch {}
-      window.print()
     }
+
+    const isMobile = typeof window !== 'undefined' && (
+      /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768
+    )
+
+    // No desktop, window.print() abre o diálogo com fidelidade total
+    if (!isMobile) {
+      window.print()
+      return
+    }
+
+    // No mobile, tenta window.print() e aciona a exportação direta de PDF
+    try {
+      window.print()
+    } catch {}
+
+    await handleOpenPdf()
   }
 
   const sanitizeImage = (url?: string | null) => {
@@ -283,16 +319,22 @@ export function PrintPedigreeModal({
           <div className="flex items-center gap-2">
             <button
               onClick={handleOpenPdf}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-white text-xs font-bold rounded-lg border border-slate-600 flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+              disabled={isExportingPdf}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 disabled:opacity-60 text-white text-xs font-bold rounded-lg border border-slate-600 flex items-center gap-1.5 transition cursor-pointer shadow-sm"
               title="Salvar ou abrir documento em PDF"
             >
-              <Download className="w-3.5 h-3.5 text-sky-400" />
-              <span>{themeStyle === 'BADGE_PRO' ? 'Salvar Crachá (PDF)' : 'Salvar Certificado (PDF)'}</span>
+              {isExportingPdf ? (
+                <Loader2 className="w-3.5 h-3.5 text-sky-400 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5 text-sky-400" />
+              )}
+              <span>{isExportingPdf ? 'Gerando PDF...' : (themeStyle === 'BADGE_PRO' ? 'Salvar Crachá (PDF)' : 'Salvar Certificado (PDF)')}</span>
             </button>
 
             <button
               onClick={handlePrint}
-              className="px-4 py-2 bg-[#00c853] hover:bg-[#00b84a] active:bg-[#009b3e] text-white text-xs font-black rounded-lg flex items-center gap-1.5 transition shadow-md cursor-pointer"
+              disabled={isExportingPdf}
+              className="px-4 py-2 bg-[#00c853] hover:bg-[#00b84a] active:bg-[#009b3e] disabled:opacity-60 text-white text-xs font-black rounded-lg flex items-center gap-1.5 transition shadow-md cursor-pointer"
               title="Imprimir diretamente ou gerar impressão"
             >
               <Printer className="w-4 h-4" />
