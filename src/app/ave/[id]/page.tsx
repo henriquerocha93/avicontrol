@@ -17,7 +17,11 @@ import {
   MessageCircle,
   ExternalLink,
   ChevronRight,
-  Bird as BirdIcon
+  Bird as BirdIcon,
+  Loader2,
+  Share2,
+  Check,
+  X
 } from 'lucide-react'
 import { db } from '@/lib/db'
 import { firebaseSync } from '@/lib/firebase-service'
@@ -26,6 +30,7 @@ import { formatDate } from '@/lib/utils'
 import { resolvePedigreeTree } from '@/lib/pedigree'
 import { BadgeFrontAndBack } from '@/components/genealogy/badge-front-and-back'
 import { PedigreeCertificateArouca } from '@/components/genealogy/pedigree-certificate-arouca'
+import { exportElementToPdf, triggerPdfDownload, shareOrDownloadPdf, ExportPdfResult } from '@/lib/pdf-export'
 
 function PublicCertificateContent() {
   const params = useParams()
@@ -60,6 +65,8 @@ function PublicCertificateContent() {
   const [badgeHeightCm, setBadgeHeightCm] = useState<number>(requestedH)
   const [generationsCount, setGenerationsCount] = useState<number>(requestedGen)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
+  const [pdfResult, setPdfResult] = useState<ExportPdfResult | null>(null)
 
   useEffect(() => {
     let isCancelled = false
@@ -256,8 +263,49 @@ function PublicCertificateContent() {
 
   const publicUrl = typeof window !== 'undefined' ? window.location.href : `https://www.birdpro.com.br/ave/${bird?.id || routeId}`
 
-  const handlePrint = () => {
-    window.print()
+  const handleSavePdf = async () => {
+    if (isExportingPdf || !bird) return
+    setIsExportingPdf(true)
+    setPdfResult(null)
+    try {
+      const cleanName = (bird.ringNumber || bird.name || 'ave').replace(/[^a-zA-Z0-9_\-]/g, '_')
+      if (themeStyle === 'BADGE_PRO') {
+        const res = await exportElementToPdf('printable-badge', {
+          filename: `cracha_${cleanName}`,
+          format: 'badge',
+          widthCm: badgeWidthCm,
+          heightCm: badgeHeightCm,
+          orientation: 'landscape'
+        })
+        if (res.success && res.blobUrl) {
+          setPdfResult(res)
+        }
+      } else {
+        const res = await exportElementToPdf('pedigree-certificate', {
+          filename: `certificado_${cleanName}`,
+          format: 'a4',
+          orientation: 'landscape'
+        })
+        if (res.success && res.blobUrl) {
+          setPdfResult(res)
+        }
+      }
+    } finally {
+      setIsExportingPdf(false)
+    }
+  }
+
+  const handlePrint = async () => {
+    const isMobile = typeof window !== 'undefined' && (
+      /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768
+    )
+
+    if (!isMobile) {
+      window.print()
+      return
+    }
+
+    await handleSavePdf()
   }
 
   // Telefone para contato no WhatsApp
@@ -332,7 +380,7 @@ function PublicCertificateContent() {
           
           <div className="inline-flex rounded-md bg-slate-800 p-0.5 border border-slate-700">
             <button
-              onClick={() => setThemeStyle('BADGE_PRO')}
+              onClick={() => { setThemeStyle('BADGE_PRO'); setPdfResult(null); }}
               className={`px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                 themeStyle === 'BADGE_PRO' 
                   ? 'bg-emerald-600 text-white shadow-xs' 
@@ -344,7 +392,7 @@ function PublicCertificateContent() {
             </button>
 
             <button
-              onClick={() => setThemeStyle('CLASSIC_LIGHT')}
+              onClick={() => { setThemeStyle('CLASSIC_LIGHT'); setPdfResult(null); }}
               className={`px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                 themeStyle === 'CLASSIC_LIGHT' 
                   ? 'bg-emerald-600 text-white shadow-xs' 
@@ -356,9 +404,45 @@ function PublicCertificateContent() {
             </button>
           </div>
 
+          {pdfResult?.blobUrl ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => triggerPdfDownload(pdfResult.blobUrl!, pdfResult.filename || 'cracha.pdf', pdfResult.blob)}
+                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1.5 transition shadow cursor-pointer border border-emerald-500 animate-pulse"
+              >
+                <Download className="w-3.5 h-3.5 text-white" />
+                <span>Baixar PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => shareOrDownloadPdf(pdfResult)}
+                className="px-3 py-2 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white font-bold rounded-lg flex items-center gap-1.5 transition shadow cursor-pointer border border-sky-500"
+              >
+                <Share2 className="w-3.5 h-3.5 text-white" />
+                <span>Compartilhar</span>
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSavePdf}
+              disabled={isExportingPdf}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 disabled:opacity-60 text-white font-bold rounded-lg flex items-center gap-1.5 transition shadow cursor-pointer border border-slate-700"
+            >
+              {isExportingPdf ? (
+                <Loader2 className="w-3.5 h-3.5 text-sky-400 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5 text-sky-400" />
+              )}
+              <span>{isExportingPdf ? 'Gerando PDF...' : 'Salvar PDF'}</span>
+            </button>
+          )}
+
           <button
             onClick={handlePrint}
-            className="px-4 py-2 bg-[#00c853] hover:bg-[#00b84a] active:bg-[#009b3e] text-slate-950 font-black rounded-lg flex items-center space-x-1.5 transition shadow cursor-pointer"
+            disabled={isExportingPdf}
+            className="px-4 py-2 bg-[#00c853] hover:bg-[#00b84a] active:bg-[#009b3e] disabled:opacity-60 text-slate-950 font-black rounded-lg flex items-center space-x-1.5 transition shadow cursor-pointer"
             title="Imprimir ou salvar em PDF no celular/computador"
           >
             <Printer className="w-4 h-4 text-slate-950" />
@@ -367,9 +451,45 @@ function PublicCertificateContent() {
         </div>
       </div>
 
+      {/* Banner de PDF Gerado com Sucesso */}
+      {pdfResult?.blobUrl && (
+        <div className="w-full bg-emerald-600 text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs font-bold print:hidden shadow-md">
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-200 shrink-0" />
+            <span>PDF gerado! Toque para baixar ou compartilhar no celular (iPhone / Android):</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => triggerPdfDownload(pdfResult.blobUrl!, pdfResult.filename || 'cracha.pdf', pdfResult.blob)}
+              className="px-3 py-1.5 bg-white text-emerald-950 rounded-lg font-black hover:bg-emerald-50 active:bg-emerald-100 transition shadow flex items-center gap-1.5 cursor-pointer text-xs"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Baixar PDF</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => shareOrDownloadPdf(pdfResult)}
+              className="px-3 py-1.5 bg-emerald-900/80 hover:bg-emerald-950 text-white rounded-lg font-black transition shadow flex items-center gap-1.5 cursor-pointer text-xs border border-emerald-300/40"
+            >
+              <Share2 className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Compartilhar / Salvar em Arquivos</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPdfResult(null)}
+              className="text-emerald-200 hover:text-white p-1 cursor-pointer"
+              title="Fechar aviso"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Dica para celular */}
       <div className="w-full bg-slate-900/90 border-b border-slate-800 px-4 py-1.5 text-center text-[11px] text-emerald-400 font-semibold print:hidden flex items-center justify-center gap-2">
-        <span>💡 No celular: Toque em <strong>Imprimir / Salvar PDF</strong> e selecione <strong>"Salvar como PDF"</strong> para baixar o arquivo.</span>
+        <span>💡 No celular (iOS / Android): Toque em <strong>Salvar PDF</strong> para gerar o arquivo pronto para baixar ou compartilhar.</span>
       </div>
 
       {/* ========================================================================= */}

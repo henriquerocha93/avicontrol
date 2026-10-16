@@ -109,6 +109,74 @@ html.dark .shadow-xl {
   box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.6) !important;
 }
 
+/* Preserve exact light printable colors inside Crachá & Certificado even in Dark Mode */
+html.dark #printable-badge .bg-white,
+html.dark #pedigree-certificate .bg-white,
+html.dark #pedigree-certificate.bg-white {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html.dark #printable-badge .bg-slate-50,
+html.dark #pedigree-certificate .bg-slate-50 {
+  background-color: #f8fafc !important;
+}
+
+html.dark #printable-badge .bg-slate-100,
+html.dark #pedigree-certificate .bg-slate-100 {
+  background-color: #f1f5f9 !important;
+}
+
+html.dark #printable-badge .bg-slate-200,
+html.dark #pedigree-certificate .bg-slate-200 {
+  background-color: #e2e8f0 !important;
+}
+
+html.dark #printable-badge .border-slate-100,
+html.dark #pedigree-certificate .border-slate-100 {
+  border-color: #f1f5f9 !important;
+}
+
+html.dark #printable-badge .border-slate-200,
+html.dark #pedigree-certificate .border-slate-200 {
+  border-color: #e2e8f0 !important;
+}
+
+html.dark #printable-badge .border-slate-300,
+html.dark #pedigree-certificate .border-slate-300 {
+  border-color: #cbd5e1 !important;
+}
+
+html.dark #printable-badge .text-slate-900,
+html.dark #pedigree-certificate .text-slate-900 {
+  color: #0f172a !important;
+}
+
+html.dark #printable-badge .text-slate-800,
+html.dark #pedigree-certificate .text-slate-800 {
+  color: #1e293b !important;
+}
+
+html.dark #printable-badge .text-slate-700,
+html.dark #pedigree-certificate .text-slate-700 {
+  color: #334155 !important;
+}
+
+html.dark #printable-badge .text-slate-600,
+html.dark #pedigree-certificate .text-slate-600 {
+  color: #475569 !important;
+}
+
+html.dark #printable-badge .text-slate-500,
+html.dark #pedigree-certificate .text-slate-500 {
+  color: #64748b !important;
+}
+
+html.dark #printable-badge .text-slate-400,
+html.dark #pedigree-certificate .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
 /* Botanical Nature Sway & Wind Animations */
 @keyframes plant-sway-left {
   0%, 100% {

@@ -20,7 +20,8 @@ import {
   Ruler,
   Download,
   Loader2,
-  Check
+  Check,
+  Share2
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { db } from '@/lib/db';
@@ -29,7 +30,7 @@ import { Bird, Tenant } from '@/types';
 import { BadgeFrontAndBack, BadgeAncestors } from '@/components/genealogy/badge-front-and-back';
 import { SpeciesCombobox } from '@/components/ui/species-combobox';
 import { resolvePedigreeTree } from '@/lib/pedigree';
-import { exportElementToPdf } from '@/lib/pdf-export';
+import { exportElementToPdf, triggerPdfDownload, shareOrDownloadPdf, ExportPdfResult } from '@/lib/pdf-export';
 
 export default function CriarCrachaPage() {
   const { tenant } = useAuth();
@@ -60,8 +61,7 @@ export default function CriarCrachaPage() {
   const [isSaved, setIsSaved] = useState(false);
   const [savedBirdRecord, setSavedBirdRecord] = useState<Bird | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-  const [pdfReadyUrl, setPdfReadyUrl] = useState<string | null>(null);
-  const [pdfReadyFilename, setPdfReadyFilename] = useState<string>('cracha.pdf');
+  const [pdfResult, setPdfResult] = useState<ExportPdfResult | null>(null);
 
   const plantelBirds = useMemo(() => {
     return db.getBirds(currentTenant?.id);
@@ -281,7 +281,7 @@ export default function CriarCrachaPage() {
   const handleSavePdf = async () => {
     if (isExportingPdf) return;
     setIsExportingPdf(true);
-    setPdfReadyUrl(null);
+    setPdfResult(null);
     try {
       if ((birdData.name || birdData.ringNumber) && !savedBirdRecord) {
         handleSaveToCriatorio();
@@ -301,8 +301,7 @@ export default function CriarCrachaPage() {
       });
 
       if (res.success && res.blobUrl) {
-        setPdfReadyUrl(res.blobUrl);
-        setPdfReadyFilename(res.filename || `${filename}.pdf`);
+        setPdfResult(res);
       }
     } finally {
       setIsExportingPdf(false);
@@ -325,10 +324,6 @@ export default function CriarCrachaPage() {
       window.print();
       return;
     }
-
-    try {
-      window.print();
-    } catch {}
 
     await handleSavePdf();
   };
@@ -877,18 +872,27 @@ export default function CriarCrachaPage() {
               <span>{isSaved ? '✓ Salvo com Sucesso!' : 'Salvar no Criatório'}</span>
             </button>
 
-            {pdfReadyUrl ? (
-              <a
-                href={pdfReadyUrl}
-                download={pdfReadyFilename}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 sm:flex-initial px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer border border-emerald-500 animate-pulse"
-                title="Toque para abrir ou baixar o PDF gerado"
-              >
-                <Download className="w-3.5 h-3.5 text-white" />
-                <span>Baixar PDF Pronto</span>
-              </a>
+            {pdfResult?.blobUrl ? (
+              <div className="flex flex-wrap items-center gap-1.5 flex-1 sm:flex-initial">
+                <button
+                  type="button"
+                  onClick={() => triggerPdfDownload(pdfResult.blobUrl!, pdfResult.filename || 'cracha.pdf', pdfResult.blob)}
+                  className="flex-1 sm:flex-initial px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer border border-emerald-500 animate-pulse"
+                  title="Toque para baixar o PDF gerado"
+                >
+                  <Download className="w-3.5 h-3.5 text-white" />
+                  <span>Baixar PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => shareOrDownloadPdf(pdfResult)}
+                  className="flex-1 sm:flex-initial px-4 py-2.5 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer border border-sky-500"
+                  title="Compartilhar ou salvar em Arquivos no iPhone/Android"
+                >
+                  <Share2 className="w-3.5 h-3.5 text-white" />
+                  <span>Compartilhar</span>
+                </button>
+              </div>
             ) : (
               <button
                 onClick={handleSavePdf}
@@ -1034,26 +1038,32 @@ export default function CriarCrachaPage() {
         </div>
 
         {/* Banner de PDF Gerado com Sucesso / Download Imediato */}
-        {pdfReadyUrl && (
+        {pdfResult?.blobUrl && (
           <div className="bg-emerald-600 text-white p-3 sm:px-4 sm:py-3 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs font-bold animate-fade-in print:hidden shadow-lg border border-emerald-500">
             <div className="flex items-center gap-2">
               <Check className="w-5 h-5 text-emerald-200 shrink-0" />
-              <span>PDF gerado com sucesso! Toque no botão para abrir ou baixar no seu celular:</span>
+              <span>PDF gerado com sucesso! Toque para baixar ou compartilhar no celular (iPhone / Android):</span>
             </div>
-            <div className="flex items-center gap-2">
-              <a
-                href={pdfReadyUrl}
-                download={pdfReadyFilename}
-                target="_blank"
-                rel="noopener noreferrer"
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => triggerPdfDownload(pdfResult.blobUrl!, pdfResult.filename || 'cracha.pdf', pdfResult.blob)}
                 className="px-4 py-2 bg-white text-emerald-950 rounded-lg font-black hover:bg-emerald-50 active:bg-emerald-100 transition shadow flex items-center gap-1.5 cursor-pointer text-xs"
               >
                 <Download className="w-4 h-4 text-emerald-700" />
-                <span>Abrir / Baixar PDF</span>
-              </a>
+                <span>Baixar PDF</span>
+              </button>
               <button
                 type="button"
-                onClick={() => setPdfReadyUrl(null)}
+                onClick={() => shareOrDownloadPdf(pdfResult)}
+                className="px-4 py-2 bg-emerald-900/80 hover:bg-emerald-950 text-white rounded-lg font-black transition shadow flex items-center gap-1.5 cursor-pointer text-xs border border-emerald-300/40"
+              >
+                <Share2 className="w-4 h-4 text-emerald-300" />
+                <span>Compartilhar / Salvar em Arquivos</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPdfResult(null)}
                 className="text-emerald-200 hover:text-white p-1 cursor-pointer"
                 title="Fechar aviso"
               >
